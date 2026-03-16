@@ -1,2 +1,1 @@
 # Yakymiv Danylo
-# Shostak Tetiana

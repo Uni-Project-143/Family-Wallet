@@ -1,1 +1,0 @@
-# Yakymiv Danylo

@@ -1,0 +1,101 @@
+# ════════════════════════════════════════
+# BACKEND — FastAPI / Python
+# ════════════════════════════════════════
+
+# Віртуальні середовища
+.venv/
+venv/
+env/
+ENV/
+.env/
+
+# Змінні середовища (секрети, URI Mongo)
+.env
+.env.*
+!.env.example
+
+# Python байт-код
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Збірка та дистрибуція
+dist/
+build/
+*.egg-info/
+.eggs/
+*.whl
+
+# Тести та покриття
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# uv / pip
+.uv/
+pip-wheel-metadata/
+
+# ════════════════════════════════════════
+# FRONTEND — Vue.js / Node
+# ════════════════════════════════════════
+
+# Залежності
+node_modules/
+
+# Збірка
+dist/
+dist-ssr/
+.output/
+.nuxt/
+
+# Vite / Webpack кеш
+.vite/
+.cache/
+.parcel-cache/
+
+# Локальні env-файли Vue/Vite
+*.local
+
+# ════════════════════════════════════════
+# Спільне
+# ════════════════════════════════════════
+
+# ОС
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*~
+
+# Логи
+*.log
+logs/
+npm-debug.log*
+
+# Тимчасові файли
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Docker (якщо є локальні override)
+docker-compose.override.yml
+.docker/
+
+# Сертифікати
+*.pem
+*.key
+*.crt

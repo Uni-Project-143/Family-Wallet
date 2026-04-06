@@ -111,6 +111,21 @@ Family-Wallet/
 
 Для деплою потрібен секрет `FLY_API_TOKEN` в налаштуваннях репозиторію на GitHub.
 
+## Code Style
+
+Проєкт дотримується задокументованих стандартів коду. Детальний опис правил — у файлі [`STYLEGUIDE.md`](STYLEGUIDE.md).
+
+Короткий огляд:
+- **Frontend:** [Airbnb Style Guide](https://github.com/airbnb/javascript), ESLint + Prettier, 2 пробіли, без `;`
+- **Backend:** [PEP 8](https://peps.python.org/pep-0008/), Ruff, 4 пробіли, подвійні лапки
+- **Format on Save** налаштовано у `.vscode/settings.json`
+
+```bash
+make check    # Перевірка лінтерів + форматування
+make lint-fix # Автовиправлення лінтерів
+make format   # Автоформатування
+```
+
 ## API
 
 - `GET /health` — перевірка стану сервера

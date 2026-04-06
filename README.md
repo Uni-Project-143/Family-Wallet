@@ -80,28 +80,6 @@ npm run dev
 
 Застосунок буде доступний на `http://localhost:5173`
 
-## Структура проєкту
-
-```
-Family-Wallet/
-├── backend/
-│   ├── app/              # FastAPI застосунок
-│   │   └── main.py       # Точка входу API
-│   ├── Dockerfile
-│   ├── fly.toml          # Конфігурація Fly.io
-│   └── requirements.txt
-├── frontend/
-│   ├── src/              # Vue 3 вихідний код
-│   ├── Dockerfile        # Multi-stage build (Node + Nginx)
-│   ├── nginx.conf        # Конфігурація Nginx для продакшену
-│   ├── fly.toml          # Конфігурація Fly.io
-│   └── package.json
-├── .github/workflows/
-│   └── deploy.yml        # CI/CD: автодеплой на Fly.io
-├── docker-compose.yml    # Локальна розробка
-└── .env.example          # Шаблон змінних середовища
-```
-
 ## Деплой
 
 Деплой відбувається автоматично через GitHub Actions при пуші в гілку `production`:
@@ -124,6 +102,43 @@ Family-Wallet/
 make check    # Перевірка лінтерів + форматування
 make lint-fix # Автовиправлення лінтерів
 make format   # Автоформатування
+```
+
+## Архітектурна документація
+
+- [Architectural Decision Record: System Style](docs/Architectural%20Decision%20Record%20-%20System%20Style.md) — обґрунтування вибору архітектурного стилю (Modular Monolith)
+- [Software Architecture Document: Internal View](docs/Software%20Architecture%20Document%20-%20Internal%20View.md) — вибір внутрішнього архітектурного патерну (Layered Architecture)
+- [Data Flow & Interaction Specification](docs/Data%20Flow%20%26%20Interaction%20Specification.md) — потоки даних та взаємодія компонентів
+
+## Структура проєкту
+
+```
+Family-Wallet/
+├── docs/                          # Документація, ТЗ, діаграми, API-специфікації
+├── backend/                       # Backend-частина (Сервер)
+│   └── app/
+│       ├── api/                   # Presentation Layer — роутери, HTTP-ендпоінти
+│       ├── services/              # Business Logic Layer — сценарії використання
+│       ├── repositories/          # Data Access Layer — робота з MongoDB
+│       ├── models/                # Структури даних (Entities)
+│       ├── schemas/               # DTO — контракти API (Pydantic)
+│       ├── middleware/            # JWT авторизація, CORS, обробка помилок
+│       ├── config/                # Налаштування підключень, змінні середовища
+│       └── main.py                # Точка входу FastAPI
+├── frontend/                      # Frontend-частина (Клієнт)
+│   └── src/
+│       ├── components/            # UI-компоненти (кнопки, картки, форми)
+│       ├── views/                 # Сторінки (Login, Dashboard, Wallet)
+│       ├── services/              # API-клієнт (Axios запити до Backend)
+│       ├── store/                 # Pinia — глобальний стан
+│       ├── hooks/                 # Composables — винесена логіка поведінки
+│       └── assets/                # Статичні ресурси (зображення, шрифти, стилі)
+├── shared/                        # Спільні ресурси (типи, константи)
+├── deploy/                        # Конфігурації для Docker, CI/CD, скрипти розгортання
+├── .github/workflows/             # CI/CD: автодеплой на Fly.io
+├── docker-compose.yml             # Локальна розробка
+├── .editorconfig                  # Загальні правила форматування
+└── .env.example                   # Шаблон змінних середовища
 ```
 
 ## API

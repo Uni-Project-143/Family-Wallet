@@ -1,0 +1,9 @@
+{
+  "id": "uuid",
+  "organizerId": "uuid (id того, хто створив)",
+  "targetUserId": "uuid",
+  "name": "string",
+  "unlockDate": "iso-date",
+  "status": "string (Active/Locked)",
+  "createdAt": "iso-date"
+}

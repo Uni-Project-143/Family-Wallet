@@ -1,0 +1,7 @@
+{
+  "id": "uuid",
+  "email": "string",
+  "fullName": "string",
+  "role": "string (Admin/Member)",
+  "createdAt": "iso-date (ISO 8601)"
+}

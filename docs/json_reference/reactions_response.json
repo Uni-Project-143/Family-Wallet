@@ -1,0 +1,6 @@
+{
+  "transactionId": "uuid",
+  "userId": "uuid (хто поставив)",
+  "emojiCode": "string",
+  "updatedAt": "iso-date"
+}

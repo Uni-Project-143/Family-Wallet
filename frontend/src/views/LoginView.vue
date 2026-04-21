@@ -14,6 +14,7 @@
           v-model="email"
           label="ЕЛЕКТРОННА АДРЕСА"
           type="email"
+          placeholder="olena@example.com"
           :error-message="fieldErrors.email"
           @blur="validateEmailField"
           @input="onEmailInput"
@@ -23,6 +24,7 @@
           v-model="password"
           label="Пароль"
           type="password"
+          placeholder="Мінімум 8 символів"
           :error-message="fieldErrors.password"
           @blur="validatePasswordField"
           @input="onPasswordInput"
@@ -91,7 +93,7 @@
     password: '',
   })
 
-  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
 
   /**
    * Валідація поля email. !!!!!
@@ -105,7 +107,7 @@
       return false
     }
     if (!EMAIL_REGEX.test(email.value)) {
-      fieldErrors.value.email = 'Введіть коректний email'
+      fieldErrors.value.email = 'Введіть коректний Gmail (@gmail.com)'
       return false
     }
     return true
@@ -122,9 +124,16 @@
       fieldErrors.value.password = "Пароль є обов'язковим"
       return false
     }
+    if (password.value.length < 8) {
+      fieldErrors.value.password = 'Пароль має містити мінімум 8 символів'
+      return false
+    }
+    if (!/[A-Z]/.test(password.value)) {
+      fieldErrors.value.password = 'Пароль має містити хоча б одну велику літеру'
+      return false
+    }
     return true
   }
-
   function onEmailInput() {
     if (emailTouched.value) validateEmailField()
   }

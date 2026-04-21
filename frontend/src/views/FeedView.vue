@@ -1031,6 +1031,7 @@
     transition: all 0.18s;
     font-family: 'DM Sans', system-ui, sans-serif;
   }
+  /* Hover на emoji реакціях */
   .reaction-pill:hover {
     background: #fbf7ec;
     border-color: #f2e9c8;

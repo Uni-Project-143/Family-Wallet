@@ -17,7 +17,6 @@
           autocomplete="name"
           :error-message="fieldErrors.fullName"
           @blur="validateField('fullName')"
-          @input="onFieldInput('fullName')"
         />
 
         <!-- Email -->
@@ -29,7 +28,6 @@
           autocomplete="email"
           :error-message="fieldErrors.email"
           @blur="validateField('email')"
-          @input="onFieldInput('email')"
         />
 
         <!-- Пароль з eye icon (Interface AC) -->
@@ -42,7 +40,6 @@
           hint="Використовуйте великі літери, цифри та спецсимволи"
           :error-message="fieldErrors.password"
           @blur="validateField('password')"
-          @input="onFieldInput('password')"
         />
 
         <!-- Підтвердження паролю -->
@@ -54,7 +51,6 @@
           autocomplete="new-password"
           :error-message="fieldErrors.confirmPassword"
           @blur="validateField('confirmPassword')"
-          @input="onFieldInput('confirmPassword')"
         />
 
         <!-- GDPR чекбокс -->
@@ -133,9 +129,9 @@
 </template>
 
 <script setup>
-  import { ref, computed } from 'vue'
   import BaseInput from '../components/BaseInput.vue'
   import { useAuth } from '../composables/useAuth'
+  import { ref, computed, watch } from 'vue'
 
   const { register, isLoading, authError } = useAuth()
 
@@ -146,6 +142,7 @@
   const confirmPassword = ref('')
   const hasGdprConsent = ref(false)
 
+  // Замість touchedFields + onFieldInput
   const touchedFields = ref({
     fullName: false,
     email: false,
@@ -153,9 +150,21 @@
     confirmPassword: false,
   })
 
-  function onFieldInput(fieldName) {
-    if (touchedFields.value[fieldName]) validateField(fieldName)
-  }
+  watch(fullName, () => {
+    if (touchedFields.value.fullName) validateField('fullName')
+  })
+
+  watch(email, () => {
+    if (touchedFields.value.email) validateField('email')
+  })
+
+  watch(password, () => {
+    if (touchedFields.value.password) validateField('password')
+  })
+
+  watch(confirmPassword, () => {
+    if (touchedFields.value.confirmPassword) validateField('confirmPassword')
+  })
 
   // Об'єкт помилок для кожного поля (FE-03 inline errors)
   const fieldErrors = ref({
@@ -166,11 +175,8 @@
     gdpr: '',
   })
 
-  // EMAIL_REGEX — валідація формату email (FE-02)
-  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-  // PASSWORD_MIN_LENGTH — мінімальна довжина паролю (FE-02)
-  const PASSWORD_MIN_LENGTH = 8
+  const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
+  const FULL_NAME_REGEX = /^[А-ЯІЇЄA-Z][а-яіїєa-z']+\s[А-ЯІЇЄA-Z][а-яіїєa-z']+$/
 
   /**
    * Валідація одного поля при blur або перед відправкою.
@@ -178,16 +184,17 @@
    * @returns {boolean} true якщо поле валідне
    */
   function validateField(fieldName) {
-    touchedFields.value[fieldName] = true // ← !!!!!!!!!!
+    touchedFields.value[fieldName] = true
     fieldErrors.value[fieldName] = ''
 
     if (fieldName === 'fullName') {
       if (!fullName.value.trim()) {
-        fieldErrors.value.fullName = "Ім'я є обов'язковим"
+        fieldErrors.value.fullName = "Повне ім'я є обов'язковим"
         return false
       }
-      if (fullName.value.trim().length < 2) {
-        fieldErrors.value.fullName = "Ім'я має містити щонайменше 2 символи"
+      if (!FULL_NAME_REGEX.test(fullName.value.trim())) {
+        fieldErrors.value.fullName =
+          "Введіть ім'я та прізвище з великої літери, напр. Олена Коваленко"
         return false
       }
     }
@@ -198,7 +205,7 @@
         return false
       }
       if (!EMAIL_REGEX.test(email.value)) {
-        fieldErrors.value.email = 'Введіть коректний email'
+        fieldErrors.value.email = 'Введіть коректний Gmail (@gmail.com)'
         return false
       }
     }
@@ -208,16 +215,12 @@
         fieldErrors.value.password = "Пароль є обов'язковим"
         return false
       }
-      if (password.value.length < PASSWORD_MIN_LENGTH) {
-        fieldErrors.value.password = `Пароль має містити мінімум ${PASSWORD_MIN_LENGTH} символів`
+      if (password.value.length < 8) {
+        fieldErrors.value.password = 'Пароль має містити мінімум 8 символів'
         return false
       }
       if (!/[A-Z]/.test(password.value)) {
         fieldErrors.value.password = 'Пароль має містити хоча б одну велику літеру'
-        return false
-      }
-      if (!/[0-9]/.test(password.value)) {
-        fieldErrors.value.password = 'Пароль має містити хоча б одну цифру'
         return false
       }
     }
@@ -256,14 +259,14 @@
   // Кнопка активна лише якщо всі поля заповнені (UI responsiveness) (FE-03)
   const canSubmit = computed(() => {
     return (
-      fullName.value.trim().length >= 2 &&
+      FULL_NAME_REGEX.test(fullName.value.trim()) &&
       EMAIL_REGEX.test(email.value) &&
-      password.value.length >= PASSWORD_MIN_LENGTH &&
+      password.value.length >= 8 &&
+      /[A-Z]/.test(password.value) &&
       confirmPassword.value === password.value &&
       hasGdprConsent.value
     )
   })
-
   /**
    * Відправка форми реєстрації.
    */

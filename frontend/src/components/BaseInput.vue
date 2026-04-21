@@ -22,7 +22,7 @@
         :autocomplete="autocomplete"
         @input="$emit('update:modelValue', $event.target.value)"
         @focus="isFocused = true"
-        @blur="isFocused = false"
+        @blur="handleBlur"
       />
 
       <!-- Іконка помилки -->
@@ -118,7 +118,7 @@
     },
   })
 
-  defineEmits(['update:modelValue'])
+  const emit = defineEmits(['update:modelValue', 'blur'])
 
   // Унікальний id щоб label + input були пов'язані
   const inputId = computed(
@@ -129,6 +129,11 @@
 
   const isFocused = ref(false)
   const isPasswordVisible = ref(false)
+
+  function handleBlur() {
+    isFocused.value = false
+    emit('blur')
+  }
 
   const currentInputType = computed(() => {
     if (isPasswordType.value) {

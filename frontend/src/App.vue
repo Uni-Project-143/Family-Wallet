@@ -1,7 +1,11 @@
 <template>
-  <div>
-    <h1>Family Wallet</h1>
-  </div>
+  <RouterView />
 </template>
 
-<script setup></script>
+<!-- <template>
+  <FeedView />
+</template>
+
+<script setup>
+  import FeedView from './views/FeedView.vue'
+</script> -->

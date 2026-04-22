@@ -1,10 +1,33 @@
 import os
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
+from beanie import init_beanie
+
+# Імпортуємо моделі
+from app.models.user import User
+from app.models.invite import InviteToken
+from app.models.group import Group
+from app.models.group_membership import GroupMembership
 
 
 load_dotenv()
 
 MONGO_URL = os.getenv("MONGO_ATLAS")
+DB_NAME = os.getenv("DB_NAME", "FamilyWallet")
 
+# ==========================================================
+# 🛠️ ХАК (Monkey Patch) ДЛЯ ВИРІШЕННЯ КОНФЛІКТУ BEANIE ТА MOTOR
+# Додаємо порожній метод, щоб Beanie не видавав TypeError
+# ==========================================================
+if not hasattr(AsyncIOMotorClient, "append_metadata"):
+    AsyncIOMotorClient.append_metadata = lambda self, *args, **kwargs: None
+
+# Створюємо підключення до БД
 db_client = AsyncIOMotorClient(MONGO_URL)
+
+async def init_db():
+    """Функція підключає моделі Beanie до MongoDB при старті сервера."""
+    await init_beanie(
+        database=db_client[DB_NAME],
+        document_models=[User, Group, GroupMembership, InviteToken]
+    )

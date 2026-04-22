@@ -1,18 +1,40 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-# Імпортуємо наші модулі з папок (Кроки 1-4)
+# Імпортуємо налаштування та обробники
 from app.middleware.logging import log_requests_middleware
 from app.exceptions import global_exception_handler, http_exception_handler
-from app.api import health, wallets, gifts
 
+# Імпортуємо функцію ініціалізації БД
+from app.config.database import init_db
+
+# Імпортуємо наші актуальні роутери
+from app.api import health, auth, group
+
+# ==========================================
+# Менеджер життєвого циклу (Lifespan)
+# ==========================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    print("Ініціалізація підключення до MongoDB...")
+    await init_db()
+    print("База даних успішно підключена та моделі зареєстровані!")
+    yield
+    # (Тут код, який виконується при вимкненні сервера)
+
+# ==========================================
+# Ініціалізація додатку
+# ==========================================
 app = FastAPI(
     title="Family Wallet API",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
-# Залишаємо налаштування CORS (це потрібно для фронтенду)
+# Налаштування CORS (це потрібно для фронтенду)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,5 +52,5 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 
 # 3. Підключаємо наші контролери (Роутери)
 app.include_router(health.router)
-app.include_router(wallets.router, prefix="/api/v1/wallets")
-app.include_router(gifts.router, prefix="/api/v1/gifts")
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
+app.include_router(group.router, prefix="/api/v1/group", tags=["Group"])

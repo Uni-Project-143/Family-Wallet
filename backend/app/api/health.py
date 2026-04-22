@@ -3,7 +3,6 @@ from fastapi.responses import JSONResponse
 from datetime import datetime
 import logging
 
-# Імпортуємо клієнт БД, який ми щойно створили
 from app.config.database import db_client
 
 logger = logging.getLogger("FamilyWallet")
@@ -14,7 +13,7 @@ router = APIRouter()
 async def health_check():
     """Ендпоінт для перевірки статусу підключення до MongoDB Atlas."""
     try:
-        # Робимо реальний пінг до твоєї бази в Atlas
+
         await db_client.admin.command('ping')
 
         return {"status": "Database is healthy", "code": 200}

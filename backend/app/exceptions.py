@@ -5,20 +5,22 @@ from fastapi.responses import JSONResponse
 
 logger = logging.getLogger("FamilyWallet")
 
+
 async def global_exception_handler(request: Request, exc: Exception):
-    """Перехоплює будь-який краш і віддає стандартний JSON."""
-    logger.error(f"CRITICAL ERROR: {repr(exc)}")
+
+    logger.error(f"INTERNAL ERROR: {repr(exc)}", exc_info=True)
+
     return JSONResponse(
         status_code=500,
         content={
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "errorCode": "INTERNAL_ERROR",
-            "message:": "Сталася непередбачувана помилка на сервері"
+            "message": "Сталася непередбачувана помилка на сервері"
         }
     )
 
+
 async def http_exception_handler(request: Request, exc: HTTPException):
-    """Обробляє стандартні помилки HTTP."""
     return JSONResponse(
         status_code=exc.status_code,
         content={

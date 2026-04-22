@@ -156,7 +156,6 @@
                 </button>
               </div>
 
-              <!-- Security note -->
               <div class="security-note">
                 <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
                   <path
@@ -235,7 +234,6 @@
 
   const emit = defineEmits(['close', 'toast'])
 
-  // ─── Invite link ───
   const inviteUrl = ref('')
   const expiresAt = ref(null)
   const isGenerating = ref(false)
@@ -295,7 +293,6 @@
     }
   }
 
-  // ─── Direct email ───
   const directEmail = ref('')
   const emailError = ref('')
   const emailTouched = ref(false)
@@ -339,14 +336,12 @@
     }
   }
 
-  // ─── Close ───
   function close() {
     emit('close')
   }
 </script>
 
 <style scoped>
-  /* ── Overlay ── */
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -359,7 +354,6 @@
     padding: 20px;
   }
 
-  /* ── Card ── */
   .modal-card {
     background: #ffffff;
     border-radius: 20px;
@@ -428,7 +422,6 @@
     line-height: 1.6;
   }
 
-  /* ── Section ── */
   .section {
     margin-bottom: 4px;
   }
@@ -457,7 +450,6 @@
     margin: 20px 0;
   }
 
-  /* ── Invite box ── */
   .invite-box {
     display: flex;
     align-items: stretch;
@@ -529,7 +521,6 @@
     color: #0d0c0a;
   }
 
-  /* ── TTL ── */
   .invite-ttl {
     display: flex;
     align-items: center;
@@ -539,12 +530,10 @@
     margin-bottom: 14px;
   }
 
-  /* ── Generate row ── */
   .generate-row {
     margin-bottom: 12px;
   }
 
-  /* ── Security note ── */
   .security-note {
     display: flex;
     align-items: flex-start;
@@ -557,7 +546,6 @@
     border-radius: 6px;
   }
 
-  /* ── Email row ── */
   .email-row {
     display: flex;
     gap: 10px;
@@ -611,7 +599,6 @@
     margin-top: 5px;
   }
 
-  /* ── Buttons ── */
   .btn-gold {
     display: inline-flex;
     align-items: center;
@@ -667,7 +654,6 @@
     cursor: not-allowed;
   }
 
-  /* ── Spinner ── */
   .spinner {
     animation: spin 0.8s linear infinite;
   }
@@ -677,7 +663,6 @@
     }
   }
 
-  /* ── Transitions ── */
   .overlay-enter-active,
   .overlay-leave-active {
     transition: opacity 0.25s ease;

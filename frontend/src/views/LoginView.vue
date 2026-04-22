@@ -5,15 +5,16 @@
         <h1 class="auth-card__title">
           Family <span class="auth-card__title--accent">Wallet</span>
         </h1>
-        <p class="auth-card__subtitle">Увійдіть до сімейного фінансового простору</p>
+        <p class="auth-card__subtitle">Enter the family financial space</p>
       </div>
 
       <form class="auth-form" novalidate @submit.prevent="handleSubmit">
         <!-- !!!!!! -->
         <BaseInput
           v-model="email"
-          label="ЕЛЕКТРОННА АДРЕСА"
+          label="EMAIL ADDRESS"
           type="email"
+          autocomplete="new-password"
           placeholder="olena@example.com"
           :error-message="fieldErrors.email"
           @blur="validateEmailField"
@@ -22,9 +23,10 @@
 
         <BaseInput
           v-model="password"
-          label="Пароль"
+          label="PASSWORD"
           type="password"
-          placeholder="Мінімум 8 символів"
+          autocomplete="new-password"
+          placeholder="At least 8 characters, 1 uppercase letter"
           :error-message="fieldErrors.password"
           @blur="validatePasswordField"
           @input="onPasswordInput"
@@ -49,8 +51,8 @@
 
         <!-- Кнопка з disabled + spinner (Interface AC) -->
         <button type="submit" class="btn-primary" :disabled="isLoading || !canSubmit">
-          <span v-if="!isLoading">Увійти</span>
-          <span v-else aria-label="Завантаження...">
+          <span v-if="!isLoading">Log in</span>
+          <span v-else aria-label="Loading...">
             <svg class="spinner-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
               <circle cx="10" cy="10" r="8" stroke="rgba(255,255,255,0.35)" stroke-width="2.5" />
               <path
@@ -66,10 +68,8 @@
 
       <!-- Посилання -->
       <div class="auth-card__links">
-        <router-link to="/forgot-password" class="auth-link">Забули пароль?</router-link>
-        <router-link to="/register" class="auth-link auth-link--bold"
-          >Створити акаунт →</router-link
-        >
+        <router-link to="/forgot-password" class="auth-link">Forgot password?</router-link>
+        <router-link to="/register" class="auth-link auth-link--bold">Create account →</router-link>
       </div>
     </div>
   </div>
@@ -103,11 +103,11 @@
     emailTouched.value = true
     fieldErrors.value.email = ''
     if (!email.value.trim()) {
-      fieldErrors.value.email = "Email є обов'язковим"
+      fieldErrors.value.email = 'Email is required'
       return false
     }
     if (!EMAIL_REGEX.test(email.value)) {
-      fieldErrors.value.email = 'Введіть коректний Gmail (@gmail.com)'
+      fieldErrors.value.email = 'Enter a valid Gmail address (@gmail.com)'
       return false
     }
     return true
@@ -121,15 +121,15 @@
     passwordTouched.value = true
     fieldErrors.value.password = ''
     if (!password.value) {
-      fieldErrors.value.password = "Пароль є обов'язковим"
+      fieldErrors.value.password = 'Password is required'
       return false
     }
     if (password.value.length < 8) {
-      fieldErrors.value.password = 'Пароль має містити мінімум 8 символів'
+      fieldErrors.value.password = 'Password must contain at least 8 characters'
       return false
     }
     if (!/[A-Z]/.test(password.value)) {
-      fieldErrors.value.password = 'Пароль має містити хоча б одну велику літеру'
+      fieldErrors.value.password = 'Password must contain at least one uppercase letter'
       return false
     }
     return true

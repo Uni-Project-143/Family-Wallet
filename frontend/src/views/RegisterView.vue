@@ -3,8 +3,8 @@
     <div class="auth-card">
       <!-- Заголовок -->
       <div class="auth-card__header">
-        <h1 class="auth-card__title">Створити акаунт</h1>
-        <p class="auth-card__subtitle">Приєднайтесь до Family Wallet — безкоштовно</p>
+        <h1 class="auth-card__title">Create Account</h1>
+        <p class="auth-card__subtitle">Join Family Wallet — it's free!</p>
       </div>
 
       <!-- Форма (FE-01) -->
@@ -12,8 +12,8 @@
         <!-- Повне ім'я -->
         <BaseInput
           v-model="fullName"
-          label="Повне ім'я"
-          placeholder="напр. Олена Коваленко"
+          label="FULL NAME"
+          placeholder="e.g., Olena Kovalenko"
           autocomplete="name"
           :error-message="fieldErrors.fullName"
           @blur="validateField('fullName')"
@@ -22,7 +22,7 @@
         <!-- Email -->
         <BaseInput
           v-model="email"
-          label="ЕЛЕКТРОННА АДРЕСА"
+          label="EMAIL ADDRESS"
           type="email"
           placeholder="olena@example.com"
           autocomplete="email"
@@ -33,11 +33,11 @@
         <!-- Пароль з eye icon (Interface AC) -->
         <BaseInput
           v-model="password"
-          label="Пароль"
+          label="PASSWORD"
           type="password"
-          placeholder="Мінімум 8 символів"
+          placeholder="At least 8 characters, 1 uppercase letter"
           autocomplete="new-password"
-          hint="Використовуйте великі літери, цифри та спецсимволи"
+          hint="Use uppercase letters, numbers, and special characters"
           :error-message="fieldErrors.password"
           @blur="validateField('password')"
         />
@@ -45,9 +45,9 @@
         <!-- Підтвердження паролю -->
         <BaseInput
           v-model="confirmPassword"
-          label="Підтвердження паролю"
+          label="CONFIRM PASSWORD"
           type="password"
-          placeholder="Повторіть пароль"
+          placeholder="Repeat your password"
           autocomplete="new-password"
           :error-message="fieldErrors.confirmPassword"
           @blur="validateField('confirmPassword')"
@@ -69,11 +69,11 @@
               @keydown.space.prevent="hasGdprConsent = !hasGdprConsent"
             ></span>
             <span class="checkbox-label">
-              Я погоджуюся з
-              <a href="/terms" target="_blank" class="auth-link">Умовами використання</a>
-              та
-              <a href="/privacy" target="_blank" class="auth-link">Політикою конфіденційності</a>.
-              Надаю згоду на збір та обробку фінансових даних.
+              I agree to the
+              <a href="/terms" target="_blank" class="auth-link">Terms of Service</a>
+              and
+              <a href="/privacy" target="_blank" class="auth-link">Privacy Policy</a>. I consent to
+              the collection and processing of my financial data.
               <span class="gdpr-note">(GDPR)</span>
             </span>
           </label>
@@ -104,8 +104,8 @@
           :class="{ 'btn-primary--loading': isLoading }"
           :disabled="isLoading || !canSubmit"
         >
-          <span v-if="!isLoading">Створити акаунт</span>
-          <span v-else class="btn-spinner" aria-label="Завантаження...">
+          <span v-if="!isLoading">Create account</span>
+          <span v-else class="btn-spinner" aria-label="Loading...">
             <svg class="spinner-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
               <circle cx="10" cy="10" r="8" stroke="rgba(255,255,255,0.35)" stroke-width="2.5" />
               <path
@@ -121,8 +121,8 @@
 
       <!-- Посилання на логін -->
       <p class="auth-card__footer">
-        Вже є акаунт?
-        <router-link to="/login" class="auth-link auth-link--bold">Увійти →</router-link>
+        Already have an account?
+        <router-link to="/login" class="auth-link auth-link--bold">Log in →</router-link>
       </p>
     </div>
   </div>
@@ -189,49 +189,49 @@
 
     if (fieldName === 'fullName') {
       if (!fullName.value.trim()) {
-        fieldErrors.value.fullName = "Повне ім'я є обов'язковим"
+        fieldErrors.value.fullName = 'Full name is required'
         return false
       }
       if (!FULL_NAME_REGEX.test(fullName.value.trim())) {
         fieldErrors.value.fullName =
-          "Введіть ім'я та прізвище з великої літери, напр. Олена Коваленко"
+          'Enter your first and last name with a capital letter, e.g., Olena Kovalenko'
         return false
       }
     }
 
     if (fieldName === 'email') {
       if (!email.value.trim()) {
-        fieldErrors.value.email = "Email є обов'язковим"
+        fieldErrors.value.email = 'Email is required'
         return false
       }
       if (!EMAIL_REGEX.test(email.value)) {
-        fieldErrors.value.email = 'Введіть коректний Gmail (@gmail.com)'
+        fieldErrors.value.email = 'Enter a valid Gmail address (@gmail.com)'
         return false
       }
     }
 
     if (fieldName === 'password') {
       if (!password.value) {
-        fieldErrors.value.password = "Пароль є обов'язковим"
+        fieldErrors.value.password = 'Password is required'
         return false
       }
       if (password.value.length < 8) {
-        fieldErrors.value.password = 'Пароль має містити мінімум 8 символів'
+        fieldErrors.value.password = 'Password must contain at least 8 characters'
         return false
       }
       if (!/[A-Z]/.test(password.value)) {
-        fieldErrors.value.password = 'Пароль має містити хоча б одну велику літеру'
+        fieldErrors.value.password = 'Password must contain at least one uppercase letter'
         return false
       }
     }
 
     if (fieldName === 'confirmPassword') {
       if (!confirmPassword.value) {
-        fieldErrors.value.confirmPassword = "Підтвердження паролю є обов'язковим"
+        fieldErrors.value.confirmPassword = 'Confirm password is required'
         return false
       }
       if (confirmPassword.value !== password.value) {
-        fieldErrors.value.confirmPassword = 'Паролі не збігаються'
+        fieldErrors.value.confirmPassword = 'Passwords do not match'
         return false
       }
     }

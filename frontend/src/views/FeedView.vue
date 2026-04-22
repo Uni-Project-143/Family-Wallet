@@ -364,7 +364,7 @@
     { id: 2, name: 'Neighborhood' },
   ])
 
-  //для ролі. Замість const isAdmin = ref(true)
+  // Для ролі. Замість const isAdmin = ref(true)
   const isAdmin = computed(() => storedUser.role === 'ADMIN')
 
   const groupMembers = ref([

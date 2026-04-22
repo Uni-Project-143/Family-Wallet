@@ -1,16 +1,19 @@
 from beanie import Document, free_fall_migration
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List, Optional
 from pydantic import Field
+import uuid
 
-# --- Snapshot Models ---
+# ==========================================
+# --- Оновлені Snapshot Models ---
+# ==========================================
 
 class User(Document):
     full_name: str
     email: str
     password_hash: str
-    role: str
+    # role - ВИДАЛЕНО
     bankcard_ids: List[str] = []
     class Settings:
         name = "users"
@@ -44,11 +47,30 @@ class Transaction(Document):
 
 class Group(Document):
     name: str
-    invite_link: str
-    member_ids: List[str] = []
+    created_by: str  # ДОДАНО
     gift_event_ids: List[str] = []
+    # member_ids та invite_link - ВИДАЛЕНО
     class Settings:
         name = "groups"
+
+# --- ДОДАНО НОВІ МОДЕЛІ ---
+class GroupMembership(Document):
+    user_id: str
+    group_id: str
+    role: str
+    joined_at: datetime = Field(default_factory=datetime.utcnow)
+    class Settings:
+        name = "group_memberships"
+
+class InviteToken(Document):
+    group_id: str
+    token: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    created_by: str
+    expires_at: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(hours=48))
+    used_at: Optional[datetime] = None
+    class Settings:
+        name = "invite_tokens"
+# ---------------------------
 
 class GiftEvent(Document):
     organizer_id: str
@@ -82,45 +104,66 @@ class VirtualTransfer(Document):
     class Settings:
         name = "virtual_transfers"
 
+# Збираємо всі моделі в один список для декораторів
+ALL_MODELS = [
+    User, Category, BankCard, Transaction, Group, GroupMembership,
+    InviteToken, GiftEvent, MoneyRequest, VirtualTransfer
+]
+
+# ==========================================
+# --- Логіка Міграції ---
+# ==========================================
 
 class Forward:
-    @free_fall_migration(document_models=[
-        User, Category, BankCard, Transaction, Group, GiftEvent, MoneyRequest, VirtualTransfer
-    ])
+    @free_fall_migration(document_models=ALL_MODELS)
     async def create_and_seed(self, session):
         # 1. Categories (Baseline)
         cat_food = Category(name="Food", icon="fastfood", color="#FF5733")
         cat_transport = Category(name="Transport", icon="directions_bus", color="#3357FF")
         cat_gifts = Category(name="Gifts", icon="redeem", color="#FF33A1")
-        await cat_food.insert(session=session)
-        await cat_transport.insert(session=session)
-        await cat_gifts.insert(session=session)
+        await Category.insert_many([cat_food, cat_transport, cat_gifts], session=session)
 
-        # 2. Users (Seed Data)
+        # 2. Users (Seed Data - тепер БЕЗ role)
         user_main = User(
-            full_name="Гелеван Олександр Віталійович",
+            full_name="Олександр Віталійович",
             email="oleksandr@familywallet.app",
-            password_hash="argon2_hashed_password_here",
-            role="Admin"
+            password_hash="argon2_hashed_password_here"
         )
         user_member = User(
             full_name="Володимир Тестовий",
             email="volodymyr@familywallet.app",
-            password_hash="argon2_hashed_password_here",
-            role="Member"
+            password_hash="argon2_hashed_password_here"
         )
-        await user_main.insert(session=session)
-        await user_member.insert(session=session)
+        await User.insert_many([user_main, user_member], session=session)
 
-        # 3. Groups
+        # 3. Groups (Тепер без member_ids, але з created_by)
         group = Group(
-            name="Гелеван Family",
-            invite_link="https://familywallet.app/join/xyz123",
-            member_ids=[str(user_main.id), str(user_member.id)]
+            name="Family Budget",
+            created_by=str(user_main.id)
         )
         await group.insert(session=session)
 
-        # 4. Bank Cards
+        # 4. Group Memberships (ОСЬ ТУТ РОЗДАЄМО РОЛІ!)
+        admin_membership = GroupMembership(
+            user_id=str(user_main.id),
+            group_id=str(group.id),
+            role="ADMIN"
+        )
+        member_membership = GroupMembership(
+            user_id=str(user_member.id),
+            group_id=str(group.id),
+            role="MEMBER"
+        )
+        await GroupMembership.insert_many([admin_membership, member_membership], session=session)
+
+        # 5. Invite Token (Закинемо один тестовий токен)
+        invite = InviteToken(
+            group_id=str(group.id),
+            created_by=str(user_main.id)
+        )
+        await invite.insert(session=session)
+
+        # 6. Bank Cards
         card = BankCard(
             user_id=str(user_main.id),
             bank_token="mono_api_token_sample",
@@ -129,7 +172,7 @@ class Forward:
         )
         await card.insert(session=session)
 
-        # 5. Transactions
+        # 7. Transactions
         t1 = Transaction(
             card_id=str(card.id),
             amount=Decimal("-450.00"),
@@ -141,13 +184,13 @@ class Forward:
         )
         await t1.insert(session=session)
 
-        # 6. Money Requests & Transfers
+        # 8. Money Requests & Transfers
         request = MoneyRequest(
             requester_id=str(user_member.id),
             recipient_id=str(user_main.id),
             group_id=str(group.id),
             amount=Decimal("200.00"),
-            description="На каву в офісі",
+            description="На каву",
             status="Accepted",
             created_at=datetime.utcnow(),
             resolved_at=datetime.utcnow()
@@ -166,11 +209,8 @@ class Forward:
         await transfer.insert(session=session)
 
 class Backward:
-    @free_fall_migration(document_models=[
-        User, Category, BankCard, Transaction, Group, GiftEvent, MoneyRequest, VirtualTransfer
-    ])
+    @free_fall_migration(document_models=ALL_MODELS)
     async def rollback(self, session):
         # Видаляємо всі дані з усіх колекцій при відкаті
-        models = [User, Category, BankCard, Transaction, Group, GiftEvent, MoneyRequest, VirtualTransfer]
-        for model in models:
+        for model in ALL_MODELS:
             await model.find_all().delete(session=session)

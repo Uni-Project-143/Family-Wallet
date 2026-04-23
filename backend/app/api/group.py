@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from bson import ObjectId
 from datetime import datetime
+from urllib.parse import urlparse
+from pydantic import BaseModel
 
 # Імпортуємо моделі
 from app.models.group_membership import GroupMembership
@@ -11,11 +13,27 @@ from app.models.user import User
 
 router = APIRouter()
 
-from pydantic import BaseModel
-
 
 class GroupCreateRequest(BaseModel):
     name: str
+
+
+class JoinGroupRequest(BaseModel):
+    invite_link: str
+
+
+def _extract_token_from_link(invite_link: str) -> str:
+    """Витягує токен з invite_link виду https://<host>/join/<token>."""
+    try:
+        parsed = urlparse(invite_link.strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="Невалідне посилання запрошення")
+
+    parts = [p for p in parsed.path.split("/") if p]
+    if len(parts) < 2 or parts[-2] != "join" or not parts[-1]:
+        raise HTTPException(status_code=400, detail="Невалідне посилання запрошення")
+
+    return parts[-1]
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -95,12 +113,15 @@ async def generate_invite_link(
     }
 
 
-@router.post("/join/{token}", status_code=status.HTTP_200_OK)
+@router.post("/join", status_code=status.HTTP_200_OK)
 async def join_group(
-    token: str,
+    request: JoinGroupRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """Приєднання до групи за унікальним токеном (для ролі MEMBER)"""
+    """Приєднання до групи за invite_link (для ролі MEMBER)"""
+    # 0. Витягуємо токен з посилання
+    token = _extract_token_from_link(request.invite_link)
+
     # 1. Шукаємо токен в базі
     invite = await InviteToken.find_one(InviteToken.token == token)
 

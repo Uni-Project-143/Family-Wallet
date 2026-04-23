@@ -1,0 +1,5 @@
+{
+  "targetUserId": "uuid (id іменинника)",
+  "name": "string (назва події)",
+  "unlockDate": "iso-date (дата відкриття інтриги)"
+}

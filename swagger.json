@@ -1,0 +1,736 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Family Wallet API",
+    "description": "API для управління спільним сімейним бюджетом, відстеження транзакцій та організації таємних зборів (Secret Gift Mode).",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Реєстрація",
+        "description": "Створює новий акаунт. Доступно для всіх (Public).",
+        "operationId": "register_api_v1_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserRegister"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Помилка (Validation, Access, Not Found or Conflict)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "timestamp": "2026-04-09T10:00:00Z",
+                  "errorCode": "SPECIFIC_ERROR_CODE",
+                  "message": "Опис проблеми зрозумілою мовою",
+                  "path": "/api/v1/...",
+                  "details": []
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Авторизація",
+        "description": "Отримання JWT токена за email та паролем.",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Помилка (Validation, Access, Not Found or Conflict)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "timestamp": "2026-04-09T10:00:00Z",
+                  "errorCode": "SPECIFIC_ERROR_CODE",
+                  "message": "Опис проблеми зрозумілою мовою",
+                  "path": "/api/v1/...",
+                  "details": []
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/groups": {
+      "get": {
+        "tags": [
+          "Groups"
+        ],
+        "summary": "Мої групи",
+        "description": "Повертає список груп, у яких користувач є учасником.",
+        "operationId": "get_my_groups_api_v1_groups_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Помилка (Validation, Access, Not Found or Conflict)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "timestamp": "2026-04-09T10:00:00Z",
+                  "errorCode": "SPECIFIC_ERROR_CODE",
+                  "message": "Опис проблеми зрозумілою мовою",
+                  "path": "/api/v1/...",
+                  "details": []
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Groups"
+        ],
+        "summary": "Створити групу",
+        "description": "Створює нову сімейну групу та генерує інвайт-лінк.",
+        "operationId": "create_group_api_v1_groups_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroupCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/groups/{id}/transactions": {
+      "get": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Стрічка витрат",
+        "description": "Отримує транзакції групи. Доступно лише для учасників цієї групи.",
+        "operationId": "get_transactions_api_v1_groups__id__transactions_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "ID Групи",
+              "title": "Id"
+            },
+            "description": "ID Групи"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "title": "Page"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Помилка (Validation, Access, Not Found or Conflict)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "timestamp": "2026-04-09T10:00:00Z",
+                  "errorCode": "SPECIFIC_ERROR_CODE",
+                  "message": "Опис проблеми зрозумілою мовою",
+                  "path": "/api/v1/...",
+                  "details": []
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Додати витрату",
+        "description": "Фіксує нову транзакцію в бюджеті групи.",
+        "operationId": "create_transaction_api_v1_groups__id__transactions_post",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Помилка (Validation, Access, Not Found or Conflict)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "timestamp": "2026-04-09T10:00:00Z",
+                  "errorCode": "SPECIFIC_ERROR_CODE",
+                  "message": "Опис проблеми зрозумілою мовою",
+                  "path": "/api/v1/...",
+                  "details": []
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/transactions/{tx_id}/reactions": {
+      "patch": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Реакція на витрату",
+        "description": "Додає або змінює емодзі користувача на транзакції (Гейміфікація).",
+        "operationId": "add_reaction_api_v1_transactions__tx_id__reactions_patch",
+        "parameters": [
+          {
+            "name": "tx_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tx Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReactionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Помилка (Validation, Access, Not Found or Conflict)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "timestamp": "2026-04-09T10:00:00Z",
+                  "errorCode": "SPECIFIC_ERROR_CODE",
+                  "message": "Опис проблеми зрозумілою мовою",
+                  "path": "/api/v1/...",
+                  "details": []
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/groups/{id}/gift-events": {
+      "post": {
+        "tags": [
+          "Secret Gift"
+        ],
+        "summary": "Створити таємний збір",
+        "description": "Створює подію. Іменинник (targetUserId) не бачитиме її до дати розблокування.",
+        "operationId": "create_gift_event_api_v1_groups__id__gift_events_post",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GiftEventCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Помилка (Validation, Access, Not Found or Conflict)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "timestamp": "2026-04-09T10:00:00Z",
+                  "errorCode": "SPECIFIC_ERROR_CODE",
+                  "message": "Опис проблеми зрозумілою мовою",
+                  "path": "/api/v1/...",
+                  "details": []
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/gift-events/{event_id}": {
+      "get": {
+        "tags": [
+          "Secret Gift"
+        ],
+        "summary": "Деталі збору",
+        "description": "Повертає статус збору. Поверне 403 Forbidden, якщо запит робить іменинник до дати unlockDate.",
+        "operationId": "get_gift_event_api_v1_gift_events__event_id__get",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Помилка (Validation, Access, Not Found or Conflict)",
+            "content": {
+              "application/json": {
+                "example": {
+                  "timestamp": "2026-04-09T10:00:00Z",
+                  "errorCode": "SPECIFIC_ERROR_CODE",
+                  "message": "Опис проблеми зрозумілою мовою",
+                  "path": "/api/v1/...",
+                  "details": []
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GiftEventCreate": {
+        "properties": {
+          "targetUserId": {
+            "type": "string",
+            "title": "Targetuserid",
+            "examples": [
+              "uuid-target-user"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "examples": [
+              "Подарунок на ДН татові"
+            ]
+          },
+          "unlockDate": {
+            "type": "string",
+            "title": "Unlockdate",
+            "examples": [
+              "2026-05-20T12:00:00Z"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "targetUserId",
+          "name",
+          "unlockDate"
+        ],
+        "title": "GiftEventCreate"
+      },
+      "GroupCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "examples": [
+              "Родина Петренків"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "GroupCreate"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ReactionCreate": {
+        "properties": {
+          "emojiCode": {
+            "type": "string",
+            "title": "Emojicode",
+            "examples": [
+              "🔥"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "emojiCode"
+        ],
+        "title": "ReactionCreate"
+      },
+      "TransactionCreate": {
+        "properties": {
+          "amount": {
+            "type": "number",
+            "title": "Amount",
+            "examples": [450.5]
+          },
+          "categoryId": {
+            "type": "string",
+            "title": "Categoryid",
+            "examples": [
+              "uuid-category-food"
+            ]
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "examples": [
+              "Вечеря в кафе"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount",
+          "categoryId"
+        ],
+        "title": "TransactionCreate"
+      },
+      "UserLogin": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "examples": [
+              "user@example.com"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "examples": [
+              "securePassword123"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "UserLogin"
+      },
+      "UserRegister": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "examples": [
+              "user@example.com"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "title": "Password",
+            "examples": [
+              "securePassword123"
+            ]
+          },
+          "fullName": {
+            "type": "string",
+            "title": "Fullname",
+            "examples": [
+              "Олексій Петренко"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password",
+          "fullName"
+        ],
+        "title": "UserRegister"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

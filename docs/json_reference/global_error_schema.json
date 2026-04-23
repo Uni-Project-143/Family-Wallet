@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-04-08T18:45:00Z",
+  "errorCode": "GIFT_TARGET_FORBIDDEN",
+  "message": "Доступ до цього ресурсу заборонено для цільового користувача події.",
+  "path": "/api/v1/gift-events/999",
+  "details": ["Target user cannot view gift details before unlockDate"]
+}

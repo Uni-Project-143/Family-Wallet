@@ -1,10 +1,9 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { registerUser, loginUser } from '../services/authService'
+import { registerUser, loginUser, fetchMyGroups } from '../services/authService'
 
 /**
  * Composable для управління станом авторизації.
- * Зберігає JWT у localStorage та надає методи login/register.
  * @returns {{
  *   currentUser: import('vue').Ref,
  *   isAuthenticated: import('vue').ComputedRef<boolean>,
@@ -23,7 +22,7 @@ export function useAuth() {
   const isLoading = ref(false)
   const authError = ref(null)
 
-  const isAuthenticated = computed(() => !!currentUser.value)
+  const isAuthenticated = computed(() => !!localStorage.getItem('accessToken'))
   const isAdmin = computed(() => currentUser.value?.role === 'ADMIN')
 
   /**
@@ -51,7 +50,7 @@ export function useAuth() {
   }
 
   /**
-   * Реєстрація нового користувача.
+   * Реєстрація — після успіху редирект на /group-setup.
    * @param {{ fullName: string, email: string, password: string }} formPayload
    */
   async function register(formPayload) {
@@ -62,13 +61,9 @@ export function useAuth() {
         fullName: formPayload.fullName,
         email: formPayload.email,
         password: formPayload.password,
-        // confirmPassword НЕ відправляємо — Swagger його не очікує
+        confirmPassword: formPayload.password,
       })
 
-      // Зберігаємо токен (access_token — саме така назва поля зі Swagger)
-      localStorage.setItem('accessToken', data.access_token)
-
-      // Зберігаємо базові дані юзера — groupId отримаємо після GroupSetup
       const userInfo = {
         fullName: formPayload.fullName,
         email: formPayload.email,
@@ -76,34 +71,32 @@ export function useAuth() {
         groupId: null,
         groupName: null,
       }
-      localStorage.setItem('currentUser', JSON.stringify(userInfo))
-      currentUser.value = userInfo
 
+      persistAuthSession(data.access_token, userInfo)
       router.push('/group-setup')
     } catch (err) {
-      // Бекенд повертає { timestamp, errorCode, message }
-      const message = err.response?.data?.message
       const status = err.response?.status
+      const message = err.response?.data?.message
 
       if (status === 409) {
-        authError.value = 'User with this email already exists'
+        authError.value = 'Користувач з таким email вже існує'
       } else if (status === 422) {
-        // Pydantic validation error — беремо перше повідомлення
         const detail = err.response?.data?.detail
         if (Array.isArray(detail) && detail.length > 0) {
           authError.value = detail[0].msg
         } else {
-          authError.value = 'Please check the correctness of the entered data'
+          authError.value = 'Перевірте правильність введених даних'
         }
       } else {
-        authError.value = message || 'Something went wrong. Please try again'
+        authError.value = message || 'Щось пішло не так. Спробуйте ще раз'
       }
     } finally {
       isLoading.value = false
     }
   }
+
   /**
-   * Авторизація існуючого користувача.
+   * Авторизація — після успіху підтягує групи і редиректить на /feed або /group-setup.
    * @param {{ email: string, password: string }} credentials
    */
   async function login(credentials) {
@@ -112,33 +105,53 @@ export function useAuth() {
     try {
       const data = await loginUser(credentials)
 
+      // Зберігаємо токен одразу — він потрібен для fetchMyGroups
       localStorage.setItem('accessToken', data.access_token)
 
-      // Після логіну потрібно отримати групи юзера
-      // Поки зберігаємо мінімум — групи підтягнемо у FeedView
-      const userInfo = {
+      let userInfo = {
         email: credentials.email,
         fullName: '',
         role: null,
         groupId: null,
         groupName: null,
       }
-      localStorage.setItem('currentUser', JSON.stringify(userInfo))
-      currentUser.value = userInfo
 
+      try {
+        const groupsData = await fetchMyGroups()
+
+        if (groupsData.groups && groupsData.groups.length > 0) {
+          const firstGroup = groupsData.groups[0]
+          userInfo.role = firstGroup.role
+          userInfo.groupId = firstGroup.group_id
+          userInfo.groupName = firstGroup.name
+        } else {
+          // Акаунт є але групи немає — відправляємо на group-setup
+          persistAuthSession(data.access_token, userInfo)
+          router.push('/group-setup')
+          return
+        }
+      } catch {
+        // fetchMyGroups впав — йдемо на feed з тим що є
+      }
+
+      persistAuthSession(data.access_token, userInfo)
       router.push('/feed')
     } catch (err) {
+      // Очищаємо токен якщо логін не вдався
+      localStorage.removeItem('accessToken')
+
       const status = err.response?.status
       if (status === 429) {
-        authError.value = 'Too many login attempts. Please try again later.'
+        authError.value = 'Забагато спроб. Спробуйте через 15 хв'
       } else {
         // 401 — навмисно одне повідомлення (захист від user enumeration)
-        authError.value = 'Incorrect email or password. Please try again.'
+        authError.value = 'Невірний email або пароль'
       }
     } finally {
       isLoading.value = false
     }
   }
+
   /**
    * Вихід із системи — очищення сесії.
    */
@@ -147,22 +160,6 @@ export function useAuth() {
     localStorage.removeItem('currentUser')
     currentUser.value = null
     router.push('/login')
-  }
-
-  /**
-   * Дістає зрозуміле повідомлення про помилку з axios error.
-   * @param {Error} err
-   * @returns {string}
-   */
-  function extractErrorMessage(err) {
-    const serverMessage = err.response?.data?.message
-    if (serverMessage) return serverMessage
-
-    const status = err.response?.status
-    if (status === 409) return 'User with this email already exists'
-    if (status === 400) return 'Please check the correctness of the entered data'
-
-    return 'Something went wrong. Please try again'
   }
 
   return {

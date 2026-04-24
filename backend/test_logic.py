@@ -23,6 +23,10 @@ def get_category_limit_status(current_spent, limit):
         return "Overlimit"
     return "OK"
 
+def get_user_balance_from_db(user_id):
+    """Цю функцію ми будемо підміняти (Mock)"""
+    pass
+
 
 # --- UNIT-ТЕСТИ ---
 
@@ -84,14 +88,16 @@ def test_limit_exact():
 
 # Група 4: MOCKING (Заміна реальної бази даних)
 def test_mock_db_get_balance(mocker):
-    # Тест 11: Замінюємо функцію через patch (як і було в оригіналі)
-    # Ми патчимо об'єкт всередині тесту, щоб імітувати поведінку БД
-    mock_db = mocker.patch('unittest.mock.MagicMock', autospec=True)
-    mock_db.get_user_balance.return_value = 5000
+    # Тест 11: Використовуємо patch для заміни виклику БД
+    mock_call = mocker.patch('test_logic.get_user_balance_from_db')
+    mock_call.return_value = 5000
 
-    result = mock_db.get_user_balance(1)
+
+    result = get_user_balance_from_db(1)
     assert result == 5000
 
+    # Перевіряємо, чи був виклик (доказ роботи Mock)
+    # mock_call.assert_called_once_with(1)
 
 def test_mock_db_save_transaction(mocker):
     # Тест 12: Перевірка, чи викликається метод збереження

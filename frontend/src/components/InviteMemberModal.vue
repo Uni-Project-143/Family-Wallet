@@ -253,30 +253,39 @@
    */
   async function generateLink(isRegen) {
     isGenerating.value = true
+
+    const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+    const groupId = storedUser.groupId
+
+    if (!groupId) {
+      emit('toast', { message: 'Group ID not found. Please re-login.', type: 'error' })
+      isGenerating.value = false
+      return
+    }
+
     try {
-      // Беремо groupId з localStorage
-      const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-      const groupId = storedUser.groupId
+      // isRegen → POST /api/v1/group/{groupId}/invite/regenerate
+      // !isRegen → GET  /api/v1/group/{groupId}/invite
+      const fn = isRegen
+        ? () => regenerateGroupInviteLink(groupId)
+        : () => fetchGroupInviteLink(groupId)
 
-      if (!groupId) {
-        emit('toast', { message: 'Group ID not found. Please try again.', type: 'error' })
-        return
-      }
+      const data = await fn()
 
-      // GET /api/v1/groups/{id}/invite
-      const data = await fetchGroupInviteLink(groupId)
-
-      // Бекенд повертає invite_link (не inviteUrl)
+      // Бекенд повертає invite_link та expires_at
       inviteUrl.value = data.invite_link
       expiresAt.value = data.expires_at
 
-      emit('toast', { message: 'Invite link ready', type: 'success' })
+      emit('toast', {
+        message: isRegen ? 'New invite link generated' : 'Invite link ready',
+        type: 'success',
+      })
     } catch (err) {
       const status = err.response?.status
       if (status === 403) {
-        emit('toast', { message: 'Only Admin can generate invite links', type: 'error' })
+        emit('toast', { message: 'Only Admin can generate invite links (Rule-02)', type: 'error' })
       } else {
-        emit('toast', { message: 'Error generating invite link', type: 'error' })
+        emit('toast', { message: 'Error generating invite link. Try again.', type: 'error' })
       }
     } finally {
       isGenerating.value = false
@@ -291,12 +300,12 @@
     try {
       await navigator.clipboard.writeText(inviteUrl.value)
       isCopied.value = true
-      emit('toast', { message: 'Invite link copied ✓', type: 'success' })
+      emit('toast', { message: 'Link copied ✓', type: 'success' })
       setTimeout(() => {
         isCopied.value = false
       }, 2500)
     } catch {
-      emit('toast', { message: 'Failed to copy link', type: 'error' })
+      emit('toast', { message: 'Failed to copy. Please copy manually.', type: 'error' })
     }
   }
 
@@ -307,12 +316,16 @@
 
   const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+  /**
+   * Валідація поля email.
+   * @returns {boolean}
+   */
   function validateEmail() {
     emailTouched.value = true
     emailError.value = ''
     if (!directEmail.value.trim()) return true
     if (!EMAIL_REGEX.test(directEmail.value)) {
-      emailError.value = 'Введіть коректний email'
+      emailError.value = 'Enter a valid email'
       return false
     }
     return true
@@ -324,6 +337,7 @@
 
   /**
    * Відправляє запрошення на email.
+   * TODO: підключити POST /api/v1/group/{groupId}/invite/send коли з'явиться endpoint
    */
   async function sendInvite() {
     if (!validateEmail()) return
@@ -331,8 +345,9 @@
 
     isSending.value = true
     try {
-      // TODO: POST /api/groups/invite/send { email: directEmail.value }
-      await new Promise((r) => setTimeout(r, 700)) // demo delay
+      // TODO: реальний запит після появи endpoint на бекенді
+      // await apiClient.post(`/api/v1/group/${groupId}/invite/send`, { email: directEmail.value })
+      await new Promise((r) => setTimeout(r, 700))
       emit('toast', { message: `Invite sent to ${directEmail.value}`, type: 'success' })
       directEmail.value = ''
       emailTouched.value = false

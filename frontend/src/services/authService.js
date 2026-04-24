@@ -1,49 +1,63 @@
 import apiClient from './apiClient'
 
 /**
- * Реєстрація нового користувача.
- * @param {{ fullName: string, email: string, password: string }} payload
- * @returns {Promise<{ token: string, user: object }>}
+ * Реєстрація — POST /api/v1/auth/register
+ * Swagger schema: { email, password, fullName }
+ * confirmPassword НЕ відправляємо — перевіряється лише на фронті
+ * @param {{ fullName, email, password }} payload
+ * @returns {{ access_token, token_type }}
  */
 export async function registerUser(payload) {
-  const response = await apiClient.post('/auth/register', payload)
+  const response = await apiClient.post('/api/v1/auth/register', {
+    fullName: payload.fullName,
+    email: payload.email,
+    password: payload.password,
+    confirmPassword: payload.password, // ← додаю цей рядок
+  })
   return response.data
 }
 
 /**
- * Авторизація користувача.
- * @param {{ email: string, password: string }} credentials
- * @returns {Promise<{ token: string, user: object }>}
+ * Авторизація — POST /api/v1/auth/login
+ * @param {{ email, password }} credentials
+ * @returns {{ access_token, token_type }}
  */
 export async function loginUser(credentials) {
-  const response = await apiClient.post('/auth/login', credentials)
+  const response = await apiClient.post('/api/v1/auth/login', {
+    email: credentials.email,
+    password: credentials.password,
+  })
   return response.data
 }
 
 /**
- * Відправка листа для скидання паролю.
- * @param {{ email: string }} payload
- * @returns {Promise<{ message: string }>}
+ * Створення групи — POST /api/v1/groups
+ * Swagger schema: { name }
+ * @param {{ name }} payload
+ * @returns {{ group_id, name, message }}
  */
-export async function requestPasswordReset(payload) {
-  const response = await apiClient.post('/auth/forgot-password', payload)
+export async function createGroup(payload) {
+  const response = await apiClient.post('/api/v1/groups', {
+    name: payload.name,
+  })
   return response.data
 }
 
 /**
- * Отримання invite-лінку групи (тільки для Admin).
- * @returns {Promise<{ inviteUrl: string, expiresAt: string }>}
+ * Мої групи — GET /api/v1/groups
+ * @returns {{ groups: [] }}
  */
-export async function fetchGroupInviteLink() {
-  const response = await apiClient.get('/group/invite')
+export async function fetchMyGroups() {
+  const response = await apiClient.get('/api/v1/groups')
   return response.data
 }
 
 /**
- * Перегенерація invite-лінку (старий стає недійсним).
- * @returns {Promise<{ inviteUrl: string, expiresAt: string }>}
+ * Invite link — GET /api/v1/groups/{id}/invite
+ * @param {string} groupId
+ * @returns {{ invite_link, token, expires_at }}
  */
-export async function regenerateGroupInviteLink() {
-  const response = await apiClient.post('/group/invite/regenerate')
+export async function fetchGroupInviteLink(groupId) {
+  const response = await apiClient.get(`/api/v1/groups/${groupId}/invite`)
   return response.data
 }

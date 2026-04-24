@@ -2,7 +2,7 @@ services:
   backend:
     build: ./backend
     volumes:
-      - ./backend/app:/app   # hot reload
+      - ./backend/app:/app # hot reload
     ports:
       - "8000:8000"
     environment:
@@ -15,7 +15,7 @@ services:
       context: ./frontend
       target: builder
     volumes:
-      - ./frontend/src:/app/src  # hot reload
+      - ./frontend/src:/app/src # hot reload
     ports:
       - "5173:5173"
     environment:

@@ -58,31 +58,50 @@ export function useAuth() {
     isLoading.value = true
     authError.value = null
     try {
-      // const { token, user } = await registerUser(formPayload)
-      // persistAuthSession(token, user)
-      // router.push('/group-setup')
-      // ── MOCK — імітація відповіді сервера ──
-      await new Promise((r) => setTimeout(r, 800)) // імітація затримки мережі
-
-      const mockUser = {
-        id: 'mock-user-1',
+      const data = await registerUser({
         fullName: formPayload.fullName,
         email: formPayload.email,
-        role: null, // роль ще не визначена — визначиться у GroupSetup
-        groupId: null, // група ще не створена
-      }
-      const mockToken = 'mock-jwt-token-' + Date.now()
+        password: formPayload.password,
+        // confirmPassword НЕ відправляємо — Swagger його не очікує
+      })
 
-      persistAuthSession(mockToken, mockUser)
+      // Зберігаємо токен (access_token — саме така назва поля зі Swagger)
+      localStorage.setItem('accessToken', data.access_token)
+
+      // Зберігаємо базові дані юзера — groupId отримаємо після GroupSetup
+      const userInfo = {
+        fullName: formPayload.fullName,
+        email: formPayload.email,
+        role: null,
+        groupId: null,
+        groupName: null,
+      }
+      localStorage.setItem('currentUser', JSON.stringify(userInfo))
+      currentUser.value = userInfo
+
       router.push('/group-setup')
-      // ── кінець MOCK ──
     } catch (err) {
-      authError.value = extractErrorMessage(err)
+      // Бекенд повертає { timestamp, errorCode, message }
+      const message = err.response?.data?.message
+      const status = err.response?.status
+
+      if (status === 409) {
+        authError.value = 'User with this email already exists'
+      } else if (status === 422) {
+        // Pydantic validation error — беремо перше повідомлення
+        const detail = err.response?.data?.detail
+        if (Array.isArray(detail) && detail.length > 0) {
+          authError.value = detail[0].msg
+        } else {
+          authError.value = 'Please check the correctness of the entered data'
+        }
+      } else {
+        authError.value = message || 'Something went wrong. Please try again'
+      }
     } finally {
       isLoading.value = false
     }
   }
-
   /**
    * Авторизація існуючого користувача.
    * @param {{ email: string, password: string }} credentials
@@ -91,37 +110,35 @@ export function useAuth() {
     isLoading.value = true
     authError.value = null
     try {
-      // const { token, user } = await loginUser(credentials)
-      // persistAuthSession(token, user)
-      // router.push('/feed')
+      const data = await loginUser(credentials)
 
-      // ── MOCK ──
-      await new Promise((r) => setTimeout(r, 600))
+      localStorage.setItem('accessToken', data.access_token)
 
-      const mockUser = {
-        id: 'mock-user-1',
-        fullName: 'Olena K.',
+      // Після логіну потрібно отримати групи юзера
+      // Поки зберігаємо мінімум — групи підтягнемо у FeedView
+      const userInfo = {
         email: credentials.email,
-        role: 'ADMIN',
-        groupId: 'mock-group-1',
+        fullName: '',
+        role: null,
+        groupId: null,
+        groupName: null,
       }
-      const mockToken = 'mock-jwt-token-' + Date.now()
+      localStorage.setItem('currentUser', JSON.stringify(userInfo))
+      currentUser.value = userInfo
 
-      persistAuthSession(mockToken, mockUser)
       router.push('/feed')
-      // ── кінець MOCK ──
     } catch (err) {
       const status = err.response?.status
       if (status === 429) {
-        authError.value = 'Забагато спроб. Спробуйте через 15 хв'
+        authError.value = 'Too many login attempts. Please try again later.'
       } else {
-        authError.value = 'Невірний email або пароль'
+        // 401 — навмисно одне повідомлення (захист від user enumeration)
+        authError.value = 'Incorrect email or password. Please try again.'
       }
     } finally {
       isLoading.value = false
     }
   }
-
   /**
    * Вихід із системи — очищення сесії.
    */
@@ -142,10 +159,10 @@ export function useAuth() {
     if (serverMessage) return serverMessage
 
     const status = err.response?.status
-    if (status === 409) return 'Користувач з таким email вже існує'
-    if (status === 400) return 'Перевірте правильність введених даних'
+    if (status === 409) return 'User with this email already exists'
+    if (status === 400) return 'Please check the correctness of the entered data'
 
-    return 'Щось пішло не так. Спробуйте ще раз'
+    return 'Something went wrong. Please try again'
   }
 
   return {

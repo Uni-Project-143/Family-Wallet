@@ -254,22 +254,29 @@
   async function generateLink(isRegen) {
     isGenerating.value = true
     try {
-      const fn = isRegen ? regenerateGroupInviteLink : fetchGroupInviteLink
-      const data = await fn()
-      inviteUrl.value = data.inviteUrl
-      expiresAt.value = data.expiresAt
-      emit('toast', {
-        message: isRegen ? 'New link generated' : 'Invite link ready',
-        type: 'success',
-      })
+      // Беремо groupId з localStorage
+      const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+      const groupId = storedUser.groupId
+
+      if (!groupId) {
+        emit('toast', { message: 'Group ID not found. Please try again.', type: 'error' })
+        return
+      }
+
+      // GET /api/v1/groups/{id}/invite
+      const data = await fetchGroupInviteLink(groupId)
+
+      // Бекенд повертає invite_link (не inviteUrl)
+      inviteUrl.value = data.invite_link
+      expiresAt.value = data.expires_at
+
+      emit('toast', { message: 'Invite link ready', type: 'success' })
     } catch (err) {
-      if (err.response?.status === 403) {
-        emit('toast', { message: 'Only Admin can generate invite links (Rule-02)', type: 'error' })
+      const status = err.response?.status
+      if (status === 403) {
+        emit('toast', { message: 'Only Admin can generate invite links', type: 'error' })
       } else {
-        // Demo fallback без бекенду
-        inviteUrl.value = `https://familywallet.app/join/${Math.random().toString(36).slice(2, 10)}`
-        expiresAt.value = new Date(Date.now() + 48 * 3600000).toISOString()
-        emit('toast', { message: 'Invite link generated', type: 'success' })
+        emit('toast', { message: 'Error generating invite link', type: 'error' })
       }
     } finally {
       isGenerating.value = false
@@ -284,12 +291,12 @@
     try {
       await navigator.clipboard.writeText(inviteUrl.value)
       isCopied.value = true
-      emit('toast', { message: 'Посилання скопійовано ✓', type: 'success' })
+      emit('toast', { message: 'Invite link copied ✓', type: 'success' })
       setTimeout(() => {
         isCopied.value = false
       }, 2500)
     } catch {
-      emit('toast', { message: 'Не вдалося скопіювати', type: 'error' })
+      emit('toast', { message: 'Failed to copy link', type: 'error' })
     }
   }
 

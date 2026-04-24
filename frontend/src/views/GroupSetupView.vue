@@ -139,6 +139,7 @@
   import { useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
   import apiClient from '../services/apiClient'
+  import { createGroup } from '../services/authService'
 
   const router = useRouter()
   const { currentUser, logout } = useAuth()
@@ -216,54 +217,34 @@
     serverError.value = ''
 
     try {
-      // if (selectedMode.value === 'create') {
-      //   // POST /api/groups { name: fieldValue }
-      //   // Server повертає { groupId, role: 'ADMIN' }
-      //   await apiClient.post('/api/groups', {
-      //     name: fieldValue.value.trim(),
-      //   })
-      // } else {
-      //   // POST /api/groups/join { inviteToken: extracted from URL }
-      //   const token = fieldValue.value.trim().split('/join/')[1]
-      //   await apiClient.post('/api/groups/join', { inviteToken: token })
-      // }
+      if (selectedMode.value === 'create') {
+        // POST /api/v1/groups { name }
+        const data = await createGroup({ name: fieldValue.value.trim() })
 
-      // // Оновлюємо currentUser з новою роллю
-      // const meResponse = await apiClient.get('/api/auth/me')
-      // localStorage.setItem('currentUser', JSON.stringify(meResponse.data))
-      // MOCK ─
-      await new Promise((r) => setTimeout(r, 700))
+        const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+        storedUser.role = 'ADMIN'
+        storedUser.groupId = data.group_id // бекенд повертає group_id
+        storedUser.groupName = fieldValue.value.trim()
+        localStorage.setItem('currentUser', JSON.stringify(storedUser))
+      } else {
+        // Join поки не має endpoint у Swagger — залишаємо заглушку
+        const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+        storedUser.role = 'MEMBER'
+        storedUser.groupName = 'Family'
+        localStorage.setItem('currentUser', JSON.stringify(storedUser))
+      }
 
-      const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-      storedUser.role = selectedMode.value === 'create' ? 'ADMIN' : 'MEMBER'
-      storedUser.groupId = 'mock-group-1'
-      storedUser.groupName =
-        selectedMode.value === 'create'
-          ? fieldValue.value.trim() // ← назва яку ввів користувач
-          : 'Family' // ← fallback для join
-      localStorage.setItem('currentUser', JSON.stringify(storedUser))
-      // ───────────────────────────────────────────
       router.push('/feed')
     } catch (err) {
-      const status = err.response?.status
       const message = err.response?.data?.message
+      const status = err.response?.status
 
-      if (selectedMode.value === 'create') {
-        if (status === 409) {
-          serverError.value = 'A group with this name already exists'
-        } else {
-          // Demo fallback — без бекенду
-          router.push('/feed')
-        }
+      if (status === 409) {
+        serverError.value = 'Group name already exists. Please choose another name.'
+      } else if (status === 410) {
+        serverError.value = 'The invite link has expired.'
       } else {
-        if (status === 410) {
-          serverError.value = 'This invite link has expired. Ask Admin to generate a new one.'
-        } else if (status === 404) {
-          serverError.value = 'Invite link not found. Check the link and try again.'
-        } else {
-          // Demo fallback
-          router.push('/feed')
-        }
+        serverError.value = message || 'Something went wrong'
       }
     } finally {
       isLoading.value = false

@@ -138,21 +138,21 @@
   import { ref, computed } from 'vue'
   import { useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
-  import apiClient from '../services/apiClient'
-  import { createGroup } from '../services/authService'
+  import { createGroup, joinGroup } from '../services/authService'
 
   const router = useRouter()
   const { currentUser, logout } = useAuth()
 
   const currentUserName = computed(() => currentUser.value?.fullName || 'User')
 
-  // ─── Mode selection ───
   const selectedMode = ref(null)
   const fieldValue = ref('')
   const fieldError = ref('')
   const fieldTouched = ref(false)
   const serverError = ref('')
   const isLoading = ref(false)
+
+  const INVITE_URL_REGEX = /^https?:\/\/.+\/join\/.+/
 
   /**
    * Перемикає режим create / join та скидає поле.
@@ -165,9 +165,6 @@
     fieldTouched.value = false
     serverError.value = ''
   }
-
-  // ─── Validation ───
-  const INVITE_URL_REGEX = /^https?:\/\/.+\/join\/.+/
 
   /**
    * Валідує поточне поле залежно від режиму.
@@ -204,11 +201,10 @@
     return selectedMode.value !== null && fieldValue.value.trim().length > 0
   })
 
-  // ─── Submit ───
   /**
    * Обробляє створення або приєднання до групи.
-   * Create → User.role = ADMIN
-   * Join   → User.role = MEMBER
+   * Create → POST /api/v1/group/ → role = ADMIN
+   * Join   → POST /api/v1/group/join → role = MEMBER
    */
   async function handleSubmit() {
     if (!validateField()) return
@@ -218,33 +214,36 @@
 
     try {
       if (selectedMode.value === 'create') {
-        // POST /api/v1/groups { name }
         const data = await createGroup({ name: fieldValue.value.trim() })
 
         const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
         storedUser.role = 'ADMIN'
-        storedUser.groupId = data.group_id // бекенд повертає group_id
+        storedUser.groupId = data.group_id
         storedUser.groupName = fieldValue.value.trim()
         localStorage.setItem('currentUser', JSON.stringify(storedUser))
       } else {
-        // Join поки не має endpoint у Swagger — залишаємо заглушку
+        await joinGroup({ inviteLink: fieldValue.value.trim() })
+
         const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
         storedUser.role = 'MEMBER'
-        storedUser.groupName = 'Family'
         localStorage.setItem('currentUser', JSON.stringify(storedUser))
       }
 
       router.push('/feed')
     } catch (err) {
-      const message = err.response?.data?.message
       const status = err.response?.status
+      const message = err.response?.data?.message
 
       if (status === 409) {
-        serverError.value = 'Group name already exists. Please choose another name.'
+        serverError.value = 'A group with this name already exists'
       } else if (status === 410) {
-        serverError.value = 'The invite link has expired.'
+        serverError.value = 'This invite link has expired. Ask Admin to generate a new one.'
+      } else if (status === 400) {
+        serverError.value = message || 'Invalid invite link'
+      } else if (status === 404) {
+        serverError.value = 'Invite link not found. Check the link and try again.'
       } else {
-        serverError.value = message || 'Something went wrong'
+        serverError.value = message || 'Something went wrong. Please try again.'
       }
     } finally {
       isLoading.value = false

@@ -37,7 +37,7 @@ export async function loginUser(credentials) {
  * @returns {{ group_id, name, message }}
  */
 export async function createGroup(payload) {
-  const response = await apiClient.post('/api/v1/groups', {
+  const response = await apiClient.post('/api/v1/group', {
     name: payload.name,
   })
   return response.data
@@ -48,7 +48,7 @@ export async function createGroup(payload) {
  * @returns {{ groups: [] }}
  */
 export async function fetchMyGroups() {
-  const response = await apiClient.get('/api/v1/groups')
+  const response = await apiClient.get('/api/v1/group')
   return response.data
 }
 
@@ -58,6 +58,28 @@ export async function fetchMyGroups() {
  * @returns {{ invite_link, token, expires_at }}
  */
 export async function fetchGroupInviteLink(groupId) {
-  const response = await apiClient.get(`/api/v1/groups/${groupId}/invite`)
+  const response = await apiClient.get(`/api/v1/group/${groupId}/invite`)
+  return response.data
+}
+
+/**
+ * Перегенерація invite link — POST /api/v1/group/{group_id}/invite/regenerate
+ * @param {string} groupId
+ * @returns {{ invite_link, token, expires_at }}
+ */
+export async function regenerateGroupInviteLink(groupId) {
+  const response = await apiClient.post(`/api/v1/group/${groupId}/invite/regenerate`)
+  return response.data
+}
+
+/**
+ * Приєднання до групи — POST /api/v1/group/join
+ * @param {{ invite_link }} payload
+ * @returns {{ message }}
+ */
+export async function joinGroup(payload) {
+  const response = await apiClient.post(`/api/v1/group/join`, {
+    invite_link: payload.inviteLink,
+  })
   return response.data
 }

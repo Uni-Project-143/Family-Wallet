@@ -96,7 +96,8 @@ export function useAuth() {
   }
 
   /**
-   * Авторизація — після успіху підтягує групи і редиректить на /feed або /group-setup.
+   * Авторизація — підтягує групи після логіну.
+   * Якщо група є → /feed, якщо немає → /group-setup.
    * @param {{ email: string, password: string }} credentials
    */
   async function login(credentials) {
@@ -119,23 +120,27 @@ export function useAuth() {
       try {
         const groupsData = await fetchMyGroups()
 
-        if (groupsData.groups && groupsData.groups.length > 0) {
-          const firstGroup = groupsData.groups[0]
+        // Підтримуємо обидва формати відповіді бекенду:
+        // { groups: [...] } або просто [...]
+        const groups = Array.isArray(groupsData) ? groupsData : groupsData.groups
+
+        if (groups && groups.length > 0) {
+          const firstGroup = groups[0]
           userInfo.role = firstGroup.role
           userInfo.groupId = firstGroup.group_id
           userInfo.groupName = firstGroup.name
+          persistAuthSession(data.access_token, userInfo)
+          router.push('/feed')
         } else {
-          // Акаунт є але групи немає — відправляємо на group-setup
+          // Акаунт є але групи немає
           persistAuthSession(data.access_token, userInfo)
           router.push('/group-setup')
-          return
         }
       } catch {
-        // fetchMyGroups впав — йдемо на feed з тим що є
+        // fetchMyGroups впав — зберігаємо мінімум і йдемо на group-setup
+        persistAuthSession(data.access_token, userInfo)
+        router.push('/group-setup')
       }
-
-      persistAuthSession(data.access_token, userInfo)
-      router.push('/feed')
     } catch (err) {
       // Очищаємо токен якщо логін не вдався
       localStorage.removeItem('accessToken')

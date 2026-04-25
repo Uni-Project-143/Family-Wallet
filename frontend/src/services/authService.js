@@ -83,3 +83,14 @@ export async function joinGroup(payload) {
   })
   return response.data
 }
+/**
+ * Запит на скидання паролю — POST /api/v1/auth/forgot-password
+ * @param {{ email: string }} payload
+ * @returns {{ message: string }}
+ */
+export async function requestPasswordReset(payload) {
+  const response = await apiClient.post('/api/v1/auth/forgot-password', {
+    email: payload.email,
+  })
+  return response.data
+}

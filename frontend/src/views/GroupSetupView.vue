@@ -234,6 +234,15 @@
       const status = err.response?.status
       const message = err.response?.data?.message
 
+      // Вже є учасником — отримуємо роль і йдемо на feed
+      if (status === 400 && message === 'Ви вже є учасником цієї групи') {
+        const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+        storedUser.role = 'MEMBER'
+        localStorage.setItem('currentUser', JSON.stringify(storedUser))
+        router.push('/feed')
+        return
+      }
+
       if (status === 409) {
         serverError.value = 'A group with this name already exists'
       } else if (status === 410) {
@@ -245,8 +254,6 @@
       } else {
         serverError.value = message || 'Something went wrong. Please try again.'
       }
-    } finally {
-      isLoading.value = false
     }
   }
 </script>

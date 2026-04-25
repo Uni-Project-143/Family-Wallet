@@ -331,18 +331,11 @@
   import { ref, computed, onMounted, onUnmounted } from 'vue'
   import { useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
-  // 1. Імпорт
   import InviteMemberModal from '../components/InviteMemberModal.vue'
 
-  // 2. Стан модалки
   const isInviteModalOpen = ref(false)
   const router = useRouter()
-  //const { currentUser, isAdmin } = useAuth()
-
-  const { currentUser } = useAuth()
-  // Тимчасово: хардкодимо Admin для демо без бекенду
-  // TODO: прибрати коли бекенд поверне реальний JWT з role: 'ADMIN'
-  // const isAdmin = ref(true)
+  const { currentUser, isAdmin } = useAuth()
 
   const currentUserName = computed(() => currentUser.value?.fullName || 'Olena K.')
   const currentUserInitials = computed(() => {
@@ -355,8 +348,6 @@
       .slice(0, 2)
   })
 
-  const activeGroupId = ref(1)
-  // СТАЛО
   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
 
   const groups = ref([
@@ -548,10 +539,10 @@
     if (wsConnection) wsConnection.close()
   })
 
-  function goToInvite() {
-    router.push({ path: '/settings', query: { section: 'members' } })
-    showToast('Opening invite members section', 'info')
-  }
+  // function goToInvite() {
+  //   router.push({ path: '/settings', query: { section: 'members' } })
+  //   showToast('Opening invite members section', 'info')
+  // }
 
   function goToConnectCard() {
     router.push({ path: '/settings', query: { section: 'cards' } })

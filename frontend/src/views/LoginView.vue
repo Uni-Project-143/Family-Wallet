@@ -9,7 +9,6 @@
       </div>
 
       <form class="auth-form" novalidate @submit.prevent="handleSubmit">
-        <!-- !!!!!! -->
         <BaseInput
           v-model="email"
           label="EMAIL ADDRESS"
@@ -96,7 +95,7 @@
   const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
 
   /**
-   * Валідація поля email. !!!!!
+   * Валідація поля email.
    * @returns {boolean}
    */
   function validateEmailField() {
@@ -114,7 +113,7 @@
   }
 
   /**
-   * Валідація поля password. !!!
+   * Валідація поля password.
    * @returns {boolean}
    */
   function validatePasswordField() {
@@ -142,7 +141,6 @@
     if (passwordTouched.value) validatePasswordField()
   }
 
-  // Кнопка була активна тільки якщо обидва поля заповнені, тепер ні !!!!
   const canSubmit = computed(() => {
     return email.value.trim().length > 0 && password.value.length > 0
   })

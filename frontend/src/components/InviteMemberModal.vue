@@ -18,7 +18,7 @@
 
             <!-- Header -->
 
-            <h2 class="modal-title">Invite New Member</h2>
+            <h2 class="modal-title">Invite new member</h2>
             <p class="modal-sub">
               Share this link with your family member. The link is valid for
               <strong>48 hours</strong>.
@@ -337,25 +337,16 @@
 
   /**
    * Відправляє запрошення на email.
-   * TODO: підключити POST /api/v1/group/{groupId}/invite/send коли з'явиться endpoint
+   * TODO: POST /api/v1/group/{groupId}/invite/send — endpoint ще не існує на бекенді
    */
   async function sendInvite() {
     if (!validateEmail()) return
     if (!directEmail.value.trim()) return
 
-    isSending.value = true
-    try {
-      // TODO: реальний запит після появи endpoint на бекенді
-      // await apiClient.post(`/api/v1/group/${groupId}/invite/send`, { email: directEmail.value })
-      await new Promise((r) => setTimeout(r, 700))
-      emit('toast', { message: `Invite sent to ${directEmail.value}`, type: 'success' })
-      directEmail.value = ''
-      emailTouched.value = false
-    } catch {
-      emit('toast', { message: 'Failed to send invite. Try again.', type: 'error' })
-    } finally {
-      isSending.value = false
-    }
+    // TODO: реальний запит після появи endpoint
+    emit('toast', { message: 'Email invite — coming soon', type: 'info' })
+    directEmail.value = ''
+    emailTouched.value = false
   }
 
   function close() {

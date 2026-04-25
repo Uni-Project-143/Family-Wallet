@@ -19,11 +19,17 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isAuthEndpoint =
+      error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register')
+
+    // 401 на auth ендпоінтах — НЕ редіректимо
+    // 401 на захищених ендпоінтах — редіректимо на /login
+    if (error.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('accessToken')
       localStorage.removeItem('currentUser')
       window.location.href = '/login'
     }
+
     return Promise.reject(error)
   },
 )

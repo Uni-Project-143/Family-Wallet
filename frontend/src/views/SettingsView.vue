@@ -388,14 +388,14 @@
 </template>
 
 <script setup>
-  import { ref, computed } from 'vue'
+  import { ref, computed, watch } from 'vue'
   import { useAuth } from '../composables/useAuth'
   import { fetchGroupInviteLink, regenerateGroupInviteLink } from '../services/authService'
-
   import { useRoute } from 'vue-router'
 
   const route = useRoute()
   const activeSection = ref(route.query.section || 'members')
+
   watch(
     () => route.query.section,
     (section) => {
@@ -404,14 +404,12 @@
     { immediate: true },
   )
 
-  // const { currentUser, isAdmin } = useAuth() повертає false, а зараз потрібно показати feed
-  const { currentUser } = useAuth()
-  // TODO: прибрати коли бекенд поверне JWT з role: 'ADMIN'
-  const isAdmin = ref(true) // тимчасово для демо
+  // Реальна роль з localStorage через useAuth
+  const { currentUser, isAdmin } = useAuth()
 
-  const currentUserName = computed(() => currentUser.value?.fullName || 'Olena K.')
+  const currentUserName = computed(() => currentUser.value?.fullName || 'User')
   const currentUserInitials = computed(() => {
-    const name = currentUser.value?.fullName || 'OK'
+    const name = currentUser.value?.fullName || 'U'
     return name
       .split(' ')
       .map((w) => w[0])
@@ -420,7 +418,6 @@
       .slice(0, 2)
   })
 
-  // ─── Навігація ───
   const navItems = [
     { key: 'members', icon: '👥', label: 'Group Members' },
     { key: 'cards', icon: '💳', label: 'Connected Cards' },
@@ -428,7 +425,7 @@
     { key: 'privacy', icon: '🛡', label: 'Privacy & Data' },
   ]
 
-  // ─── Учасники ───
+  // TODO: підключити до GET /api/v1/group/{groupId}/members коли з'явиться endpoint
   const groupMembers = ref([
     {
       id: 1,
@@ -462,6 +459,10 @@
     },
   ])
 
+  /**
+   * Видаляє учасника з групи.
+   * @param {object} member
+   */
   function removeMember(member) {
     if (confirm(`Remove ${member.name} from the group?`)) {
       groupMembers.value = groupMembers.value.filter((m) => m.id !== member.id)
@@ -469,7 +470,7 @@
     }
   }
 
-  // ─── Invite link (US 1.3 FE-02) ───
+  // ─── Invite link ───
   const inviteUrl = ref('')
   const inviteExpiresAt = ref(null)
   const isGeneratingLink = ref(false)
@@ -486,25 +487,39 @@
   })
 
   /**
-   * Генерує або перегенеровує invite-лінк (GET /group/invite або POST /group/invite/regenerate).
+   * Генерує або перегенеровує invite-лінк.
+   * GET /api/v1/group/{groupId}/invite
    */
   async function generateInviteLink() {
     isGeneratingLink.value = true
+
+    const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+    const groupId = storedUser.groupId
+
+    if (!groupId) {
+      showToast('Group ID not found. Please re-login.', 'error')
+      isGeneratingLink.value = false
+      return
+    }
+
     try {
-      const fn = inviteUrl.value ? regenerateGroupInviteLink : fetchGroupInviteLink
+      const fn = inviteUrl.value
+        ? () => regenerateGroupInviteLink(groupId)
+        : () => fetchGroupInviteLink(groupId)
+
       const data = await fn()
-      inviteUrl.value = data.inviteUrl
-      inviteExpiresAt.value = data.expiresAt
+
+      // Бекенд повертає invite_link та expires_at
+      inviteUrl.value = data.invite_link
+      inviteExpiresAt.value = data.expires_at
+
       showToast(inviteUrl.value ? 'New link generated' : 'Invite link ready', 'success')
     } catch (err) {
       const status = err.response?.status
       if (status === 403) {
         showToast('Only Admin can generate invite links (Rule-02)', 'error')
       } else {
-        // Fallback для демо без бекенду
-        inviteUrl.value = `https://familywallet.app/join/${generateDemoToken()}`
-        inviteExpiresAt.value = new Date(Date.now() + 48 * 3600000).toISOString()
-        showToast('Invite link generated (demo mode)', 'success')
+        showToast('Error generating invite link. Try again.', 'error')
       }
     } finally {
       isGeneratingLink.value = false
@@ -512,39 +527,32 @@
   }
 
   /**
-   * Генерує демо-токен для відображення без бекенду.
-   * @returns {string}
-   */
-  function generateDemoToken() {
-    return Math.random().toString(36).slice(2, 10)
-  }
-
-  /**
-   * Копіює invite URL в буфер обміну (Clipboard API).
+   * Копіює invite URL через Clipboard API.
    */
   async function copyInviteLink() {
     if (!inviteUrl.value) return
     try {
       await navigator.clipboard.writeText(inviteUrl.value)
       isCopied.value = true
-      showToast('Посилання скопійовано', 'success')
+      showToast('Link copied ✓', 'success')
       setTimeout(() => {
         isCopied.value = false
       }, 2500)
     } catch {
-      showToast('Не вдалося скопіювати. Скопіюйте вручну.', 'error')
+      showToast('Failed to copy. Please copy manually.', 'error')
     }
   }
 
   /**
    * Відправляє запрошення напряму на email.
+   * TODO: підключити POST /api/v1/group/{groupId}/invite/send коли з'явиться endpoint
    */
   async function sendDirectInvite() {
     if (!directEmail.value.trim()) return
     isSendingDirectInvite.value = true
     try {
-      // TODO: POST /group/invite/send { email: directEmail.value }
-      await new Promise((r) => setTimeout(r, 800)) // demo delay
+      // TODO: реальний запит після появи endpoint
+      // await apiClient.post(`/api/v1/group/${groupId}/invite/send`, { email: directEmail.value })
       showToast(`Invite sent to ${directEmail.value}`, 'success')
       directEmail.value = ''
     } catch {
@@ -555,11 +563,16 @@
   }
 
   // ─── Cards ───
+  // TODO: підключити до GET /api/v1/group/{groupId}/cards коли з'явиться endpoint
   const connectedCards = ref([
     { id: 1, bankName: 'Monobank', maskedPan: '•••• •••• •••• 4521', balance: 12340 },
     { id: 2, bankName: 'Monobank', maskedPan: '•••• •••• •••• 7732', balance: 3870 },
   ])
 
+  /**
+   * Відключає картку від групи.
+   * @param {object} card
+   */
   function disconnectCard(card) {
     if (confirm(`Disconnect ${card.maskedPan}?`)) {
       connectedCards.value = connectedCards.value.filter((c) => c.id !== card.id)

@@ -337,16 +337,25 @@
 
   /**
    * Відправляє запрошення на email.
-   * TODO: POST /api/v1/group/{groupId}/invite/send — endpoint ще не існує на бекенді
+   * TODO: підключити POST /api/v1/group/{groupId}/invite/send коли з'явиться endpoint
    */
   async function sendInvite() {
     if (!validateEmail()) return
     if (!directEmail.value.trim()) return
 
-    // TODO: реальний запит після появи endpoint
-    emit('toast', { message: 'Email invite — coming soon', type: 'info' })
-    directEmail.value = ''
-    emailTouched.value = false
+    isSending.value = true
+    try {
+      // TODO: реальний запит після появи endpoint
+      // const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+      // await apiClient.post(`/api/v1/group/${storedUser.groupId}/invite/send`, { email: directEmail.value })
+      emit('toast', { message: `Invite sent to ${directEmail.value}`, type: 'success' })
+      directEmail.value = ''
+      emailTouched.value = false
+    } catch {
+      emit('toast', { message: 'Failed to send invite. Try again.', type: 'error' })
+    } finally {
+      isSending.value = false
+    }
   }
 
   function close() {

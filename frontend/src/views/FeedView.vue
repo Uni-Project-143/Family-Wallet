@@ -335,11 +335,15 @@
 
   const isInviteModalOpen = ref(false)
   const router = useRouter()
-  const { currentUser, isAdmin } = useAuth()
+  //const { currentUser, isAdmin } = useAuth()
+  const { currentUser } = useAuth()
 
-  const currentUserName = computed(() => currentUser.value?.fullName || 'Olena K.')
+  const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+
+  const currentUserName = computed(() => storedUser.fullName || currentUser.value?.fullName || '')
   const currentUserInitials = computed(() => {
-    const name = currentUser.value?.fullName || 'OK'
+    const name = storedUser.fullName || currentUser.value?.fullName || ''
+    if (!name) return '?'
     return name
       .split(' ')
       .map((w) => w[0])
@@ -348,8 +352,6 @@
       .slice(0, 2)
   })
 
-  const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-
   const groups = ref([
     { id: 1, name: storedUser.groupName || 'Family' },
     { id: 2, name: 'Neighborhood' },
@@ -357,7 +359,7 @@
 
   // Для ролі. Замість const isAdmin = ref(true)
   const isAdmin = computed(() => storedUser.role === 'ADMIN')
-
+  const activeGroupId = ref(1)
   const groupMembers = ref([
     {
       id: 1,

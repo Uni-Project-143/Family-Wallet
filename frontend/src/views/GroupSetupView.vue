@@ -123,12 +123,6 @@
             />
           </svg>
         </button>
-
-        <!-- Logout link -->
-        <p class="setup-card__footer">
-          Wrong account?
-          <button class="btn-text" @click="logout">Log out</button>
-        </p>
       </div>
     </div>
   </div>
@@ -141,7 +135,7 @@
   import { createGroup, joinGroup } from '../services/authService'
 
   const router = useRouter()
-  const { currentUser, logout } = useAuth()
+  const { currentUser } = useAuth()
 
   const currentUserName = computed(() => currentUser.value?.fullName || 'User')
 

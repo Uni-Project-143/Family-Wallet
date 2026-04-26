@@ -5,8 +5,32 @@ const LoginView = () => import('../views/LoginView.vue')
 const ForgotPasswordView = () => import('../views/ForgotPasswordView.vue')
 const FeedView = () => import('../views/FeedView.vue')
 
+// function hasValidToken() {
+//   return !!localStorage.getItem('accessToken')
+// }
+
 function hasValidToken() {
-  return !!localStorage.getItem('accessToken')
+  const token = localStorage.getItem('accessToken')
+  if (!token) return false
+
+  try {
+    // JWT складається з трьох частин через крапку
+    // payload — друга частина, закодована у base64
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    // exp у JWT — це Unix timestamp у секундах
+    const isExpired = payload.exp * 1000 < Date.now()
+    if (isExpired) {
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('currentUser')
+      return false
+    }
+    return true
+  } catch {
+    // Якщо токен зіпсований — чистимо і повертаємо false
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('currentUser')
+    return false
+  }
 }
 
 const routes = [
@@ -50,6 +74,12 @@ const routes = [
     path: '/group-setup',
     name: 'GroupSetup',
     component: () => import('../views/GroupSetupView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/gift-events',
+    name: 'GiftEvents',
+    component: () => import('../views/FeedView.vue'), // тимчасово — поки немає своєї сторінки
     meta: { requiresAuth: true },
   },
 ]

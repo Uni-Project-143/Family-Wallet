@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { registerUser, loginUser, fetchMyGroups } from '../services/authService'
+import { registerUser, loginUser } from '../services/authService'
 
 /**
  * Composable для управління станом авторизації.
@@ -12,7 +12,6 @@ import { registerUser, loginUser, fetchMyGroups } from '../services/authService'
  *   authError: import('vue').Ref<string|null>,
  *   register: Function,
  *   login: Function,
- *   logout: Function,
  * }}
  */
 export function useAuth() {
@@ -96,7 +95,7 @@ export function useAuth() {
   }
 
   /**
-   * Авторизація — підтягує групи після логіну.
+   * Авторизація — підтягує попередню сесію з localStorage.
    * Якщо група є → /feed, якщо немає → /group-setup.
    * @param {{ email: string, password: string }} credentials
    */
@@ -106,65 +105,34 @@ export function useAuth() {
     try {
       const data = await loginUser(credentials)
 
-      // Зберігаємо токен одразу — він потрібен для fetchMyGroups
-      localStorage.setItem('accessToken', data.access_token)
+      const previousSession = JSON.parse(localStorage.getItem('currentUser') || '{}')
 
-      let userInfo = {
+      const userInfo = {
         email: credentials.email,
-        fullName: '',
-        role: null,
-        groupId: null,
-        groupName: null,
+        fullName: previousSession.fullName || '',
+        role: previousSession.role || null,
+        groupId: previousSession.groupId || null,
+        groupName: previousSession.groupName || null,
       }
 
-      try {
-        const groupsData = await fetchMyGroups()
+      persistAuthSession(data.access_token, userInfo)
 
-        // Підтримуємо обидва формати відповіді бекенду:
-        // { groups: [...] } або просто [...]
-        const groups = Array.isArray(groupsData) ? groupsData : groupsData.groups
-
-        if (groups && groups.length > 0) {
-          const firstGroup = groups[0]
-          userInfo.role = firstGroup.role
-          userInfo.groupId = firstGroup.group_id
-          userInfo.groupName = firstGroup.name
-          persistAuthSession(data.access_token, userInfo)
-          router.push('/feed')
-        } else {
-          // Акаунт є але групи немає
-          persistAuthSession(data.access_token, userInfo)
-          router.push('/group-setup')
-        }
-      } catch {
-        // fetchMyGroups впав — зберігаємо мінімум і йдемо на group-setup
-        persistAuthSession(data.access_token, userInfo)
+      if (userInfo.groupId) {
+        router.push('/feed')
+      } else {
         router.push('/group-setup')
       }
     } catch (err) {
-      // Очищаємо токен якщо логін не вдався
       localStorage.removeItem('accessToken')
-
       const status = err.response?.status
       if (status === 429) {
         authError.value = 'Забагато спроб. Спробуйте через 15 хв'
       } else {
-        // 401 — навмисно одне повідомлення (захист від user enumeration)
         authError.value = 'Невірний email або пароль'
       }
     } finally {
       isLoading.value = false
     }
-  }
-
-  /**
-   * Вихід із системи — очищення сесії.
-   */
-  function logout() {
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('currentUser')
-    currentUser.value = null
-    router.push('/login')
   }
 
   return {
@@ -175,6 +143,5 @@ export function useAuth() {
     authError,
     register,
     login,
-    logout,
   }
 }

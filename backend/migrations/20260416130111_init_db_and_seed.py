@@ -123,7 +123,7 @@ class Forward:
         cat_gifts = Category(name="Gifts", icon="redeem", color="#FF33A1")
         await Category.insert_many([cat_food, cat_transport, cat_gifts], session=session)
 
-        # 2. Users (Seed Data - тепер БЕЗ role)
+        # 2. Users (Seed Data)
         user_main = User(
             full_name="Олександр Віталійович",
             email="oleksandr@familywallet.app",
@@ -134,16 +134,19 @@ class Forward:
             email="volodymyr@familywallet.app",
             password_hash="argon2_hashed_password_here"
         )
-        await User.insert_many([user_main, user_member], session=session)
 
-        # 3. Groups (Тепер без member_ids, але з created_by)
+
+        await user_main.insert(session=session)
+        await user_member.insert(session=session)
+
+        # 3. Group
         group = Group(
             name="Family Budget",
             created_by=str(user_main.id)
         )
         await group.insert(session=session)
 
-        # 4. Group Memberships (ОСЬ ТУТ РОЗДАЄМО РОЛІ!)
+        # 4. Memberships
         admin_membership = GroupMembership(
             user_id=str(user_main.id),
             group_id=str(group.id),
@@ -154,16 +157,17 @@ class Forward:
             group_id=str(group.id),
             role="MEMBER"
         )
+        # Для membership .insert_many() безпечно, бо ми не використовуємо їхні id далі
         await GroupMembership.insert_many([admin_membership, member_membership], session=session)
 
-        # 5. Invite Token (Закинемо один тестовий токен)
+        # 5. InviteToken
         invite = InviteToken(
             group_id=str(group.id),
             created_by=str(user_main.id)
         )
         await invite.insert(session=session)
 
-        # 6. Bank Cards
+        # 6. BankCard
         card = BankCard(
             user_id=str(user_main.id),
             bank_token="mono_api_token_sample",
@@ -172,7 +176,7 @@ class Forward:
         )
         await card.insert(session=session)
 
-        # 7. Transactions
+        # 7. Transaction
         t1 = Transaction(
             card_id=str(card.id),
             amount=Decimal("-450.00"),
@@ -184,7 +188,7 @@ class Forward:
         )
         await t1.insert(session=session)
 
-        # 8. Money Requests & Transfers
+        # 8. MoneyRequest & VirtualTransfer
         request = MoneyRequest(
             requester_id=str(user_member.id),
             recipient_id=str(user_main.id),
@@ -208,9 +212,9 @@ class Forward:
         )
         await transfer.insert(session=session)
 
+
 class Backward:
     @free_fall_migration(document_models=ALL_MODELS)
     async def rollback(self, session):
-        # Видаляємо всі дані з усіх колекцій при відкаті
         for model in ALL_MODELS:
             await model.find_all().delete(session=session)

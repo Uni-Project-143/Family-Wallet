@@ -10,7 +10,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Секретний ключ для JWT (в ідеалі має братися з os.getenv("JWT_SECRET"))
 SECRET_KEY = os.getenv("JWT_SECRET", "super-secret-key-for-development-only")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_HOURS = 24
+ACCESS_TOKEN_EXPIRE_HOURS = 48
 
 
 def verify_password(plain_password, hashed_password):
@@ -25,7 +25,7 @@ def get_password_hash(password):
 
 def create_access_token(user_id: str):
     """Створює JWT токен, який містить лише ID користувача."""
-    expire = datetime.utcnow() + timedelta(hours=24)  # Або твій час
+    expire = datetime.utcnow() + timedelta(hours=48)  # Або твій час
 
     # В payload тепер тільки userId та час життя
     payload = {

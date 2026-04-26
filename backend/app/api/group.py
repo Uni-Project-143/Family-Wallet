@@ -27,11 +27,11 @@ def _extract_token_from_link(invite_link: str) -> str:
     try:
         parsed = urlparse(invite_link.strip())
     except Exception:
-        raise HTTPException(status_code=400, detail="Невалідне посилання запрошення")
+        raise HTTPException(status_code=400, detail="Invalid invite link structure")
 
     parts = [p for p in parsed.path.split("/") if p]
     if len(parts) < 2 or parts[-2] != "join" or not parts[-1]:
-        raise HTTPException(status_code=400, detail="Невалідне посилання запрошення")
+        raise HTTPException(status_code=400, detail="Invalid invite link structure")
 
     return parts[-1]
 
@@ -57,7 +57,7 @@ async def create_group(
     await membership.insert()
 
     return {
-        "message": "Група успішно створена",
+        "message": "Group created successfully",
         "group_id": str(new_group.id),
         "name": new_group.name
     }
@@ -74,7 +74,7 @@ async def generate_invite_link(
     try:
         group_obj_id = ObjectId(group_id)
     except:
-        raise HTTPException(status_code=400, detail="Невалідний формат ID групи")
+        raise HTTPException(status_code=400, detail="Invalid group ID format")
 
     # КРОК 2: Перевірка прав доступу (Чи є юзер в цій групі і чи він АДМІН)
     membership = await GroupMembership.find_one(
@@ -85,13 +85,13 @@ async def generate_invite_link(
     if not membership:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Ви не є учасником цієї групи"
+            detail="You are not a member of this group"
         )
 
     if membership.role != "ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Тільки адміністратор може генерувати посилання"
+            detail="Only an administrator can generate invite links"
         )
 
     # КРОК 3: Генерація та збереження токена
@@ -126,11 +126,11 @@ async def join_group(
     invite = await InviteToken.find_one(InviteToken.token == token)
 
     if not invite:
-        raise HTTPException(status_code=400, detail="Недійсний або підроблений токен запрошення")
+        raise HTTPException(status_code=400, detail="Invalid or forged invite token")
 
     # 2. Перевіряємо, чи не прострочений лінк (Negative AC -> 410 Gone)
     if invite.expires_at < datetime.utcnow():
-        raise HTTPException(status_code=410, detail="Термін дії посилання минув")
+        raise HTTPException(status_code=410, detail="Invite link has expired")
 
     # 3. Перевіряємо, чи користувач вже не в цій сім'ї
     existing_member = await GroupMembership.find_one(
@@ -138,7 +138,7 @@ async def join_group(
         GroupMembership.group_id == invite.group_id
     )
     if existing_member:
-        raise HTTPException(status_code=400, detail="Ви вже є учасником цієї групи")
+        raise HTTPException(status_code=400, detail="You are already a member of this group")
 
     # 4. Створюємо членство з роллю MEMBER
     new_membership = GroupMembership(
@@ -152,4 +152,4 @@ async def join_group(
     invite.used_at = datetime.utcnow()
     await invite.save()
 
-    return {"message": "Ви успішно приєдналися до сім'ї!"}
+    return {"message": "You have successfully joined the family!"}

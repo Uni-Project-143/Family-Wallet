@@ -11,7 +11,7 @@ async def register(request: UserRegisterRequest):
     # 1. Перевірка дублікату
     existing_user = await User.find_one(User.email == request.email)
     if existing_user:
-        raise HTTPException(status_code=409, detail="Email вже зареєстрований")
+        raise HTTPException(status_code=409, detail="Email is already registered")
 
     # 2. Хешування та створення
     hashed_pwd = get_password_hash(request.password)
@@ -36,7 +36,7 @@ async def login(request: UserLoginRequest):
     if not user or not verify_password(request.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Невірний email або пароль"
+            detail="Invalid email or password"
         )
 
     # Генерація токена ТІЛЬКИ з user_id

@@ -59,46 +59,110 @@ async def create_group(request: GroupCreateRequest, current_user: User = Depends
 
 
 @router.get("/{group_id}/invite", status_code=status.HTTP_200_OK)
-async def generate_invite_link(group_id: str, current_user: User = Depends(get_current_user)):
+async def get_invite_link(
+    group_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """
-    Генерація унікального посилання для запрошення в групу.
-    Доступно ТІЛЬКИ для користувачів з роллю ADMIN у цій групі.
+    Get an active invite link for the group.
+    If a valid link already exists, returns it. If not, creates a new one.
+    Available ONLY to users with the ADMIN role in this group.
     """
     try:
         group_obj_id = ObjectId(group_id)
-    except:
+    except Exception:
         raise HTTPException(status_code=400, detail="Invalid group ID format")
 
-    # КРОК 2: Перевірка прав доступу (Чи є юзер в цій групі і чи він АДМІН)
+    # Перевірка прав доступу (тільки ADMIN)
     membership = await GroupMembership.find_one(
-        GroupMembership.user_id == current_user.id, GroupMembership.group_id == group_obj_id
+        GroupMembership.user_id == current_user.id,
+        GroupMembership.group_id == group_obj_id
     )
 
     if not membership:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not a member of this group"
-        )
-
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not a member of this group")
     if membership.role != "ADMIN":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only an administrator can generate invite links"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only an administrator can view invite links")
 
-    # КРОК 3: Генерація та збереження токена
-    new_invite = InviteToken(group_id=group_obj_id, created_by=current_user.id)
+    now = datetime.utcnow()
+    base_url = "https://family-wallet.com"
+
+    # 1. Шукаємо вже існуючий активний токен для цієї групи
+    active_invite = await InviteToken.find_one(
+        # БУЛО: InviteToken.group_id == str(group_obj_id)
+        InviteToken.group_id == group_obj_id,  # <--- ПРИБРАЛИ str()
+        InviteToken.expires_at > now
+    )
+
+    # Якщо знайшли — просто повертаємо його (не плодимо дублікати в БД)
+    if active_invite:
+        return {
+            "invite_link": f"{base_url}/join/{active_invite.token}",
+            "token": active_invite.token,
+            "expires_at": active_invite.expires_at
+        }
+
+    # 2. Якщо активного токена немає (або всі прострочені) — створюємо новий
+    new_invite = InviteToken(
+        group_id=str(group_obj_id),
+        created_by=str(current_user.id)
+    )
     await new_invite.insert()
 
-    # КРОК 4: Формування відповіді
-    # Для MVP можна захардкодити домен фронтенду в .env, наприклад FRONTEND_URL=http://localhost:3000
-    base_url = "https://family-wallet.com"  # або os.getenv("FRONTEND_URL")
-    invite_link = f"{base_url}/join/{new_invite.token}"
-
     return {
-        "invite_link": invite_link,
+        "invite_link": f"{base_url}/join/{new_invite.token}",
         "token": new_invite.token,
-        "expires_at": new_invite.expires_at,
+        "expires_at": new_invite.expires_at
+    }
+
+
+@router.post("/{group_id}/invite/regenerate", status_code=status.HTTP_200_OK)
+async def regenerate_invite_link(
+    group_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Invalidate all existing invite links for the group and generate a new one.
+    Available ONLY to users with the ADMIN role in this group.
+    """
+    try:
+        group_obj_id = ObjectId(group_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid group ID format")
+
+    # Перевірка прав доступу (тільки ADMIN)
+    membership = await GroupMembership.find_one(
+        GroupMembership.user_id == current_user.id,
+        GroupMembership.group_id == group_obj_id
+    )
+
+    if not membership:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not a member of this group")
+    if membership.role != "ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only an administrator can regenerate invite links")
+
+    now = datetime.utcnow()
+
+    await InviteToken.find(
+
+        InviteToken.group_id == group_obj_id,
+        InviteToken.expires_at > now
+    ).update({"$set": {"expires_at": now}})
+
+
+    new_invite = InviteToken(
+        group_id=group_obj_id,
+        created_by=current_user.id
+    )
+    await new_invite.insert()
+
+    base_url = "https://family-wallet.com"
+
+    # 3. Віддаємо новий лінк фронтенду
+    return {
+        "invite_link": f"{base_url}/join/{new_invite.token}",
+        "token": new_invite.token,
+        "expires_at": new_invite.expires_at
     }
 
 

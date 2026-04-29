@@ -94,3 +94,13 @@ export async function requestPasswordReset(payload) {
   })
   return response.data
 }
+
+/**
+ * Список учасників групи — GET /api/v1/group/{group_id}/members
+ * @param {string} groupId
+ * @returns {Promise<Array>} масив учасників { user_id, full_name, email, role, joined_at }
+ */
+export async function fetchGroupMembers(groupId) {
+  const response = await apiClient.get(`/api/v1/group/${groupId}/members`)
+  return response.data
+}

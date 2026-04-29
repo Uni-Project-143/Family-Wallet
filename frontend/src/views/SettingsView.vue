@@ -109,9 +109,7 @@
               <!-- Group Invite Code -->
               <div class="invite-section__label">
                 Group Invite Code
-                <span class="invite-section__label-note"
-                  >· Group.invite_code · Admin Only · Rule-02</span
-                >
+                <span class="invite-section__label-note">Only Admin can generate invite links</span>
               </div>
 
               <!-- Link box (FE-02) -->
@@ -237,7 +235,7 @@
                     stroke-width="1.2"
                   />
                 </svg>
-                Only Admin can generate invite links (Rule-02). Non-admin users receive 403 on GET
+                Only Admin can generate invite links. Non-admin users receive 403 on GET
                 /group/invite.
               </div>
 
@@ -330,10 +328,17 @@
             v-if="isAdmin"
             class="btn-gold"
             style="margin-top: 16px"
-            @click="showToast('Connect Card modal — coming soon', 'info')"
+            @click="isConnectCardOpen = true"
           >
             + Connect Card
           </button>
+
+          <ConnectCardModal
+            :is-open="isConnectCardOpen"
+            @close="isConnectCardOpen = false"
+            @toast="showToast($event.message, $event.type)"
+            @connected="handleCardConnected"
+          />
         </section>
 
         <!-- NOTIFICATIONS section -->
@@ -392,7 +397,9 @@
   import { useAuth } from '../composables/useAuth'
   import { fetchGroupInviteLink, regenerateGroupInviteLink } from '../services/authService'
   import { useRoute } from 'vue-router'
+  import ConnectCardModal from '../components/ConnectCardModal.vue'
 
+  const isConnectCardOpen = ref(false)
   const route = useRoute()
   const activeSection = ref(route.query.section || 'members')
 
@@ -627,6 +634,20 @@
     setTimeout(() => {
       toast.value.isVisible = false
     }, 3000)
+  }
+
+  /**
+   * Додає нову картку у локальний список після успішного підключення.
+   * @param {{ alias: string, syncFrom: string }} cardData
+   */
+  function handleCardConnected(cardData) {
+    connectedCards.value.push({
+      id: Date.now(),
+      bankName: 'Monobank',
+      maskedPan: '•••• •••• •••• ' + Math.floor(1000 + Math.random() * 9000),
+      balance: 0,
+      alias: cardData.alias,
+    })
   }
 </script>
 

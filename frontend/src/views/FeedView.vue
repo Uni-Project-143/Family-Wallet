@@ -331,6 +331,7 @@
   import { ref, computed, onMounted, onUnmounted } from 'vue'
   import { useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
+  import { fetchGroupMembers } from '../services/authService'
   import InviteMemberModal from '../components/InviteMemberModal.vue'
 
   const isInviteModalOpen = ref(false)
@@ -360,32 +361,56 @@
   // Для ролі. Замість const isAdmin = ref(true)
   const isAdmin = computed(() => storedUser.role === 'ADMIN')
   const activeGroupId = ref(1)
-  const groupMembers = ref([
-    {
-      id: 1,
-      name: 'Olena K.',
-      initials: 'OK',
-      role: 'ADMIN',
-      avatarVariant: 'gold',
-      isCurrentUser: true,
-    },
-    {
-      id: 2,
-      name: 'Mykola K.',
-      initials: 'MK',
-      role: 'MEMBER',
-      avatarVariant: 'dark',
-      isCurrentUser: false,
-    },
-    {
-      id: 3,
-      name: 'Sofia K.',
-      initials: 'SK',
-      role: 'MEMBER',
-      avatarVariant: 'light',
-      isCurrentUser: false,
-    },
-  ])
+  // ─── Group Members з API ───
+  const groupMembers = ref([])
+  const isLoadingMembers = ref(false)
+
+  /**
+   * Транформує бекенд-формат у формат для UI.
+   * Бекенд повертає user_id, full_name, role, joined_at.
+   */
+  function mapMemberFromApi(apiMember, currentUserEmail) {
+    const fullName = apiMember.full_name || apiMember.email || 'User'
+    const initials = fullName
+      .split(' ')
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+
+    // Просте мапування для аватара — за першою літерою імені
+    const variants = ['gold', 'dark', 'light']
+    const variantIdx = (initials.charCodeAt(0) || 0) % variants.length
+
+    return {
+      id: apiMember.user_id || apiMember.id,
+      name: fullName,
+      initials,
+      role: apiMember.role,
+      avatarVariant: variants[variantIdx],
+      isCurrentUser: apiMember.email === currentUserEmail,
+    }
+  }
+
+  async function loadGroupMembers() {
+    if (!storedUser.groupId) return
+
+    isLoadingMembers.value = true
+    try {
+      const data = await fetchGroupMembers(storedUser.groupId)
+      const members = Array.isArray(data) ? data : data.members || []
+      groupMembers.value = members.map((m) => mapMemberFromApi(m, storedUser.email))
+    } catch (err) {
+      showToast('Failed to load group members', 'error')
+    } finally {
+      isLoadingMembers.value = false
+    }
+  }
+
+  onMounted(() => {
+    loadGroupMembers()
+    connectWebSocket()
+  })
 
   const connectedCards = ref([
     { id: 1, bankName: 'Monobank', maskedPan: '•••• •••• •••• 4521', balance: 12340 },

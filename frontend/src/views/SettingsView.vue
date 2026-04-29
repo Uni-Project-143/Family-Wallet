@@ -393,9 +393,14 @@
 </template>
 
 <script setup>
-  import { ref, computed, watch } from 'vue'
+  import { ref, computed, watch, onMounted } from 'vue'
   import { useAuth } from '../composables/useAuth'
-  import { fetchGroupInviteLink, regenerateGroupInviteLink } from '../services/authService'
+  import {
+    fetchGroupInviteLink,
+    regenerateGroupInviteLink,
+    fetchGroupMembers,
+  } from '../services/authService'
+
   import { useRoute } from 'vue-router'
   import ConnectCardModal from '../components/ConnectCardModal.vue'
 
@@ -432,49 +437,69 @@
     { key: 'privacy', icon: '🛡', label: 'Privacy & Data' },
   ]
 
-  // TODO: підключити до GET /api/v1/group/{groupId}/members коли з'явиться endpoint
-  const groupMembers = ref([
-    {
-      id: 1,
-      name: 'Olena K.',
-      initials: 'OK',
-      role: 'ADMIN',
-      avatarVariant: 'gold',
-      email: 'olena@example.com',
-      joinedAt: 'Jan 10',
-      isCurrentUser: true,
-    },
-    {
-      id: 2,
-      name: 'Mykola K.',
-      initials: 'MK',
-      role: 'MEMBER',
-      avatarVariant: 'dark',
-      email: 'mykola@example.com',
-      joinedAt: 'Jan 12',
-      isCurrentUser: false,
-    },
-    {
-      id: 3,
-      name: 'Sofia K.',
-      initials: 'SK',
-      role: 'MEMBER',
-      avatarVariant: 'light',
-      email: 'sofia@example.com',
-      joinedAt: 'Jan 12',
-      isCurrentUser: false,
-    },
-  ])
+  // ─── Group Members з API ───
+  const groupMembers = ref([])
+  const isLoadingMembers = ref(false)
+
+  function formatJoinedDate(isoDate) {
+    if (!isoDate) return ''
+    return new Date(isoDate).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    })
+  }
+
+  function mapMemberFromApi(apiMember, currentUserEmail) {
+    const fullName = apiMember.full_name || apiMember.email || 'User'
+    const initials = fullName
+      .split(' ')
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+
+    const variants = ['gold', 'dark', 'light']
+    const variantIdx = (initials.charCodeAt(0) || 0) % variants.length
+
+    return {
+      id: apiMember.user_id || apiMember.id,
+      name: fullName,
+      initials,
+      role: apiMember.role,
+      avatarVariant: variants[variantIdx],
+      email: apiMember.email,
+      joinedAt: formatJoinedDate(apiMember.joined_at),
+      isCurrentUser: apiMember.email === storedUser.email,
+    }
+  }
+
+  async function loadGroupMembers() {
+    const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+    if (!storedUser.groupId) return
+
+    isLoadingMembers.value = true
+    try {
+      const data = await fetchGroupMembers(storedUser.groupId)
+      const members = Array.isArray(data) ? data : data.members || []
+      groupMembers.value = members.map((m) => mapMemberFromApi(m, storedUser.email))
+    } catch (err) {
+      showToast('Failed to load group members', 'error')
+    } finally {
+      isLoadingMembers.value = false
+    }
+  }
+
+  onMounted(() => {
+    loadGroupMembers()
+  })
 
   /**
    * Видаляє учасника з групи.
-   * @param {object} member
+   * TODO: підключити DELETE /api/v1/group/{groupId}/members/{userId} коли з'явиться
    */
   function removeMember(member) {
-    if (confirm(`Remove ${member.name} from the group?`)) {
-      groupMembers.value = groupMembers.value.filter((m) => m.id !== member.id)
-      showToast(`${member.name} removed from group`, 'success')
-    }
+    if (!confirm(`Remove ${member.name} from the group?`)) return
+    showToast('Remove member endpoint not available yet', 'info')
   }
 
   // ─── Invite link ───

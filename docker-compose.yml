@@ -2,13 +2,14 @@ services:
   backend:
     build: ./backend
     volumes:
-      - ./backend/app:/app # hot reload
+      - ./backend/app:/code/app # hot reload
     ports:
       - "8000:8000"
     environment:
-      - MONGO_URI=${MONGO_URI}
+      - MONGO_ATLAS=${MONGO_ATLAS}
+      - DB_NAME=${DB_NAME}
       - SECRET_KEY=${SECRET_KEY}
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
     build:

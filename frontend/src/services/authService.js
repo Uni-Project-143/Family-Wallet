@@ -63,9 +63,10 @@ export async function fetchGroupInviteLink(groupId) {
 }
 
 /**
- * Перегенерація invite link — POST /api/v1/group/{group_id}/invite/regenerate
+ * Регенерація invite-лінку — старі токени інвалідуються, створюється новий.
+ * POST /api/v1/group/{group_id}/invite/regenerate
  * @param {string} groupId
- * @returns {{ invite_link, token, expires_at }}
+ * @returns {Promise<{invite_link: string, token: string, expires_at: string}>}
  */
 export async function regenerateGroupInviteLink(groupId) {
   const response = await apiClient.post(`/api/v1/group/${groupId}/invite/regenerate`)

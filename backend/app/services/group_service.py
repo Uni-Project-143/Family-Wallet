@@ -8,6 +8,8 @@ from app.models.invite import InviteToken
 from app.repositories.group_repository import GroupRepository
 from app.repositories.invite_repository import InviteRepository
 from app.exceptions import ForbiddenAccessError, InvalidInviteError, InviteExpiredError
+from app.schemas.group import GroupResponse
+
 
 class GroupService:
     BASE_URL = "https://family-wallet.com"
@@ -119,3 +121,30 @@ class GroupService:
         await InviteRepository.save(invite)
 
         return {"message": "You have successfully joined the family!"}
+
+    @staticmethod
+    async def get_user_groups(user_id: ObjectId) -> list[GroupResponse]:
+        # 1. Знаходимо всі "зв'язки" юзера з групами
+        memberships = await GroupRepository.get_user_memberships(user_id)
+
+        if not memberships:
+            return []  # Якщо груп немає — повертаємо пустий список (Фронт покаже Empty State)
+
+        # 2. Збираємо всі ID груп і робимо словник (мапу) ролей,
+        group_ids = [m.group_id for m in memberships]
+        role_map = {str(m.group_id): m.role for m in memberships}
+
+        # 3. Дістаємо самі групи з бази (за один запит!)
+        groups = await GroupRepository.get_groups_by_ids(group_ids)
+
+        # 4. Формуємо красиву відповідь для фронтенда
+        result = []
+        for group in groups:
+            result.append(
+                GroupResponse(
+                    id=str(group.id),
+                    name=group.name,
+                    role=role_map.get(str(group.id), "MEMBER")
+                )
+            )
+        return result

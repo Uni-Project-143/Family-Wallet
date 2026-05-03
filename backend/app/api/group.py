@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
+from typing import List
 
 # Твій імпорт для авторизації (переконайся, що він правильний)
 from app.core.dependencies import get_current_user
 from app.models.user import User
+from app.schemas.group import GroupResponse
 from app.services.group_service import GroupService
 
 router = APIRouter()
@@ -18,6 +20,11 @@ class JoinGroupRequest(BaseModel):
 async def create_group(request: GroupCreateRequest, current_user: User = Depends(get_current_user)):
     """Створення нової сім'ї/групи. Користувач автоматично стає ADMIN."""
     return await GroupService.create_group(request.name, current_user.id)
+
+@router.get("/me", response_model=List[GroupResponse])
+async def get_my_groups(current_user = Depends(get_current_user)):
+    """Повертає список всіх груп авотризованого юзера"""
+    return await GroupService.get_user_groups(current_user.id)
 
 @router.get("/{group_id}/invite", status_code=status.HTTP_200_OK)
 async def get_invite_link(group_id: str, current_user: User = Depends(get_current_user)):

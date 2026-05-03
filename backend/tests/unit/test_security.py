@@ -67,12 +67,12 @@ class TestCreateAccessToken:
         assert "exp" in payload
         assert payload["exp"] > int(time.time())
 
-    def test_token_expires_in_roughly_24h(self):
+    def test_token_expires_in_roughly_48h(self):
         token = create_access_token("uid-002")
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         seconds_left = payload["exp"] - int(time.time())
         # має бути між 23 і 25 годинами
-        assert 23 * 3600 < seconds_left < 25 * 3600
+        assert 47 * 3600 < seconds_left < 49 * 3600
 
     def test_expired_token_raises(self):
         """Перевіряємо, що PyJWT відхиляє протерміновані токени."""

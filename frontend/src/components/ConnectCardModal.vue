@@ -17,77 +17,172 @@
 
             <h2 class="modal-title">Connect Monobank Card</h2>
             <p class="modal-sub">
-              Enter your personal Monobank API token. Get one at
-              <a href="https://api.monobank.ua/" target="_blank" class="link">api.monobank.ua</a>.
+              Connect your Monobank account to automatically sync transactions with your family.
             </p>
 
             <form class="form" novalidate @submit.prevent="handleConnect">
-              <BaseInput
-                v-model="apiToken"
-                label="MONOBANK API TOKEN"
-                type="password"
-                placeholder="uXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-                autocomplete="off"
-                hint="Stored encrypted on our server. Never shared."
-                :error-message="fieldErrors.token"
-                @blur="validateToken"
-              />
+              <!-- ── Token field with tooltip (FE-03) ── -->
+              <div class="field">
+                <div class="field__header">
+                  <label class="field__label" for="mono-token">PERSONAL API TOKEN</label>
 
-              <div class="form-field">
-                <div class="form-field__label">SYNC TRANSACTIONS FROM</div>
-                <div class="i-field-wrap">
-                  <input v-model="syncFromDate" class="i-field" type="date" :max="todayIso" />
+                  <div
+                    class="tooltip-wrap"
+                    @mouseenter="isTooltipOpen = true"
+                    @mouseleave="isTooltipOpen = false"
+                  >
+                    <button
+                      type="button"
+                      class="tooltip-trigger"
+                      aria-label="How to find token"
+                      @click="isTooltipOpen = !isTooltipOpen"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.3" />
+                        <path
+                          d="M7 6V10"
+                          stroke="currentColor"
+                          stroke-width="1.3"
+                          stroke-linecap="round"
+                        />
+                        <circle cx="7" cy="4" r=".8" fill="currentColor" />
+                      </svg>
+                      How to find token
+                    </button>
+
+                    <Transition name="fade-down">
+                      <div v-if="isTooltipOpen" class="tooltip" role="tooltip">
+                        <div class="tooltip__title">Where to get your token</div>
+                        <ol class="tooltip__list">
+                          <li>Open the Monobank mobile app</li>
+                          <li>
+                            Visit
+                            <a
+                              href="https://api.monobank.ua/"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="tooltip__link"
+                              >api.monobank.ua</a
+                            >
+                            on your phone
+                          </li>
+                          <li>Scan the QR code in the app to authorize</li>
+                          <li>Copy your Personal Token (starts with <code>u</code>)</li>
+                        </ol>
+                        <div class="tooltip__hint">
+                          Read-only access to your account statements.
+                        </div>
+                      </div>
+                    </Transition>
+                  </div>
                 </div>
-                <p class="form-field__hint">Older transactions won't appear in feed.</p>
+
+                <div class="i-field-wrap" :class="{ 'i-field-wrap--error': fieldErrors.token }">
+                  <input
+                    id="mono-token"
+                    v-model="apiToken"
+                    :type="inputType"
+                    class="i-field"
+                    placeholder="uXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+                    autocomplete="off"
+                    spellcheck="false"
+                    @blur="validateToken"
+                    @input="serverError = ''"
+                  />
+                  <button
+                    type="button"
+                    class="eye-btn"
+                    :aria-label="showToken ? 'Hide token' : 'Show token'"
+                    @click="showToken = !showToken"
+                  >
+                    <svg v-if="!showToken" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path
+                        d="M1 8C1 8 3.5 3 8 3C12.5 3 15 8 15 8C15 8 12.5 13 8 13C3.5 13 1 8 1 8Z"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                      />
+                      <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.3" />
+                    </svg>
+                    <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path
+                        d="M2 2L14 14M6.5 6.5C5.97 7.04 5.5 7.84 5.5 8C5.5 9.38 6.62 10.5 8 10.5C8.16 10.5 8.96 10.03 9.5 9.5"
+                        stroke="currentColor"
+                        stroke-width="1.3"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                <p v-if="fieldErrors.token" class="error-text">{{ fieldErrors.token }}</p>
               </div>
 
-              <div class="security-note">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path
-                    d="M7 1L1.5 3.5V7C1.5 10 4 12.5 7 13C10 12.5 12.5 10 12.5 7V3.5L7 1Z"
-                    stroke="currentColor"
-                    stroke-width="1.3"
+              <!-- ── Alias (optional) ── -->
+              <div class="field">
+                <label class="field__label" for="card-alias">CARD NICKNAME (OPTIONAL)</label>
+                <div class="i-field-wrap">
+                  <input
+                    id="card-alias"
+                    v-model="cardAlias"
+                    type="text"
+                    class="i-field"
+                    placeholder="e.g. My Black Card"
+                    maxlength="40"
+                    autocomplete="off"
                   />
-                  <path
-                    d="M5 7L6.5 8.5L9 5.5"
-                    stroke="currentColor"
-                    stroke-width="1.3"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-                Token is encrypted and stored server-side only. It is never exposed to other users
-                or third parties. Only Admin can connect cards.
+                </div>
               </div>
 
+              <!-- ── Privacy + GDPR (FE-01) ── -->
+              <label class="checkbox-row">
+                <input v-model="agreedToPrivacy" type="checkbox" class="checkbox" />
+                <span class="checkbox-text">
+                  I agree to the
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer" class="link">
+                    Privacy Policy
+                  </a>
+                  and
+                  <a href="/gdpr" target="_blank" rel="noopener noreferrer" class="link">
+                    GDPR Data Processing
+                  </a>
+                  terms. My token will be encrypted (AES-256) before storage.
+                </span>
+              </label>
+
+              <!-- ── Server error ── -->
               <Transition name="fade-down">
                 <div v-if="serverError" class="server-error" role="alert">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.3" />
+                    <path
+                      d="M7 4V8M7 10V10.01"
+                      stroke="currentColor"
+                      stroke-width="1.3"
+                      stroke-linecap="round"
+                    />
+                  </svg>
                   {{ serverError }}
                 </div>
               </Transition>
 
+              <!-- ── Actions ── -->
               <div class="actions">
                 <button type="button" class="btn-secondary" :disabled="isConnecting" @click="close">
                   Cancel
                 </button>
-                <button type="submit" class="btn-gold" :disabled="!apiToken.trim() || isConnecting">
-                  <span v-if="!isConnecting">Connect Card</span>
-                  <svg
-                    v-else
-                    class="spinner"
-                    width="18"
-                    height="18"
-                    viewBox="0 0 18 18"
-                    fill="none"
-                  >
-                    <circle cx="9" cy="9" r="7" stroke="rgba(255,255,255,.3)" stroke-width="2" />
-                    <path
-                      d="M9 2A7 7 0 0 1 16 9"
-                      stroke="white"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                    />
-                  </svg>
+                <button type="submit" class="btn-gold" :disabled="!canSubmit">
+                  <template v-if="!isConnecting">Connect Card</template>
+                  <template v-else>
+                    <svg class="spinner" width="18" height="18" viewBox="0 0 18 18" fill="none">
+                      <circle cx="9" cy="9" r="7" stroke="rgba(255,255,255,.3)" stroke-width="2" />
+                      <path
+                        d="M9 2A7 7 0 0 1 16 9"
+                        stroke="white"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                    Validating token...
+                  </template>
                 </button>
               </div>
             </form>
@@ -99,10 +194,10 @@
 </template>
 
 <script setup>
-  import { ref, computed } from 'vue'
-  import BaseInput from './BaseInput.vue'
+  import { ref, computed, watch } from 'vue'
+  import { connectMonobankCard } from '../services/cardService'
 
-  defineProps({
+  const props = defineProps({
     isOpen: { type: Boolean, default: false },
   })
 
@@ -110,87 +205,104 @@
 
   const apiToken = ref('')
   const cardAlias = ref('')
-  const syncFromDate = ref(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10))
+  const agreedToPrivacy = ref(false)
+  const showToken = ref(false)
+  const isTooltipOpen = ref(false)
   const isConnecting = ref(false)
   const serverError = ref('')
-
   const fieldErrors = ref({ token: '' })
 
-  const todayIso = computed(() => new Date().toISOString().slice(0, 10))
+  const inputType = computed(() => (showToken.value ? 'text' : 'password'))
 
-  /**
-   * Перевіряє формат Monobank API токена.
-   * Токен має префікс 'u' і ~32+ символи.
-   */
+  // FE-01: кнопка disabled до підтвердження чекбоксу
+  const canSubmit = computed(
+    () => apiToken.value.trim().length > 0 && agreedToPrivacy.value && !isConnecting.value,
+  )
+
+  watch(
+    () => props.isOpen,
+    (open) => {
+      if (!open) resetForm()
+    },
+  )
+
   function validateToken() {
     fieldErrors.value.token = ''
     const token = apiToken.value.trim()
     if (!token) {
-      fieldErrors.value.token = 'API token is required'
+      fieldErrors.value.token = 'Token is required'
       return false
     }
     if (token.length < 20) {
-      fieldErrors.value.token = 'Token looks too short. Check api.monobank.ua'
+      fieldErrors.value.token = 'Token looks too short. Get a valid one at api.monobank.ua'
       return false
     }
     return true
   }
 
-  /**
-   * Підключення картки.
-   * TODO: підключити POST /api/v1/cards/connect коли з'явиться endpoint
-   */
   async function handleConnect() {
     if (!validateToken()) return
+    if (!agreedToPrivacy.value) return
+
+    const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+    if (!storedUser.groupId) {
+      serverError.value = 'No active group found. Please re-login.'
+      return
+    }
 
     isConnecting.value = true
     serverError.value = ''
 
     try {
-      const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-      if (!storedUser.groupId) {
-        serverError.value = 'No active group found. Please re-login.'
-        return
-      }
-
-      // TODO: реальний запит коли бекенд буде готовий
-      // const data = await connectMonobankCard({
-      //   groupId: storedUser.groupId,
-      //   apiToken: apiToken.value.trim(),
-      //   alias: cardAlias.value.trim(),
-      //   syncFrom: syncFromDate.value,
-      // })
-
-      emit('connected', {
-        alias: cardAlias.value.trim() || 'Monobank',
-        syncFrom: syncFromDate.value,
+      const card = await connectMonobankCard({
+        groupId: storedUser.groupId,
+        apiToken: apiToken.value.trim(),
+        alias: cardAlias.value.trim(),
       })
-      emit('toast', { message: 'Card connected successfully', type: 'success' })
-      resetForm()
+
+      emit('connected', card)
+      emit('toast', {
+        message: `Card connected: ${card.masked_pan || '•••• ????'}`,
+        type: 'success',
+      })
       close()
     } catch (err) {
-      const status = err.response?.status
-      if (status === 401) {
-        serverError.value = 'Invalid Monobank token. Please check and try again.'
-      } else if (status === 409) {
-        serverError.value = 'This card is already connected.'
-      } else {
-        serverError.value = 'Failed to connect card. Please try again.'
-      }
+      handleServerError(err)
     } finally {
       isConnecting.value = false
+    }
+  }
+
+  function handleServerError(err) {
+    const status = err.response?.status
+    const detail = err.response?.data?.message || err.response?.data?.detail
+
+    if (status === 400) {
+      serverError.value = detail || 'Invalid Monobank token. Please check and try again.'
+    } else if (status === 403) {
+      serverError.value = 'Only Admin can connect cards to the family group.'
+    } else if (status === 409) {
+      serverError.value = 'This token is already used in the system.'
+    } else if (status === 503) {
+      serverError.value = 'Monobank API is temporarily unavailable. Please try again later.'
+    } else if (status === 422) {
+      serverError.value = 'Token is required.'
+    } else {
+      serverError.value = 'Failed to connect card. Please try again.'
     }
   }
 
   function resetForm() {
     apiToken.value = ''
     cardAlias.value = ''
+    agreedToPrivacy.value = false
+    showToken.value = false
+    isTooltipOpen.value = false
     fieldErrors.value.token = ''
     serverError.value = ''
   }
 
   function close() {
-    resetForm()
     emit('close')
   }
 </script>
@@ -216,7 +328,7 @@
       0 0 0 1px rgba(184, 151, 58, 0.1);
     padding: 40px 40px 32px;
     width: 100%;
-    max-width: 520px;
+    max-width: 540px;
     position: relative;
     border-top: 3px solid #b8973a;
     max-height: 90vh;
@@ -267,73 +379,215 @@
     line-height: 1.6;
   }
 
-  .link {
-    color: #b8973a;
-    text-decoration: underline;
-  }
-
   .form {
     display: flex;
     flex-direction: column;
     gap: 18px;
   }
+  .field {
+    display: flex;
+    flex-direction: column;
+  }
 
-  .form-field__label {
+  .field__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .field__label {
     font-size: 11px;
     font-weight: 600;
     color: #6b6860;
     letter-spacing: 0.7px;
     text-transform: uppercase;
-    margin-bottom: 6px;
   }
 
-  .form-field__hint {
+  /* Tooltip */
+  .tooltip-wrap {
+    position: relative;
+  }
+
+  .tooltip-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    background: none;
+    color: #b8973a;
     font-size: 11px;
-    color: #b0ada7;
-    margin: 5px 0 0;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 4px;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+
+  .tooltip-trigger:hover {
+    color: #9b7a25;
+  }
+
+  .tooltip {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 280px;
+    background: #0d0c0a;
+    color: #ead9a0;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 12px;
+    line-height: 1.5;
+    box-shadow: 0 12px 32px rgba(13, 12, 10, 0.32);
+    z-index: 10;
+  }
+
+  .tooltip::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    right: 14px;
+    width: 12px;
+    height: 12px;
+    background: #0d0c0a;
+    transform: rotate(45deg);
+  }
+
+  .tooltip__title {
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .tooltip__list {
+    margin: 0;
+    padding-left: 18px;
+    color: rgba(234, 217, 160, 0.85);
+  }
+  .tooltip__list li {
+    margin-bottom: 4px;
+  }
+
+  .tooltip__list code {
+    background: rgba(184, 151, 58, 0.18);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'DM Mono', 'Courier New', monospace;
+    font-size: 11px;
+    color: #ead9a0;
+  }
+
+  .tooltip__link {
+    color: #ead9a0;
+    text-decoration: underline;
+  }
+
+  .tooltip__hint {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(184, 151, 58, 0.18);
+    color: rgba(234, 217, 160, 0.6);
+    font-size: 11px;
   }
 
   .i-field-wrap {
+    position: relative;
     border: 1.5px solid #eae8e4;
     border-radius: 8px;
     overflow: hidden;
     transition:
       border-color 0.18s,
       box-shadow 0.18s;
+    background: #f4f1e9;
   }
 
   .i-field-wrap:focus-within {
     border-color: #b8973a;
     box-shadow: 0 0 0 3px rgba(184, 151, 58, 0.15);
+    background: #ffffff;
+  }
+
+  .i-field-wrap--error {
+    border-color: #c4402a;
   }
 
   .i-field {
     width: 100%;
     height: 46px;
     border: none;
-    background: #f4f1e9;
-    padding: 0 16px;
+    background: transparent;
+    padding: 0 44px 0 16px;
     font-family: 'DM Sans', system-ui, sans-serif;
     font-size: 14px;
     color: #0d0c0a;
     outline: none;
   }
 
-  .i-field:focus {
-    background: #ffffff;
+  .i-field::placeholder {
+    color: #b0ada7;
   }
 
-  .security-note {
+  .eye-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: #6b6860;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .eye-btn:hover {
+    background: rgba(184, 151, 58, 0.1);
+    color: #b8973a;
+  }
+
+  .error-text {
+    font-size: 12px;
+    color: #c4402a;
+    margin: 5px 0 0;
+  }
+
+  .checkbox-row {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
+    gap: 10px;
+    padding: 12px 14px;
+    background: #fbf7ec;
+    border: 1px solid #f2e9c8;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  .checkbox {
+    width: 16px;
+    height: 16px;
+    margin: 2px 0 0;
+    accent-color: #b8973a;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .checkbox-text {
     font-size: 12px;
     color: #6b6860;
     line-height: 1.6;
-    padding: 12px 14px;
-    background: #f4f1e9;
-    border-radius: 6px;
-    border-left: 3px solid #b8973a;
+  }
+
+  .link {
+    color: #b8973a;
+    text-decoration: underline;
+  }
+  .link:hover {
+    color: #9b7a25;
   }
 
   .server-error {
@@ -351,7 +605,7 @@
   .actions {
     display: flex;
     gap: 12px;
-    margin-top: 8px;
+    margin-top: 4px;
   }
 
   .btn-secondary {
@@ -374,7 +628,7 @@
   }
 
   .btn-gold {
-    flex: 1;
+    flex: 1.4;
     height: 46px;
     background: linear-gradient(135deg, #b8973a, #c9a84c);
     color: #ffffff;
@@ -388,6 +642,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     box-shadow: 0 4px 16px rgba(184, 151, 58, 0.18);
   }
 

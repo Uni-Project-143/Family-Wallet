@@ -27,9 +27,12 @@ class Category(Document):
 
 class BankCard(Document):
     user_id: str
-    bank_token: str
+    group_id: str
+    encrypted_token: str
+    account_id: str
     masked_pan: str
     balance: Decimal
+    status: str = "ACTIVE"
     transaction_ids: List[str] = []
     class Settings:
         name = "bank_cards"
@@ -170,9 +173,12 @@ class Forward:
         # 6. BankCard
         card = BankCard(
             user_id=str(user_main.id),
-            bank_token="mono_api_token_sample",
-            masked_pan="4441********1111",
-            balance=Decimal("25400.50")
+            group_id=str(group.id),
+            encrypted_token="encrypted_dummy_token",
+            account_id="dummy_mono_account_123",
+            masked_pan="•••• 1111",
+            balance=Decimal("25400.50"),
+            status="ACTIVE"
         )
         await card.insert(session=session)
 

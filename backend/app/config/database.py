@@ -9,6 +9,7 @@ from app.models.invite import InviteToken
 from app.models.group import Group
 from app.models.group_membership import GroupMembership
 from app.models.blacklisted_token import BlacklistedToken
+from app.models.bank_card import BankCard
 
 load_dotenv()
 
@@ -29,5 +30,5 @@ async def init_db():
     """Функція підключає моделі Beanie до MongoDB при старті сервера."""
     await init_beanie(
         database=db_client[DB_NAME],
-        document_models=[User, Group, GroupMembership, InviteToken, BlacklistedToken]
+        document_models=[User, Group, GroupMembership, InviteToken, BlacklistedToken, BankCard]
     )

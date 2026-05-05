@@ -1,71 +1,51 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { registerUser, loginUser } from '../services/authService'
+import { loginUser, registerUser, fetchMyGroups } from '../services/authService'
 
-/**
- * Composable для управління станом авторизації.
- * @returns {{
- *   currentUser: import('vue').Ref,
- *   isAuthenticated: import('vue').ComputedRef<boolean>,
- *   isAdmin: import('vue').ComputedRef<boolean>,
- *   isLoading: import('vue').Ref<boolean>,
- *   authError: import('vue').Ref<string|null>,
- *   register: Function,
- *   login: Function,
- * }}
- */
+const STORAGE_TOKEN_KEY = 'accessToken'
+const STORAGE_USER_KEY = 'currentUser'
+
+function parseStoredUser() {
+  try {
+    const raw = localStorage.getItem(STORAGE_USER_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+// Реактивний глобальний стан
+const currentUser = ref(parseStoredUser())
+const isLoading = ref(false)
+const authError = ref(null)
+
+function persistAuthSession(token, user) {
+  localStorage.setItem(STORAGE_TOKEN_KEY, token)
+  localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user))
+  currentUser.value = user
+}
+
 export function useAuth() {
   const router = useRouter()
 
-  const currentUser = ref(parseStoredUser())
-  const isLoading = ref(false)
-  const authError = ref(null)
-
-  const isAuthenticated = computed(() => !!localStorage.getItem('accessToken'))
+  const isAuthenticated = computed(
+    () => !!currentUser.value && !!localStorage.getItem(STORAGE_TOKEN_KEY),
+  )
   const isAdmin = computed(() => currentUser.value?.role === 'ADMIN')
 
   /**
-   * Зчитує збережений користувач з localStorage.
-   * @returns {object|null}
+   * Реєстрація нового юзера.
+   * Після реєстрації групи ще нема, тому відправляємо на /group-setup.
    */
-  function parseStoredUser() {
-    try {
-      const stored = localStorage.getItem('currentUser')
-      return stored ? JSON.parse(stored) : null
-    } catch {
-      return null
-    }
-  }
-
-  /**
-   * Зберігає токен і дані користувача в localStorage.
-   * @param {string} token
-   * @param {object} user
-   */
-  function persistAuthSession(token, user) {
-    localStorage.setItem('accessToken', token)
-    localStorage.setItem('currentUser', JSON.stringify(user))
-    currentUser.value = user
-  }
-
-  /**
-   * Реєстрація — після успіху редирект на /group-setup.
-   * @param {{ fullName: string, email: string, password: string }} formPayload
-   */
-  async function register(formPayload) {
+  async function register(payload) {
     isLoading.value = true
     authError.value = null
     try {
-      const data = await registerUser({
-        fullName: formPayload.fullName,
-        email: formPayload.email,
-        password: formPayload.password,
-        confirmPassword: formPayload.password,
-      })
+      const data = await registerUser(payload)
 
       const userInfo = {
-        fullName: formPayload.fullName,
-        email: formPayload.email,
+        fullName: payload.fullName,
+        email: payload.email,
         role: null,
         groupId: null,
         groupName: null,
@@ -75,19 +55,12 @@ export function useAuth() {
       router.push('/group-setup')
     } catch (err) {
       const status = err.response?.status
-      const message = err.response?.data?.message
-
       if (status === 409) {
         authError.value = 'Користувач з таким email вже існує'
       } else if (status === 422) {
-        const detail = err.response?.data?.detail
-        if (Array.isArray(detail) && detail.length > 0) {
-          authError.value = detail[0].msg
-        } else {
-          authError.value = 'Перевірте правильність введених даних'
-        }
+        authError.value = err.response?.data?.detail?.[0]?.msg || 'Перевірте правильність полів'
       } else {
-        authError.value = message || 'Щось пішло не так. Спробуйте ще раз'
+        authError.value = err.response?.data?.message || 'Щось пішло не так. Спробуйте ще раз'
       }
     } finally {
       isLoading.value = false
@@ -95,39 +68,77 @@ export function useAuth() {
   }
 
   /**
-   * Авторизація — підтягує попередню сесію з localStorage.
-   * Якщо група є → /feed, якщо немає → /group-setup.
-   * @param {{ email: string, password: string }} credentials
+   * Логін з повним flow:
+   * 1. POST /auth/login — отримуємо токен
+   * 2. Зберігаємо токен у localStorage (apiClient interceptor читає звідти)
+   * 3. GET /group/me — підтягуємо групи юзера з role і groupId
+   * 4. Беремо першу групу (MVP) → формуємо userInfo
+   * 5. Якщо є groupId → /feed; якщо груп нема → /group-setup
    */
   async function login(credentials) {
     isLoading.value = true
     authError.value = null
+
     try {
-      const data = await loginUser(credentials)
+      // Крок 1: отримуємо токен
+      const tokenData = await loginUser(credentials)
 
-      const previousSession = JSON.parse(localStorage.getItem('currentUser') || '{}')
+      // Крок 2: зберігаємо токен ДО fetchMyGroups,
+      // бо apiClient додасть його у Authorization header
+      localStorage.setItem(STORAGE_TOKEN_KEY, tokenData.access_token)
 
-      const userInfo = {
-        email: credentials.email,
-        fullName: previousSession.fullName || '',
-        role: previousSession.role || null,
-        groupId: previousSession.groupId || null,
-        groupName: previousSession.groupName || null,
+      // Крок 3: підтягуємо групи з реального endpoint /group/me
+      let groups = []
+      try {
+        groups = await fetchMyGroups()
+      } catch (err) {
+        // Якщо ендпоінт впав — логін все ще працює, юзер піде на group-setup
+        console.warn('fetchMyGroups failed:', err)
       }
 
-      persistAuthSession(data.access_token, userInfo)
+      // Крок 4: формуємо повний об'єкт юзера
+      const previousSession = parseStoredUser() || {}
+      let userInfo
 
+      if (Array.isArray(groups) && groups.length > 0) {
+        // Беремо першу групу — для MVP підтримуємо лише одну активну групу
+        const primaryGroup = groups[0]
+        userInfo = {
+          fullName: previousSession.fullName || '',
+          email: credentials.email,
+          role: primaryGroup.role, // 'ADMIN' або 'MEMBER' — з беку
+          groupId: primaryGroup.id, // справжній ID з беку
+          groupName: primaryGroup.name,
+        }
+      } else {
+        // Юзер без груп — наприклад, акаунт є, але не приєднався ні до якої сім'ї
+        userInfo = {
+          fullName: previousSession.fullName || '',
+          email: credentials.email,
+          role: null,
+          groupId: null,
+          groupName: null,
+        }
+      }
+
+      persistAuthSession(tokenData.access_token, userInfo)
+
+      // Крок 5: редирект за станом юзера
       if (userInfo.groupId) {
         router.push('/feed')
       } else {
         router.push('/group-setup')
       }
     } catch (err) {
-      localStorage.removeItem('accessToken')
+      // Логін фейл (401, 429, etc.) — токен не зберігаємо
+      localStorage.removeItem(STORAGE_TOKEN_KEY)
+
       const status = err.response?.status
       if (status === 429) {
         authError.value = 'Забагато спроб. Спробуйте через 15 хв'
       } else {
+        // 401 і будь-які інші — однаковий текст
+        // (захист від user enumeration з AC US 2)
         authError.value = 'Невірний email або пароль'
       }
     } finally {
@@ -135,13 +146,24 @@ export function useAuth() {
     }
   }
 
+  /**
+   * Logout — видаляємо тільки токен.
+   * fullName/role/groupId залишаються у localStorage для UX наступного логіну.
+   */
+  function logout() {
+    localStorage.removeItem(STORAGE_TOKEN_KEY)
+    currentUser.value = null
+    router.push('/login')
+  }
+
   return {
     currentUser,
-    isAuthenticated,
-    isAdmin,
     isLoading,
     authError,
+    isAuthenticated,
+    isAdmin,
     register,
     login,
+    logout,
   }
 }

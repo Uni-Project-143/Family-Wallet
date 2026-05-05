@@ -20,13 +20,9 @@ class MonobankService:
         )
 
         if not membership:
-
-            all_user_mems = await GroupMembership.find(GroupMembership.user_id == user_id).to_list()
-            print(f"--- DEBUG --- Знайдено в базі для цього юзера: {all_user_mems}")
-
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Ви не є учасником цієї групи і не можете підключати сюди картки."
+                detail="You are not a member of this group and cannot connect cards."
             )
 
         # 2. BE-01: Валідація токена через MonobankClient
@@ -37,7 +33,7 @@ class MonobankService:
         if not client_info.get("accounts"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="На цьому токені немає активних рахунків."
+                detail="No active accounts found for this token."
             )
 
         main_account = client_info["accounts"][0]
@@ -49,7 +45,7 @@ class MonobankService:
         if existing_card:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Цей рахунок вже підключено до системи."
+                detail="This account is already connected to the system."
             )
 
         # 4. BE-03: Шифрування токена
@@ -79,6 +75,6 @@ class MonobankService:
         # 7. Позитивний AC: Повертаємо дані для UI
         return {
             "masked_pan": masked_pan,
-            "status": "Активна",
-            "message": "Картку успішно підключено"
+            "status": "Active",
+            "message": "Card connected successfully"
         }

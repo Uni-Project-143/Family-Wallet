@@ -78,3 +78,50 @@ class MonobankService:
             "status": "Active",
             "message": "Card connected successfully"
         }
+
+
+    @classmethod
+    async def disconnect_card(cls, card_id: str, user_id: str) -> dict:
+        """
+        Disconnects the card (Soft delete) and removes the webhook.
+        """
+        # 1. Шукаємо картку в базі
+        card = await BankCardRepository.get_by_id(card_id)
+        if not card:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Card not found."
+            )
+
+        # 2. BE-03: Перевірка власності картки (захист від видалення чужої картки)
+        if card.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only disconnect your own cards."
+            )
+
+        # 3. Перевірка, чи не відключена вона вже
+        if card.status == "INACTIVE":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Card is already disconnected."
+            )
+
+        # 4. BE-02: Скидання webhook у Monobank API
+        try:
+            decrypted_token = EncryptionService.decrypt(card.encrypted_token)
+            # Передаємо порожній рядок "", щоб Монобанк перестав слати транзакції
+            await MonobankClient.register_webhook(decrypted_token, "")
+        except Exception as e:
+            # Якщо токен невалідний або банк лежить, ми все одно дозволяємо
+            # відключити картку локально, щоб юзер не "застряг".
+            print(f"Warning: Failed to reset Monobank webhook: {e}")
+
+        # 5. BE-01: Soft delete (Транзакції залишаться, бо ми не видаляємо запис)
+        card.status = "INACTIVE"
+        await BankCardRepository.save(card)
+
+        # 6. Успішна відповідь для UI
+        return {
+            "message": "Card disconnected successfully. Transaction history is saved."
+        }

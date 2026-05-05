@@ -270,7 +270,7 @@
     if (status === 400) {
       serverError.value = detail || 'Invalid Monobank token'
     } else if (status === 403) {
-      serverError.value = detail || 'You do not have permission to connect a card to this group'
+      serverError.value = detail || 'You are not a member of this family group'
     } else if (status === 409) {
       serverError.value = detail || 'This account is already connected to the system'
     } else if (status === 503) {

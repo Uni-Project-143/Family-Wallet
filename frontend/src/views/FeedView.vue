@@ -96,9 +96,7 @@
             <div class="card-widget__pan">{{ card.maskedPan }}</div>
             <div class="card-widget__balance">{{ formatCurrency(card.balance) }}</div>
           </div>
-          <button v-if="isAdmin" class="connect-card-btn" @click="goToConnectCard">
-            + Connect Card
-          </button>
+          <button class="..." @click="goToConnectCard">+ Connect Card</button>
         </section>
       </aside>
 
@@ -412,10 +410,10 @@
     connectWebSocket()
   })
 
-  const connectedCards = ref([
-    { id: 1, bankName: 'Monobank', maskedPan: '•••• •••• •••• 4521', balance: 12340 },
-    { id: 2, bankName: 'Monobank', maskedPan: '•••• •••• •••• 7732', balance: 3870 },
-  ])
+  // const connectedCards = ref([
+  //   { id: 1, bankName: 'Monobank', maskedPan: '•••• •••• •••• 4521', balance: 12340 },
+  //   { id: 2, bankName: 'Monobank', maskedPan: '•••• •••• •••• 7732', balance: 3870 },
+  // ])
 
   const isLoadingFeed = ref(false)
   const transactions = ref([

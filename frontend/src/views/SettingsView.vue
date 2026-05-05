@@ -353,12 +353,8 @@
             </div>
           </div>
 
-          <button
-            v-if="isAdmin"
-            class="btn-gold"
-            style="margin-top: 16px"
-            @click="isConnectCardOpen = true"
-          >
+          <!-- СТАЛО -->
+          <button class="btn-gold" style="margin-top: 16px" @click="isConnectCardOpen = true">
             + Connect Card
           </button>
 

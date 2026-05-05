@@ -307,16 +307,44 @@
           <div class="settings-section__header">
             <h2 class="settings-section__title">Connected Cards</h2>
           </div>
-          <div class="cards-list">
+
+          <!-- Empty state -->
+          <div v-if="connectedCards.length === 0" class="cards-empty">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <rect
+                x="4"
+                y="10"
+                width="32"
+                height="22"
+                rx="3"
+                stroke="#d6d3ce"
+                stroke-width="1.5"
+              />
+              <path d="M4 16H36" stroke="#d6d3ce" stroke-width="1.5" />
+            </svg>
+            <p>No cards connected.</p>
+            <span>Connect your Monobank card to automatically track family expenses.</span>
+          </div>
+
+          <!-- FE-02: список з масованим номером та статусом -->
+          <div v-else class="cards-list">
             <div v-for="card in connectedCards" :key="card.id" class="card-item">
+              <div class="card-item__icon">
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                  <rect x="2" y="5" width="18" height="13" rx="2" fill="#0d0c0a" />
+                  <rect x="2" y="8" width="18" height="2" fill="#b8973a" />
+                </svg>
+              </div>
+
               <div class="card-item__info">
                 <div class="card-item__bank">{{ card.bankName }}</div>
                 <div class="card-item__pan">{{ card.maskedPan }}</div>
-                <div class="card-item__balance">{{ card.balance.toLocaleString('uk-UA') }} UAH</div>
               </div>
+
               <div class="card-item__actions">
                 <span class="card-item__status">
-                  <span class="card-item__dot"></span> Connected
+                  <span class="card-item__dot"></span>
+                  {{ card.status }}
                 </span>
                 <button v-if="isAdmin" class="btn-remove" @click="disconnectCard(card)">
                   Disconnect
@@ -324,6 +352,7 @@
               </div>
             </div>
           </div>
+
           <button
             v-if="isAdmin"
             class="btn-gold"
@@ -404,7 +433,6 @@
   import { useRoute } from 'vue-router'
   import ConnectCardModal from '../components/ConnectCardModal.vue'
 
-  const isConnectCardOpen = ref(false)
   const route = useRoute()
   const activeSection = ref(route.query.section || 'members')
 
@@ -595,21 +623,35 @@
   }
 
   // ─── Cards ───
-  // TODO: підключити до GET /api/v1/group/{groupId}/cards коли з'явиться endpoint
-  const connectedCards = ref([
-    { id: 1, bankName: 'Monobank', maskedPan: '•••• •••• •••• 4521', balance: 12340 },
-    { id: 2, bankName: 'Monobank', maskedPan: '•••• •••• •••• 7732', balance: 3870 },
-  ])
 
+  // Картки — поки що зберігаються локально після підключення.
+  // TODO: коли бекенд додасть GET /api/v1/monobank/cards/{groupId} — підвантажувати з API
+  const connectedCards = ref([])
+  const isConnectCardOpen = ref(false)
   /**
    * Відключає картку від групи.
    * @param {object} card
    */
+  /**
+   * FE-02: викликається після успішного підключення.
+   * Бекенд повертає { masked_pan, status: "Активна" }.
+   */
+  function handleCardConnected(card) {
+    connectedCards.value.push({
+      id: Date.now(), // тимчасовий локальний ID
+      bankName: 'Monobank',
+      maskedPan: card.masked_pan,
+      status: card.status, // "Активна"
+    })
+  }
+
+  /**
+   * Локальне видалення з UI. Реальне disconnect — у наступній тасці PROJ-63.
+   */
   function disconnectCard(card) {
-    if (confirm(`Disconnect ${card.maskedPan}?`)) {
-      connectedCards.value = connectedCards.value.filter((c) => c.id !== card.id)
-      showToast('Card disconnected. Existing transactions preserved.', 'success')
-    }
+    if (!confirm(`Disconnect ${card.maskedPan}?`)) return
+    connectedCards.value = connectedCards.value.filter((c) => c.id !== card.id)
+    showToast('Card disconnected. Existing transactions preserved.', 'success')
   }
 
   // ─── Notifications ───
@@ -659,20 +701,6 @@
     setTimeout(() => {
       toast.value.isVisible = false
     }, 3000)
-  }
-
-  /**
-   * Додає нову картку у локальний список після успішного підключення.
-   * @param {{ alias: string, syncFrom: string }} cardData
-   */
-  function handleCardConnected(cardData) {
-    connectedCards.value.push({
-      id: Date.now(),
-      bankName: 'Monobank',
-      maskedPan: '•••• •••• •••• ' + Math.floor(1000 + Math.random() * 9000),
-      balance: 0,
-      alias: cardData.alias,
-    })
   }
 </script>
 
@@ -1376,5 +1404,46 @@
   .toast-leave-to {
     opacity: 0;
     transform: translateY(12px);
+  }
+
+  .cards-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 48px 20px;
+    background: #ffffff;
+    border: 1px dashed #d6d3ce;
+    border-radius: 12px;
+    text-align: center;
+  }
+
+  .cards-empty p {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0d0c0a;
+    margin: 8px 0 0;
+  }
+
+  .cards-empty span {
+    font-size: 12px;
+    color: #b0ada7;
+  }
+
+  .card-item__icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #fbf7ec, #f4f1e9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .card-item {
+    display: flex;
+    gap: 14px;
+    align-items: center;
   }
 </style>

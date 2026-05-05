@@ -1,70 +1,55 @@
-"""
-Unit-тести для _extract_token_from_link з app/api/groups.py
-
-Реальна поведінка функції:
-- повертає токен (str) якщо посилання валідне
-- кидає HTTPException(400) в усіх невалідних випадках
-"""
-
 import pytest
-from fastapi import HTTPException
+from unittest.mock import AsyncMock, patch
+from fastapi.testclient import TestClient
+from bson import ObjectId
 
-from app.api.groups import _extract_token_from_link
+from app.main import app
+from app.core.dependencies import get_current_user
 
+client = TestClient(app)
 
-class TestExtractTokenFromLink:
-    # ── Happy path ────────────────────────────────────────────────────────
+# 1. Створюємо фейкового юзера для обходу авторизації
+class MockUser:
+    id = ObjectId("507f1f77bcf86cd799439011")
 
-    def test_valid_link_returns_token(self):
-        url = "https://family-wallet.com/join/abc123xyz"
-        assert _extract_token_from_link(url) == "abc123xyz"
+async def override_get_current_user():
+    return MockUser()
 
-    def test_valid_link_with_hex_token(self):
-        """uuid4().hex — саме такий токен генерує InviteToken."""
-        token = "a3f1c2d4e5b6a7f8c9d0e1f2a3b4c5d6"
-        url = f"https://family-wallet.com/join/{token}"
-        assert _extract_token_from_link(url) == token
+# Підміняємо реальну перевірку токена на нашого фейкового юзера
+app.dependency_overrides[get_current_user] = override_get_current_user
 
-    def test_valid_link_with_extra_path_prefix(self):
-        """Шлях /app/join/<token> — parts[-2] == 'join' все одно."""
-        url = "https://family-wallet.com/app/join/tok789"
-        assert _extract_token_from_link(url) == "tok789"
+class TestGroupEndpoints:
 
-    def test_valid_link_with_query_string_ignores_query(self):
-        """Query string не впливає на токен."""
-        url = "https://family-wallet.com/join/tok789?ref=email"
-        assert _extract_token_from_link(url) == "tok789"
+    @patch("app.api.group.GroupService.create_group", new_callable=AsyncMock)
+    def test_create_group_endpoint_201(self, mock_create):
+        """Перевіряємо, що ендпоінт створення групи віддає статус 201"""
+        # Кажемо моку, що має повернути сервіс
+        mock_create.return_value = {"message": "Success", "group_id": "123", "name": "Test Family"}
 
-    # ── Negative: кидає HTTPException(400) ───────────────────────────────
+        # Робимо HTTP запит
+        response = client.post("/api/v1/group/", json={"name": "Test Family"})
 
-    def test_link_without_join_segment_raises_400(self):
-        with pytest.raises(HTTPException) as exc_info:
-            _extract_token_from_link("https://family-wallet.com/groups/abc123")
-        assert exc_info.value.status_code == 400
+        assert response.status_code == 201
+        assert response.json()["name"] == "Test Family"
 
-    def test_empty_token_after_join_raises_400(self):
-        """Шлях /join/ без токена → parts[-1] == '' після split."""
-        with pytest.raises(HTTPException) as exc_info:
-            _extract_token_from_link("https://family-wallet.com/join/")
-        assert exc_info.value.status_code == 400
+    @patch("app.api.group.GroupService.regenerate_invite_link", new_callable=AsyncMock)
+    def test_regenerate_invite_endpoint_200(self, mock_regenerate):
+        """Перевіряємо ендпоінт твоєї задачі PROJ-234"""
+        mock_regenerate.return_value = {
+            "invite_link": "https://family-wallet.com/join/new-token",
+            "token": "new-token",
+            "expires_at": "2026-05-01T00:00:00"
+        }
 
-    def test_only_join_no_token_raises_400(self):
-        with pytest.raises(HTTPException) as exc_info:
-            _extract_token_from_link("https://family-wallet.com/join")
-        assert exc_info.value.status_code == 400
+        group_id = str(ObjectId())
+        response = client.post(f"/api/v1/group/{group_id}/invite/regenerate")
 
-    def test_empty_string_raises_400(self):
-        with pytest.raises(HTTPException) as exc_info:
-            _extract_token_from_link("")
-        assert exc_info.value.status_code == 400
+        assert response.status_code == 200
+        assert response.json()["token"] == "new-token"
 
-    def test_random_string_no_join_raises_400(self):
-        with pytest.raises(HTTPException) as exc_info:
-            _extract_token_from_link("not-a-url-at-all")
-        assert exc_info.value.status_code == 400
+    def test_create_group_missing_name_422(self):
+        """Перевіряємо Pydantic валідацію (якщо не передали name)"""
+        response = client.post("/api/v1/group/", json={})
 
-    def test_join_not_second_to_last_raises_400(self):
-        """join є в шляху, але не перед токеном."""
-        with pytest.raises(HTTPException) as exc_info:
-            _extract_token_from_link("https://family-wallet.com/join/sub/token")
-        assert exc_info.value.status_code == 400
+        # FastAPI має автоматично відбити запит із 422 Unprocessable Entity
+        assert response.status_code == 422

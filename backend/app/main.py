@@ -2,6 +2,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.core.limiter import limiter
 
 # Імпортуємо налаштування та обробники
 from app.middleware.logging import log_requests_middleware
@@ -12,6 +15,7 @@ from app.config.database import init_db
 
 # Імпортуємо наші актуальні роутери
 from app.api import health, auth, group
+from app.api import monobank
 
 # ==========================================
 # Менеджер життєвого циклу (Lifespan)
@@ -43,6 +47,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # 1. Підключаємо наше системне логування подій
 app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests_middleware)
 
@@ -54,3 +61,5 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(group.router, prefix="/api/v1/group", tags=["Group"])
+
+app.include_router(monobank.router)

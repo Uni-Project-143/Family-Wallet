@@ -4,7 +4,7 @@
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
         <Transition name="modal">
           <div v-if="isOpen" class="modal-card" role="dialog" aria-modal="true">
-            <button class="modal-close" @click="close" aria-label="Close">
+            <button class="modal-close" @click="close" aria-label="Закрити">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d="M1 1L13 13M13 1L1 13"
@@ -21,10 +21,10 @@
             </p>
 
             <form class="form" novalidate @submit.prevent="handleConnect">
-              <!-- ── Token field with tooltip (FE-03) ── -->
+              <!-- ── FE-03: Token field with tooltip ── -->
               <div class="field">
                 <div class="field__header">
-                  <label class="field__label" for="mono-token">PERSONAL API TOKEN</label>
+                  <label class="field__label" for="mono-token"> PERSONAL API TOKEN </label>
 
                   <div
                     class="tooltip-wrap"
@@ -34,7 +34,7 @@
                     <button
                       type="button"
                       class="tooltip-trigger"
-                      aria-label="How to find token"
+                      aria-label="Як знайти токен"
                       @click="isTooltipOpen = !isTooltipOpen"
                     >
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -47,16 +47,16 @@
                         />
                         <circle cx="7" cy="4" r=".8" fill="currentColor" />
                       </svg>
-                      How to find token
+                      Where to find the token
                     </button>
 
                     <Transition name="fade-down">
                       <div v-if="isTooltipOpen" class="tooltip" role="tooltip">
-                        <div class="tooltip__title">Where to get your token</div>
+                        <div class="tooltip__title">Where to find the token</div>
                         <ol class="tooltip__list">
                           <li>Open the Monobank mobile app</li>
                           <li>
-                            Visit
+                            Go to
                             <a
                               href="https://api.monobank.ua/"
                               target="_blank"
@@ -64,13 +64,12 @@
                               class="tooltip__link"
                               >api.monobank.ua</a
                             >
-                            on your phone
                           </li>
-                          <li>Scan the QR code in the app to authorize</li>
-                          <li>Copy your Personal Token (starts with <code>u</code>)</li>
+                          <li>Scan the QR code in the app</li>
+                          <li>Copy the Personal Token (starts with <code>u</code>)</li>
                         </ol>
                         <div class="tooltip__hint">
-                          Read-only access to your account statements.
+                          The token provides only read access to transaction statements.
                         </div>
                       </div>
                     </Transition>
@@ -80,7 +79,7 @@
                 <div class="i-field-wrap" :class="{ 'i-field-wrap--error': fieldErrors.token }">
                   <input
                     id="mono-token"
-                    v-model="apiToken"
+                    v-model="personalToken"
                     :type="inputType"
                     class="i-field"
                     placeholder="uXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
@@ -116,35 +115,18 @@
                 <p v-if="fieldErrors.token" class="error-text">{{ fieldErrors.token }}</p>
               </div>
 
-              <!-- ── Alias (optional) ── -->
-              <div class="field">
-                <label class="field__label" for="card-alias">CARD NICKNAME (OPTIONAL)</label>
-                <div class="i-field-wrap">
-                  <input
-                    id="card-alias"
-                    v-model="cardAlias"
-                    type="text"
-                    class="i-field"
-                    placeholder="e.g. My Black Card"
-                    maxlength="40"
-                    autocomplete="off"
-                  />
-                </div>
-              </div>
-
-              <!-- ── Privacy + GDPR (FE-01) ── -->
+              <!-- ── FE-01: Privacy + GDPR ── -->
               <label class="checkbox-row">
                 <input v-model="agreedToPrivacy" type="checkbox" class="checkbox" />
                 <span class="checkbox-text">
-                  I agree to the
+                  I agree to with the
                   <a href="/privacy" target="_blank" rel="noopener noreferrer" class="link">
                     Privacy Policy
                   </a>
-                  and
+                  and conditions of
                   <a href="/gdpr" target="_blank" rel="noopener noreferrer" class="link">
-                    GDPR Data Processing
-                  </a>
-                  terms. My token will be encrypted (AES-256) before storage.
+                    GDPR-processing data </a
+                  >. My token will be encrypted (AES-256) before being saved.
                 </span>
               </label>
 
@@ -181,7 +163,7 @@
                         stroke-linecap="round"
                       />
                     </svg>
-                    Validating token...
+                    Checking token...
                   </template>
                 </button>
               </div>
@@ -203,8 +185,7 @@
 
   const emit = defineEmits(['close', 'toast', 'connected'])
 
-  const apiToken = ref('')
-  const cardAlias = ref('')
+  const personalToken = ref('')
   const agreedToPrivacy = ref(false)
   const showToken = ref(false)
   const isTooltipOpen = ref(false)
@@ -214,9 +195,9 @@
 
   const inputType = computed(() => (showToken.value ? 'text' : 'password'))
 
-  // FE-01: кнопка disabled до підтвердження чекбоксу
+  // FE-01: кнопка disabled до підтвердження чекбоксу і непорожнього токена
   const canSubmit = computed(
-    () => apiToken.value.trim().length > 0 && agreedToPrivacy.value && !isConnecting.value,
+    () => personalToken.value.trim().length > 0 && agreedToPrivacy.value && !isConnecting.value,
   )
 
   watch(
@@ -228,13 +209,13 @@
 
   function validateToken() {
     fieldErrors.value.token = ''
-    const token = apiToken.value.trim()
+    const token = personalToken.value.trim()
     if (!token) {
       fieldErrors.value.token = 'Token is required'
       return false
     }
     if (token.length < 20) {
-      fieldErrors.value.token = 'Token looks too short. Get a valid one at api.monobank.ua'
+      fieldErrors.value.token = 'Token looks too short. Get a valid one from api.monobank.ua'
       return false
     }
     return true
@@ -246,7 +227,7 @@
 
     const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
     if (!storedUser.groupId) {
-      serverError.value = 'No active group found. Please re-login.'
+      serverError.value = 'Active group not found. Please log in again.'
       return
     }
 
@@ -254,17 +235,22 @@
     serverError.value = ''
 
     try {
-      const card = await connectMonobankCard({
+      const data = await connectMonobankCard({
         groupId: storedUser.groupId,
-        apiToken: apiToken.value.trim(),
-        alias: cardAlias.value.trim(),
+        personalToken: personalToken.value.trim(),
       })
 
-      emit('connected', card)
+      // FE-02: бекенд повертає { masked_pan, status: "Активна", message }
+      emit('connected', {
+        masked_pan: data.masked_pan,
+        status: data.status || 'Active',
+      })
+
       emit('toast', {
-        message: `Card connected: ${card.masked_pan || '•••• ????'}`,
+        message: `Card connected: ${data.masked_pan}`,
         type: 'success',
       })
+
       close()
     } catch (err) {
       handleServerError(err)
@@ -273,28 +259,31 @@
     }
   }
 
+  /**
+   * Mapping помилок з бекенду monobank_service.py.
+   * Бекенд кладе текст у `detail`, FastAPI HTTPException формат.
+   */
   function handleServerError(err) {
     const status = err.response?.status
-    const detail = err.response?.data?.message || err.response?.data?.detail
+    const detail = err.response?.data?.detail || err.response?.data?.message
 
     if (status === 400) {
-      serverError.value = detail || 'Invalid Monobank token. Please check and try again.'
+      serverError.value = detail || 'Invalid Monobank token'
     } else if (status === 403) {
-      serverError.value = 'Only Admin can connect cards to the family group.'
+      serverError.value = detail || 'You do not have permission to connect a card to this group'
     } else if (status === 409) {
-      serverError.value = 'This token is already used in the system.'
+      serverError.value = detail || 'This account is already connected to the system'
     } else if (status === 503) {
-      serverError.value = 'Monobank API is temporarily unavailable. Please try again later.'
+      serverError.value = 'Monobank API is currently unavailable. Please try again later.'
     } else if (status === 422) {
-      serverError.value = 'Token is required.'
+      serverError.value = 'Please check the correctness of the field values'
     } else {
-      serverError.value = 'Failed to connect card. Please try again.'
+      serverError.value = 'Failed to connect the card. Please try again.'
     }
   }
 
   function resetForm() {
-    apiToken.value = ''
-    cardAlias.value = ''
+    personalToken.value = ''
     agreedToPrivacy.value = false
     showToken.value = false
     isTooltipOpen.value = false
@@ -404,7 +393,6 @@
     text-transform: uppercase;
   }
 
-  /* Tooltip */
   .tooltip-wrap {
     position: relative;
   }

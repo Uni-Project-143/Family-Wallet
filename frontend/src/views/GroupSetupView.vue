@@ -132,7 +132,7 @@
   import { ref, computed } from 'vue'
   import { useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
-  import { createGroup, joinGroup } from '../services/authService'
+  import { createGroup, joinGroup, fetchMyGroups } from '../services/authService'
 
   const router = useRouter()
   const { currentUser } = useAuth()
@@ -201,6 +201,8 @@
    * Join   → POST /api/v1/group/join → role = MEMBER
    */
   async function handleSubmit() {
+    console.log('1. handleSubmit started, mode:', selectedMode.value)
+    console.log('2. fieldValue value:', fieldValue.value, typeof fieldValue.value)
     if (!validateField()) return
 
     isLoading.value = true
@@ -208,28 +210,53 @@
 
     try {
       if (selectedMode.value === 'create') {
-        const data = await createGroup({ name: fieldValue.value.trim() })
+        console.log('3. About to call createGroup...')
+        const result = await createGroup(fieldValue.value)
+        console.log('4. createGroup returned:', result)
 
         const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
         storedUser.role = 'ADMIN'
-        storedUser.groupId = data.group_id
+        storedUser.groupId = result.group_id
         storedUser.groupName = fieldValue.value.trim()
         localStorage.setItem('currentUser', JSON.stringify(storedUser))
       } else {
-        await joinGroup({ inviteLink: fieldValue.value.trim() })
+        await joinGroup(fieldValue.value)
+
+        // Бек у /join повертає тільки { message }, без даних групи.
+        // Тягнемо повний список і знаходимо щойно приєднану групу.
+        const groups = await fetchMyGroups()
 
         const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-        storedUser.role = 'MEMBER'
+
+        // Знаходимо групу, якої не було як активної раніше — це і є щойно приєднана.
+        // Якщо такої не знайшлось (наприклад це перший join) — беремо останню зі списку.
+        const joinedGroup =
+          groups.find((g) => g.id !== storedUser.groupId) || groups[groups.length - 1]
+
+        if (joinedGroup) {
+          storedUser.role = joinedGroup.role
+          storedUser.groupId = joinedGroup.id
+          storedUser.groupName = joinedGroup.name
+        } else {
+          storedUser.role = 'MEMBER'
+        }
+
         localStorage.setItem('currentUser', JSON.stringify(storedUser))
       }
 
       router.push('/feed')
+      console.log('5. After createGroup logic')
     } catch (err) {
+      console.log('6. CAUGHT ERROR:', err)
+      console.log('7. Error response:', err.response)
+      console.log('8. Error response data:', err.response?.data)
+      console.log('9. Error response status:', err.response?.status)
+
       const status = err.response?.status
       const message = err.response?.data?.message
 
       // Вже є учасником — отримуємо роль і йдемо на feed
-      if (status === 400 && message === 'Ви вже є учасником цієї групи') {
+      if (status === 400 && message === 'You are already a member of this group') {
         const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
         storedUser.role = 'MEMBER'
         localStorage.setItem('currentUser', JSON.stringify(storedUser))
@@ -248,6 +275,8 @@
       } else {
         serverError.value = message || 'Something went wrong. Please try again.'
       }
+    } finally {
+      isLoading.value = false
     }
   }
 </script>

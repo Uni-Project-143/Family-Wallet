@@ -15,7 +15,7 @@
             {{ group.name }}
           </button>
           <!-- СТАЛО -->
-          <button v-if="isAdmin" class="navbar__group-tab navbar__group-tab--add">
+          <button class="navbar__group-tab navbar__group-tab--add" @click="goToGroupSetup">
             + New group
           </button>
         </div>
@@ -40,6 +40,25 @@
         <span class="navbar__user-name">{{ currentUserName }}</span>
         <span v-if="isAdmin" class="badge badge--admin">Admin</span>
         <span v-else class="badge badge--member">Member</span>
+
+        <!-- ↓ нова кнопка -->
+        <button class="logout-btn" :disabled="isLoading" @click="handleLogout" aria-label="Logout">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M6 14H3.5C2.67 14 2 13.33 2 12.5V3.5C2 2.67 2.67 2 3.5 2H6"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
+            <path
+              d="M11 11L14 8L11 5M14 8H6"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
       </div>
     </header>
 
@@ -96,7 +115,7 @@
             <div class="card-widget__pan">{{ card.maskedPan }}</div>
             <div class="card-widget__balance">{{ formatCurrency(card.balance) }}</div>
           </div>
-          <button class="..." @click="goToConnectCard">+ Connect Card</button>
+          <button class="connect-card-btn" @click="goToConnectCard">+ Connect Card</button>
         </section>
       </aside>
 
@@ -337,6 +356,12 @@
   //const { currentUser, isAdmin } = useAuth()
   const { currentUser } = useAuth()
 
+  const { isLoading, logout } = useAuth()
+
+  async function handleLogout() {
+    await logout()
+  }
+
   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
 
   const currentUserName = computed(() => storedUser.fullName || currentUser.value?.fullName || '')
@@ -409,7 +434,7 @@
     loadGroupMembers()
     connectWebSocket()
   })
-
+  const connectedCards = ref([])
   // const connectedCards = ref([
   //   { id: 1, bankName: 'Monobank', maskedPan: '•••• •••• •••• 4521', balance: 12340 },
   //   { id: 2, bankName: 'Monobank', maskedPan: '•••• •••• •••• 7732', balance: 3870 },
@@ -572,6 +597,17 @@
   function goToConnectCard() {
     router.push({ path: '/settings', query: { section: 'cards' } })
     showToast('Opening connect card section', 'info')
+  }
+  /**
+   * Перехід на екран створення/приєднання до групи.
+   * Працює для всіх ролей — і Admin, і Member можуть створити свою власну сім'ю
+   * або приєднатись до іншої.
+   */
+  /**
+   * Перехід на екран керування групою — юзер сам обере create або join.
+   */
+  function goToGroupSetup() {
+    router.push('/group-setup')
   }
 </script>
 
@@ -1326,5 +1362,30 @@
   .tx-list-enter-from {
     opacity: 0;
     transform: translateY(-12px);
+  }
+  .logout-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.18s;
+    margin-left: 4px;
+  }
+
+  .logout-btn:hover:not(:disabled) {
+    background: rgba(196, 64, 42, 0.18);
+    border-color: rgba(196, 64, 42, 0.4);
+    color: #ff8a72;
+  }
+
+  .logout-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 </style>

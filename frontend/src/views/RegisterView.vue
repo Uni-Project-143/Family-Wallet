@@ -277,6 +277,7 @@
       fullName: fullName.value.trim(),
       email: email.value.trim().toLowerCase(),
       password: password.value,
+      confirmPassword: confirmPassword.value,
     })
   }
 </script>

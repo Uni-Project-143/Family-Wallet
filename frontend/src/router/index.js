@@ -82,6 +82,12 @@ const routes = [
     component: () => import('../views/GiftEventsView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/select-group',
+    name: 'SelectGroup',
+    component: () => import('../views/SelectGroupView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

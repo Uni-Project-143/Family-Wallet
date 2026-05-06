@@ -157,6 +157,7 @@ export async function regenerateGroupInviteLink(groupId) {
  * POST /api/v1/group/
  */
 export async function createGroup(name) {
+  console.log('createGroup received:', name, typeof name) // тимчасово
   const response = await apiClient.post('/api/v1/group/', { name })
   return response.data
 }
@@ -167,7 +168,7 @@ export async function createGroup(name) {
  */
 export async function joinGroup(inviteLink) {
   const response = await apiClient.post('/api/v1/group/join', {
-    invite_link: inviteLink,
+    invite_link: inviteLink, // ← snake_case, як чекає бек
   })
   return response.data
 }
@@ -180,5 +181,38 @@ export async function requestPasswordReset(payload) {
   const response = await apiClient.post('/api/v1/auth/forgot-password', {
     email: payload.email,
   })
+  return response.data
+}
+// /**
+//  * Список учасників групи.
+//  * GET /api/v1/group/{group_id}/members
+//  */
+// export async function fetchGroupMembers(groupId) {
+//   const response = await apiClient.get(`/api/v1/group/${groupId}/members`)
+//   return response.data
+// }
+export async function fetchGroupMembers(groupId) {
+  try {
+    const response = await apiClient.get(`/api/v1/group/${groupId}/members`)
+    return response.data
+  } catch (err) {
+    if (err.response?.status === 404) {
+      // endpoint поки не реалізований — повертаємо порожній масив
+      return []
+    }
+    throw err
+  }
+}
+/**
+ * Logout — додає поточний JWT токен у чорний список на беку.
+ * POST /api/v1/auth/logout
+ *
+ * Бекенд читає токен з заголовку Authorization (apiClient додає автоматично),
+ * додає його у колекцію blacklisted_tokens — після цього токен стає невалідним.
+ *
+ * @returns {Promise<{ message: string }>}
+ */
+export async function logoutUser() {
+  const response = await apiClient.post('/api/v1/auth/logout')
   return response.data
 }

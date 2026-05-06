@@ -25,9 +25,6 @@ class BankCardRepository:
         return card
 
     @classmethod
-    async def check_token_exists(cls, token_check: str) -> bool:
-         # На цьому етапі ми не можемо просто шукати по токену,
-         # тому що він зашифрований з випадковим salt (nonce) кожного разу по-різному.
-         # Перевірка на "вже використаний" буде відбуватися пізніше через account_id,
-         # який ми отримуємо з Монобанку (він унікальний і постійний).
-         pass
+    async def delete(cls, card: BankCard) -> None:
+        """Повне видалення картки з бази (Hard Delete)."""
+        await card.delete()

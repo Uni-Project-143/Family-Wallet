@@ -79,13 +79,12 @@ class MonobankService:
             "message": "Card connected successfully"
         }
 
-
     @classmethod
     async def disconnect_card(cls, card_id: str, user_id: str) -> dict:
         """
-        Disconnects the card (Soft delete) and removes the webhook.
+        Disconnects the card and completely removes it from the database (Hard delete).
         """
-        # 1. Шукаємо картку в базі
+        # 1. Шукаємо картку
         card = await BankCardRepository.get_by_id(card_id)
         if not card:
             raise HTTPException(
@@ -93,35 +92,26 @@ class MonobankService:
                 detail="Card not found."
             )
 
-        # 2. BE-03: Перевірка власності картки (захист від видалення чужої картки)
+        # 2. Перевірка власності картки
         if card.user_id != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You can only disconnect your own cards."
             )
 
-        # 3. Перевірка, чи не відключена вона вже
-        if card.status == "INACTIVE":
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Card is already disconnected."
-            )
+        # (Прибрали перевірку на INACTIVE, бо ми тепер видаляємо фізично)
 
-        # 4. BE-02: Скидання webhook у Monobank API
+        # 3. Скидання webhook у Monobank API
         try:
             decrypted_token = EncryptionService.decrypt(card.encrypted_token)
-            # Передаємо порожній рядок "", щоб Монобанк перестав слати транзакції
             await MonobankClient.register_webhook(decrypted_token, "")
         except Exception as e:
-            # Якщо токен невалідний або банк лежить, ми все одно дозволяємо
-            # відключити картку локально, щоб юзер не "застряг".
             print(f"Warning: Failed to reset Monobank webhook: {e}")
 
-        # 5. BE-01: Soft delete (Транзакції залишаться, бо ми не видаляємо запис)
-        card.status = "INACTIVE"
-        await BankCardRepository.save(card)
+        # 4. HARD DELETE: Фізично видаляємо картку з БД
+        await BankCardRepository.delete(card)
 
-        # 6. Успішна відповідь для UI
+        # 5. Успішна відповідь (текст трішки змінили для відображення реальності)
         return {
-            "message": "Card disconnected successfully. Transaction history is saved."
+            "message": "Card permanently deleted and disconnected successfully."
         }

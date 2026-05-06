@@ -24,7 +24,7 @@ class MonobankClient:
                 if response.status_code == 403:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Невірний токен Monobank"
+                        detail="Invalid Monobank token"
                     )
 
                 response.raise_for_status()  # Якщо статус 500 тощо, викине помилку
@@ -34,13 +34,13 @@ class MonobankClient:
                 logger.error(f"Monobank API error: {e}")
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Monobank API зараз недоступний. Спробуйте пізніше."
+                    detail="Monobank API is currently unavailable. Please try again later."
                 )
             except httpx.RequestError as e:
                 logger.error(f"Monobank API connection failed: {e}")
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Спробуйте пізніше"  # AC: timeout -> 503
+                    detail="Please try again later."  # AC: timeout -> 503
                 )
 
     @classmethod
@@ -63,7 +63,7 @@ class MonobankClient:
                 if response.status_code == 403:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="Невірний токен Monobank"
+                        detail="Invalid Monobank token"
                     )
 
                 response.raise_for_status()
@@ -73,5 +73,5 @@ class MonobankClient:
                 logger.error(f"Monobank webhook registration error: {e}")
                 raise HTTPException(
                     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Не вдалося зареєструвати вебхук у Monobank."
+                    detail="Failed to register Monobank webhook."
                 )

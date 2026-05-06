@@ -22,3 +22,19 @@ async def connect_monobank_card(
         personal_token=request.personal_token
     )
     return result
+
+
+@router.delete("/card/{card_id}", status_code=status.HTTP_200_OK)
+async def disconnect_monobank_card(
+    card_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Disconnect Monobank card (Soft delete).
+    Transaction history remains intact.
+    """
+    result = await MonobankService.disconnect_card(
+        card_id=card_id,
+        user_id=str(current_user.id)
+    )
+    return result

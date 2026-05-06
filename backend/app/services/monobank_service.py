@@ -78,3 +78,40 @@ class MonobankService:
             "status": "Active",
             "message": "Card connected successfully"
         }
+
+    @classmethod
+    async def disconnect_card(cls, card_id: str, user_id: str) -> dict:
+        """
+        Disconnects the card and completely removes it from the database (Hard delete).
+        """
+        # 1. Шукаємо картку
+        card = await BankCardRepository.get_by_id(card_id)
+        if not card:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Card not found."
+            )
+
+        # 2. Перевірка власності картки
+        if card.user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only disconnect your own cards."
+            )
+
+        # (Прибрали перевірку на INACTIVE, бо ми тепер видаляємо фізично)
+
+        # 3. Скидання webhook у Monobank API
+        try:
+            decrypted_token = EncryptionService.decrypt(card.encrypted_token)
+            await MonobankClient.register_webhook(decrypted_token, "")
+        except Exception as e:
+            print(f"Warning: Failed to reset Monobank webhook: {e}")
+
+        # 4. HARD DELETE: Фізично видаляємо картку з БД
+        await BankCardRepository.delete(card)
+
+        # 5. Успішна відповідь (текст трішки змінили для відображення реальності)
+        return {
+            "message": "Card permanently deleted and disconnected successfully."
+        }

@@ -227,7 +227,7 @@
 
     const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
     if (!storedUser.groupId) {
-      serverError.value = 'Active group not found. Please log in again.'
+      serverError.value = 'Активну групу не знайдено. Будь ласка, увійдіть знову.'
       return
     }
 
@@ -235,19 +235,17 @@
     serverError.value = ''
 
     try {
-      const data = await connectMonobankCard({
-        groupId: storedUser.groupId,
-        personalToken: personalToken.value.trim(),
-      })
+      const card = await connectMonobankCard(storedUser.groupId, personalToken.value.trim())
 
-      // FE-02: бекенд повертає { masked_pan, status: "Активна", message }
+      // Передаємо повний об'єкт картки у Settings, щоб додати до списку
       emit('connected', {
-        masked_pan: data.masked_pan,
-        status: data.status || 'Active',
+        id: card.id,
+        masked_pan: card.masked_pan,
+        status: card.status, // "Active" з беку
       })
 
       emit('toast', {
-        message: `Card connected: ${data.masked_pan}`,
+        message: `Card connected: ${card.masked_pan}`,
         type: 'success',
       })
 
@@ -260,25 +258,28 @@
   }
 
   /**
-   * Mapping помилок з бекенду monobank_service.py.
-   * Бекенд кладе текст у `detail`, FastAPI HTTPException формат.
+   * Mapping помилок з бекенду.
+   * Бекенд через http_exception_handler повертає { message: "..." } для HTTPException.
+   * Pydantic 422 повертає { detail: [...] }.
    */
   function handleServerError(err) {
     const status = err.response?.status
-    const detail = err.response?.data?.detail || err.response?.data?.message
+    const message = err.response?.data?.message
+    const detail = err.response?.data?.detail
 
     if (status === 400) {
-      serverError.value = detail || 'Invalid Monobank token'
+      serverError.value = message || 'Invalid Monobank token'
     } else if (status === 403) {
-      serverError.value = detail || 'You are not a member of this family group'
+      serverError.value = message || 'You are not a member of this group'
     } else if (status === 409) {
-      serverError.value = detail || 'This account is already connected to the system'
+      serverError.value = message || 'This account is already connected to the system'
     } else if (status === 503) {
       serverError.value = 'Monobank API is currently unavailable. Please try again later.'
     } else if (status === 422) {
-      serverError.value = 'Please check the correctness of the field values'
+      // Pydantic validation: дістаємо перше повідомлення
+      serverError.value = detail?.[0]?.msg || 'Please check the form fields'
     } else {
-      serverError.value = 'Failed to connect the card. Please try again.'
+      serverError.value = message || 'Failed to connect card. Please try again.'
     }
   }
 

@@ -322,11 +322,11 @@
               />
               <path d="M4 16H36" stroke="#d6d3ce" stroke-width="1.5" />
             </svg>
-            <p>No cards connected.</p>
-            <span>Connect your Monobank card to automatically track family expenses.</span>
+            <p>No cards connected yet.</p>
+            <span>Connect your Monobank card to start tracking family expenses automatically.</span>
           </div>
 
-          <!-- FE-02: список з масованим номером та статусом -->
+          <!-- FE-02: Active cards list -->
           <div v-else class="cards-list">
             <div v-for="card in connectedCards" :key="card.id" class="card-item">
               <div class="card-item__icon">
@@ -338,7 +338,7 @@
 
               <div class="card-item__info">
                 <div class="card-item__bank">{{ card.bankName }}</div>
-                <div class="card-item__pan">{{ card.maskedPan }}</div>
+                <div class="card-item__pan">{{ card.masked_pan }}</div>
               </div>
 
               <div class="card-item__actions">
@@ -346,23 +346,38 @@
                   <span class="card-item__dot"></span>
                   {{ card.status }}
                 </span>
-                <button v-if="isAdmin" class="btn-remove" @click="disconnectCard(card)">
-                  Disconnect
-                </button>
+                <button class="btn-remove" @click="askDisconnect(card)">Disconnect</button>
               </div>
             </div>
           </div>
 
-          <!-- СТАЛО -->
           <button class="btn-gold" style="margin-top: 16px" @click="isConnectCardOpen = true">
             + Connect Card
           </button>
 
+          <!-- PROJ-49: модалка підключення -->
           <ConnectCardModal
             :is-open="isConnectCardOpen"
             @close="isConnectCardOpen = false"
             @toast="showToast($event.message, $event.type)"
             @connected="handleCardConnected"
+          />
+
+          <!-- PROJ-63 FE-01: підтвердження disconnect -->
+          <ConfirmDialog
+            :is-open="isConfirmOpen"
+            title="Disconnect this card?"
+            :message="
+              cardToDisconnect
+                ? `New transactions from ${cardToDisconnect.masked_pan} will not be synced. Existing transaction history will be preserved.`
+                : ''
+            "
+            confirm-text="Yes, disconnect"
+            cancel-text="Keep card"
+            variant="danger"
+            :is-loading="isDisconnecting"
+            @confirm="confirmDisconnect"
+            @cancel="cancelDisconnect"
           />
         </section>
 
@@ -425,9 +440,15 @@
     regenerateGroupInviteLink,
     fetchGroupMembers,
   } from '../services/authService'
-
-  import { useRoute } from 'vue-router'
+  import { disconnectMonobankCard } from '../services/cardService'
+  import {
+    getCardsFromStorage,
+    addCardToStorage,
+    removeCardFromStorage,
+  } from '../services/cardStorage'
   import ConnectCardModal from '../components/ConnectCardModal.vue'
+  import ConfirmDialog from '../components/ConfirmDialog.vue'
+  import { useRoute } from 'vue-router'
 
   const route = useRoute()
   const activeSection = ref(route.query.section || 'members')
@@ -617,37 +638,86 @@
       isSendingDirectInvite.value = false
     }
   }
-
   // ─── Cards ───
+  const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+  const groupId = storedUser.groupId
 
-  // Картки — поки що зберігаються локально після підключення.
-  // TODO: коли бекенд додасть GET /api/v1/monobank/cards/{groupId} — підвантажувати з API
-  const connectedCards = ref([])
+  // Завантажуємо з localStorage при монтуванні (TODO: замінити на API коли буде GET endpoint)
+  const connectedCards = ref(getCardsFromStorage(groupId))
+
   const isConnectCardOpen = ref(false)
+
+  // Confirm dialog для disconnect (PROJ-63)
+  const isConfirmOpen = ref(false)
+  const cardToDisconnect = ref(null)
+  const isDisconnecting = ref(false)
+
   /**
-   * Відключає картку від групи.
-   * @param {object} card
-   */
-  /**
-   * FE-02: викликається після успішного підключення.
-   * Бекенд повертає { masked_pan, status: "Активна" }.
+   * Викликається з ConnectCardModal після успішного підключення.
+   * Бек повертає { id, masked_pan, status }.
    */
   function handleCardConnected(card) {
-    connectedCards.value.push({
-      id: Date.now(), // тимчасовий локальний ID
+    const cardData = {
+      id: card.id,
       bankName: 'Monobank',
-      maskedPan: card.masked_pan,
-      status: card.status, // "Активна"
-    })
+      masked_pan: card.masked_pan,
+      status: card.status,
+    }
+    connectedCards.value.push(cardData)
+    addCardToStorage(groupId, cardData)
   }
 
   /**
-   * Локальне видалення з UI. Реальне disconnect — у наступній тасці PROJ-63.
+   * PROJ-63 FE-01: відкриває confirmation dialog перед disconnect.
    */
-  function disconnectCard(card) {
-    if (!confirm(`Disconnect ${card.maskedPan}?`)) return
-    connectedCards.value = connectedCards.value.filter((c) => c.id !== card.id)
-    showToast('Card disconnected. Existing transactions preserved.', 'success')
+  function askDisconnect(card) {
+    cardToDisconnect.value = card
+    isConfirmOpen.value = true
+  }
+
+  /**
+   * PROJ-63 FE-02: реальний disconnect через бек + toast + видалення з UI.
+   */
+  async function confirmDisconnect() {
+    if (!cardToDisconnect.value) return
+
+    const card = cardToDisconnect.value
+    isDisconnecting.value = true
+
+    try {
+      await disconnectMonobankCard(card.id)
+
+      // Прибираємо локально + з кешу
+      connectedCards.value = connectedCards.value.filter((c) => c.id !== card.id)
+      removeCardFromStorage(groupId, card.id)
+
+      showToast('Card disconnected successfully. Transaction history is preserved.', 'success')
+      isConfirmOpen.value = false
+      cardToDisconnect.value = null
+    } catch (err) {
+      const status = err.response?.status
+      const message = err.response?.data?.message
+
+      if (status === 403) {
+        showToast(message || 'You can only disconnect your own cards', 'error')
+      } else if (status === 404) {
+        // Картка вже видалена на беку — синхронізуємо локальний стан
+        connectedCards.value = connectedCards.value.filter((c) => c.id !== card.id)
+        removeCardFromStorage(groupId, card.id)
+        showToast('Card was already disconnected', 'info')
+        isConfirmOpen.value = false
+        cardToDisconnect.value = null
+      } else {
+        showToast(message || 'Failed to disconnect card', 'error')
+      }
+    } finally {
+      isDisconnecting.value = false
+    }
+  }
+
+  function cancelDisconnect() {
+    isConfirmOpen.value = false
+    cardToDisconnect.value = null
   }
 
   // ─── Notifications ───
@@ -1426,6 +1496,17 @@
     color: #b0ada7;
   }
 
+  .card-item {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #faf8f3, #fbf7ec);
+    border: 1px solid #f2e9c8;
+    border-radius: 12px;
+    margin-bottom: 10px;
+  }
+
   .card-item__icon {
     width: 40px;
     height: 40px;
@@ -1437,9 +1518,21 @@
     flex-shrink: 0;
   }
 
-  .card-item {
-    display: flex;
-    gap: 14px;
-    align-items: center;
+  .card-item__info {
+    flex: 1;
+  }
+
+  .card-item__bank {
+    font-size: 11px;
+    font-weight: 700;
+    color: #9b7a25;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+
+  .card-item__pan {
+    font-size: 13px;
+    color: #6b6860;
+    font-family: 'DM Mono', 'Courier New', monospace;
   }
 </style>

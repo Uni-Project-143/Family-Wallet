@@ -342,6 +342,12 @@
       </div>
     </Transition>
   </div>
+  <ConnectCardModal
+    :is-open="isConnectCardOpen"
+    @close="isConnectCardOpen = false"
+    @toast="showToast($event.message, $event.type)"
+    @connected="handleCardConnected"
+  />
 </template>
 
 <script setup>
@@ -350,19 +356,23 @@
   import { useAuth } from '../composables/useAuth'
   import { fetchGroupMembers } from '../services/authService'
   import InviteMemberModal from '../components/InviteMemberModal.vue'
+  import { getCardsFromStorage } from '../services/cardStorage'
+  import ConnectCardModal from '../components/ConnectCardModal.vue'
 
-  const isInviteModalOpen = ref(false)
-  const router = useRouter()
-  //const { currentUser, isAdmin } = useAuth()
   const { currentUser } = useAuth()
+  const router = useRouter()
+  const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+  const connectedCards = ref(getCardsFromStorage(storedUser.groupId))
+  //const connectedCards = ref([])
+  const isInviteModalOpen = ref(false)
+
+  //const { currentUser, isAdmin } = useAuth()
 
   const { isLoading, logout } = useAuth()
 
   async function handleLogout() {
     await logout()
   }
-
-  const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
 
   const currentUserName = computed(() => storedUser.fullName || currentUser.value?.fullName || '')
   const currentUserInitials = computed(() => {
@@ -434,11 +444,6 @@
     loadGroupMembers()
     connectWebSocket()
   })
-  const connectedCards = ref([])
-  // const connectedCards = ref([
-  //   { id: 1, bankName: 'Monobank', maskedPan: '•••• •••• •••• 4521', balance: 12340 },
-  //   { id: 2, bankName: 'Monobank', maskedPan: '•••• •••• •••• 7732', balance: 3870 },
-  // ])
 
   const isLoadingFeed = ref(false)
   const transactions = ref([
@@ -594,10 +599,10 @@
   //   showToast('Opening invite members section', 'info')
   // }
 
-  function goToConnectCard() {
-    router.push({ path: '/settings', query: { section: 'cards' } })
-    showToast('Opening connect card section', 'info')
-  }
+  //function goToConnectCard() {
+  //  router.push({ path: '/settings', query: { section: 'cards' } })
+  // showToast('Opening connect card section', 'info')
+  //}
   /**
    * Перехід на екран створення/приєднання до групи.
    * Працює для всіх ролей — і Admin, і Member можуть створити свою власну сім'ю
@@ -608,6 +613,26 @@
    */
   function goToGroupSetup() {
     router.push('/group-setup')
+  }
+
+  const isConnectCardOpen = ref(false)
+
+  function goToConnectCard() {
+    isConnectCardOpen.value = true // одразу відкриваємо модалку
+  }
+
+  /**
+   * Після успішного підключення оновлюємо локальний список і кеш.
+   */
+  function handleCardConnected(card) {
+    const cardData = {
+      id: card.id,
+      bankName: 'Monobank',
+      masked_pan: card.masked_pan,
+      status: card.status,
+    }
+    connectedCards.value.push(cardData)
+    addCardToStorage(storedUser.groupId, cardData)
   }
 </script>
 

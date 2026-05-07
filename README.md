@@ -7,7 +7,7 @@
 - **Frontend:** Vue 3, Vue Router, Pinia, Axios, Vite
 - **Backend:** FastAPI, Uvicorn, Motor (async MongoDB)
 - **База даних:** MongoDB Atlas
-- **Деплой:** Fly.io, GitHub Actions CI/CD
+- **Деплой:** Cloudflare Pages (frontend), Render.com (backend), GitHub Actions CI/CD
 - **Контейнеризація:** Docker, Docker Compose
 
 ## Вимоги
@@ -82,12 +82,10 @@ npm run dev
 
 ## Деплой
 
-Деплой відбувається автоматично через GitHub Actions при пуші в гілку `production`:
+Деплой відбувається автоматично при пуші в гілку `production`:
 
-1. Backend деплоїться на Fly.io (`family-wallet-backend`)
-2. Frontend деплоїться на Fly.io (`family-wallet-frontend`)
-
-Для деплою потрібен секрет `FLY_API_TOKEN` в налаштуваннях репозиторію на GitHub.
+1. Backend деплоїться на Render.com — https://family-wallet-backend-tb1v.onrender.com/
+2. Frontend деплоїться на Cloudflare Pages — https://family-wallet.pages.dev/
 
 ## Code Style
 
@@ -135,7 +133,7 @@ Family-Wallet/
 │       └── assets/                # Статичні ресурси (зображення, шрифти, стилі)
 ├── shared/                        # Спільні ресурси (типи, константи)
 ├── deploy/                        # Конфігурації для Docker, CI/CD, скрипти розгортання
-├── .github/workflows/             # CI/CD: автодеплой на Fly.io
+├── .github/workflows/             # CI/CD: автодеплой (Cloudflare Pages + Render.com)
 ├── docker-compose.yml             # Локальна розробка
 ├── .editorconfig                  # Загальні правила форматування
 └── .env.example                   # Шаблон змінних середовища

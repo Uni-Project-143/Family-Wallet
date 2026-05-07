@@ -26,8 +26,15 @@ class AuthService:
         # 3. Генерація токена
         token = create_access_token(user_id=str(new_user.id))
 
-        return {"access_token": token, "token_type": "bearer"}
-
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                        "id": str(new_user.id),
+                        "email": new_user.email,
+                        "fullName": new_user.full_name
+                    }
+        }
     @staticmethod
     async def login(request: UserLoginRequest) -> dict:
         # 1. Шукаємо юзера
@@ -40,4 +47,12 @@ class AuthService:
         # 3. Генерація токена
         token = create_access_token(user_id=str(user.id))
 
-        return {"access_token": token, "token_type": "bearer"}
+        return {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "fullName": user.full_name
+            }
+        }

@@ -1,0 +1,5 @@
+{
+  "email": "string (email format)",
+  "password": "string (min 8 chars)",
+  "fullName": "string"
+}

@@ -1,8 +1,44 @@
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.core.limiter import limiter
 
-app = FastAPI(title="Family Wallet API")
+# Імпортуємо налаштування та обробники
+from app.middleware.logging import log_requests_middleware
+from app.exceptions import global_exception_handler, http_exception_handler
 
+# Імпортуємо функцію ініціалізації БД
+from app.config.database import init_db
+
+# Імпортуємо наші актуальні роутери
+from app.api import health, auth, group
+from app.api import monobank
+
+# ==========================================
+# Менеджер життєвого циклу (Lifespan)
+# ==========================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    print("Ініціалізація підключення до MongoDB...")
+    await init_db()
+    print("База даних успішно підключена та моделі зареєстровані!")
+    yield
+    # (Тут код, який виконується при вимкненні сервера)
+
+# ==========================================
+# Ініціалізація додатку
+# ==========================================
+app = FastAPI(
+    title="Family Wallet API",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# Налаштування CORS (це потрібно для фронтенду)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -11,7 +47,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+# 1. Підключаємо наше системне логування подій
+app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests_middleware)
+
+# 2. Підключаємо централізовані обробники помилок
+app.add_exception_handler(Exception, global_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+
+# 3. Підключаємо наші контролери (Роутери)
+app.include_router(health.router)
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
+app.include_router(group.router, prefix="/api/v1/group", tags=["Group"])
+
+app.include_router(monobank.router)

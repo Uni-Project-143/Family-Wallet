@@ -14,9 +14,8 @@ class UserRegisterRequest(BaseModel):
             raise ValueError('Password must contain at least one uppercase letter')
         return v
 
-
     @model_validator(mode='after')
-    def check_passwords_match(self) -> 'UserRegisterRequest':
+    def check_passwords_match(self):
         if self.password != self.confirmPassword:
             raise ValueError('Passwords do not match')
         return self
@@ -25,6 +24,12 @@ class UserLoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class UserLoginInfo(BaseModel):
+    id: str
+    email: str
+    fullName: str
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    user: UserLoginInfo

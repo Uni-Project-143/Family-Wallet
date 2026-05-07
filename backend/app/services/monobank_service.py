@@ -74,6 +74,7 @@ class MonobankService:
 
         # 7. Позитивний AC: Повертаємо дані для UI
         return {
+            "id": str(new_card.id),  # Перетворюємо ObjectId в звичайний рядок
             "masked_pan": masked_pan,
             "status": "Active",
             "message": "Card connected successfully"

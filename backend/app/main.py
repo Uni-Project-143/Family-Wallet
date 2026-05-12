@@ -16,6 +16,7 @@ from app.config.database import init_db
 # Імпортуємо наші актуальні роутери
 from app.api import health, auth, group
 from app.api import monobank
+from app.api import transaction
 
 # ==========================================
 # Менеджер життєвого циклу (Lifespan)
@@ -61,5 +62,6 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(group.router, prefix="/api/v1/group", tags=["Group"])
+app.include_router(transaction.router, prefix="/api/v1/transactions", tags=["Transactions"])
 
 app.include_router(monobank.router)

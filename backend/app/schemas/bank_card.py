@@ -10,7 +10,7 @@ class BankCardResponse(BaseModel):
     masked_pan: str
     balance: Decimal
     status: str
-    transaction_ids: List[str] = Field(default_factory=list) # Додали поле з БД
+    transaction_ids: List[str] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

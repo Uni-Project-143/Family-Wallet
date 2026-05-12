@@ -183,16 +183,48 @@ class Forward:
         await card.insert(session=session)
 
         # 7. Transaction
+        now = datetime.utcnow()
+        yesterday = now - timedelta(days=1)
+        last_week = now - timedelta(days=7)
+
         t1 = Transaction(
             card_id=str(card.id),
             amount=Decimal("-450.00"),
             currency="UAH",
             category_id=str(cat_food.id),
             description="Сільпо",
-            timestamp=datetime.utcnow(),
+            timestamp=now,
             reactions=[{"user_id": str(user_member.id), "emoji_code": "👍"}]
         )
-        await t1.insert(session=session)
+
+        t2 = Transaction(
+            card_id=str(card.id),
+            amount=Decimal("15000.00"),  # INCOME
+            currency="UAH",
+            category_id=str(cat_gifts.id),  # Наприклад, подарунок
+            description="Зарплата або переказ",
+            timestamp=yesterday,
+        )
+
+        t3 = Transaction(
+            card_id=str(card.id),
+            amount=Decimal("-35.00"),
+            currency="UAH",
+            category_id=str(cat_transport.id),
+            description="Київський Метрополітен",
+            timestamp=last_week,
+        )
+
+        t4 = Transaction(
+            card_id=str(card.id),
+            amount=Decimal("-1200.00"),
+            currency="UAH",
+            category_id=str(cat_food.id),
+            description="Ашан",
+            timestamp=last_week - timedelta(days=2),
+        )
+
+        await Transaction.insert_many([t1, t2, t3, t4], session=session)
 
         # 8. MoneyRequest & VirtualTransfer
         request = MoneyRequest(

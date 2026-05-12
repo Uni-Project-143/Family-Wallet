@@ -1,48 +1,68 @@
-from app.models.transaction import Transaction  # Підстав свій імпорт моделі
-from app.schemas.transaction import TransactionFilterParams
-from pymongo import DESCENDING, ASCENDING
+from app.models.transaction import Transaction
+from app.schemas.transaction import TransactionFilterParams, TransactionType
+from datetime import datetime, time
 
 
 class TransactionRepository:
 
     @staticmethod
-    async def get_filtered_transactions(group_id: str, filters: TransactionFilterParams):
-        # 1. Базовий запит: юзер бачить тільки транзакції своєї групи/сім'ї
-        query = {"group_id": group_id}
+    async def get_filtered_transactions(card_ids: list[str], filters: TransactionFilterParams):
+        # 1. Завжди шукаємо тільки по картках поточного юзера
+        query = {"card_id": {"$in": card_ids}}
 
-        # 2. Динамічно додаємо фільтри, якщо фронтенд їх передав
-        if filters.category:
-            query["category"] = filters.category
+        # 2. Фільтр по категорії
+        if filters.category_id:
+            query["category_id"] = filters.category_id
 
-        if filters.tx_type:
-            query["type"] = filters.tx_type.value
+        # 3. Фільтр по типу та сумі
+        amount_query = {}
+        if filters.tx_type == TransactionType.INCOME:
+            amount_query["$gt"] = 0
+            if filters.min_amount is not None: amount_query["$gte"] = filters.min_amount
+            if filters.max_amount is not None: amount_query["$lte"] = filters.max_amount
 
-        # Фільтр по сумі (від і до)
-        if filters.min_amount is not None or filters.max_amount is not None:
-            query["amount"] = {}
-            if filters.min_amount is not None:
-                query["amount"]["$gte"] = filters.min_amount
-            if filters.max_amount is not None:
-                query["amount"]["$lte"] = filters.max_amount
+        elif filters.tx_type == TransactionType.EXPENSE:
+            amount_query["$lt"] = 0
+            # Оскільки витрати негативні (-500), логіка перевертається
+            if filters.min_amount is not None: amount_query["$lte"] = -filters.min_amount
+            if filters.max_amount is not None: amount_query["$gte"] = -filters.max_amount
+        else:
+            # Якщо тип не вибрано, шукаємо просто додатні числа (щоб не ламати логіку)
+            if filters.min_amount is not None: amount_query["$gte"] = filters.min_amount
+            if filters.max_amount is not None: amount_query["$lte"] = filters.max_amount
 
-        # Фільтр по даті
+        if amount_query:
+            query["amount"] = amount_query
+
+        # 4. Фільтр по датах (обробка кінця дня)
         if filters.start_date or filters.end_date:
-            query["time"] = {}
+            query["timestamp"] = {}
             if filters.start_date:
-                query["time"]["$gte"] = filters.start_date
+                query["timestamp"]["$gte"] = datetime.combine(filters.start_date, time.min)
             if filters.end_date:
-                query["time"]["$lte"] = filters.end_date
+                query["timestamp"]["$lte"] = datetime.combine(filters.end_date, time.max)
 
-        # 3. Налаштування сортування
-        direction = DESCENDING if filters.sort_order == "desc" else ASCENDING
-        sort_query = [(filters.sort_by.value, direction)]
-
-        # 4. Налаштування пагінації
+        # 5. Пагінація та сортування
+        sort_dir = -1 if filters.sort_order == "desc" else 1
         skip = (filters.page - 1) * filters.size
 
-        # 5. Виконання запиту до MongoDB (Beanie)
+        # 6. Запити до бази
         total_count = await Transaction.find(query).count()
-        transactions = await Transaction.find(query).sort(sort_query).skip(skip).limit(
-            filters.size).to_list()
+        docs = await Transaction.find(query).sort((filters.sort_by.value, sort_dir)).skip(
+            skip).limit(filters.size).to_list()
+
+        # 7. Конвертація в словники для Pydantic
+        transactions = []
+        for doc in docs:
+            transactions.append({
+                "id": str(doc.id),
+                "card_id": doc.card_id,
+                "amount": doc.amount,
+                "currency": doc.currency,
+                "category_id": doc.category_id,
+                "description": doc.description,
+                "timestamp": doc.timestamp,
+                "reactions": doc.reactions
+            })
 
         return transactions, total_count

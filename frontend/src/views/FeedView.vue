@@ -112,8 +112,8 @@
               <span class="card-widget__bank">{{ card.bankName }}</span>
               <span class="card-widget__dot"></span>
             </div>
-            <div class="card-widget__pan">{{ card.maskedPan }}</div>
-            <div class="card-widget__balance">{{ formatCurrency(card.balance) }}</div>
+            <div class="card-widget__pan">{{ card.masked_pan }}</div>
+            <!-- <div class="card-widget__balance">{{ formatCurrency(card.balance) }}</div> -->
           </div>
           <button class="connect-card-btn" @click="goToConnectCard">+ Connect Card</button>
         </section>
@@ -356,10 +356,10 @@
   import { useAuth } from '../composables/useAuth'
   import { fetchGroupMembers } from '../services/authService'
   import InviteMemberModal from '../components/InviteMemberModal.vue'
-  import { getCardsFromStorage } from '../services/cardStorage'
+  import { getCardsFromStorage, addCardToStorage } from '../services/cardStorage'
   import ConnectCardModal from '../components/ConnectCardModal.vue'
 
-  const { currentUser } = useAuth()
+  // const { currentUser } = useAuth()
   const router = useRouter()
   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
   const connectedCards = ref(getCardsFromStorage(storedUser.groupId))
@@ -374,9 +374,12 @@
     await logout()
   }
 
-  const currentUserName = computed(() => storedUser.fullName || currentUser.value?.fullName || '')
+  // СТАЛО — все через useAuth
+  const { currentUser, isAdmin } = useAuth()
+
+  const currentUserName = computed(() => currentUser.value?.fullName || '')
   const currentUserInitials = computed(() => {
-    const name = storedUser.fullName || currentUser.value?.fullName || ''
+    const name = currentUser.value?.fullName || '?'
     if (!name) return '?'
     return name
       .split(' ')
@@ -392,7 +395,7 @@
   ])
 
   // Для ролі. Замість const isAdmin = ref(true)
-  const isAdmin = computed(() => storedUser.role === 'ADMIN')
+  // const isAdmin = computed(() => storedUser.role === 'ADMIN')
   const activeGroupId = ref(1)
   // ─── Group Members з API ───
   const groupMembers = ref([])
@@ -565,7 +568,9 @@
    * @param {number} amount
    * @returns {string}
    */
+  // СТАЛО
   function formatCurrency(amount) {
+    if (amount == null) return '— UAH'
     return amount.toLocaleString('uk-UA') + ' UAH'
   }
 
@@ -621,19 +626,35 @@
     isConnectCardOpen.value = true // одразу відкриваємо модалку
   }
 
-  /**
-   * Після успішного підключення оновлюємо локальний список і кеш.
-   */
   function handleCardConnected(card) {
-    const cardData = {
-      id: card.id,
-      bankName: 'Monobank',
-      masked_pan: card.masked_pan,
-      status: card.status,
+    try {
+      const cardData = {
+        id: card.id,
+        bankName: 'Monobank',
+        masked_pan: card.masked_pan,
+        status: card.status,
+      }
+      connectedCards.value.push(cardData)
+      addCardToStorage(storedUser.groupId, cardData)
+    } catch (err) {
+      console.warn('Failed to update local card state:', err)
+      // Не пробрасуємо назад — модалка вже відобразила успіх
     }
-    connectedCards.value.push(cardData)
-    addCardToStorage(storedUser.groupId, cardData)
   }
+
+  // /**
+  //  * Після успішного підключення оновлюємо локальний список і кеш.
+  //  */
+  // function handleCardConnected(card) {
+  //   const cardData = {
+  //     id: card.id,
+  //     bankName: 'Monobank',
+  //     masked_pan: card.masked_pan,
+  //     status: card.status,
+  //   }
+  //   connectedCards.value.push(cardData)
+  //   addCardToStorage(storedUser.groupId, cardData)
+  // }
 </script>
 
 <style scoped>

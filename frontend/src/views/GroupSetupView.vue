@@ -135,7 +135,8 @@
   import { createGroup, joinGroup, fetchMyGroups } from '../services/authService'
 
   const router = useRouter()
-  const { currentUser } = useAuth()
+  const { currentUser, setActiveGroup } = useAuth()
+  // const { currentUser } = useAuth()
 
   const currentUserName = computed(() => currentUser.value?.fullName || 'User')
 
@@ -201,8 +202,6 @@
    * Join   → POST /api/v1/group/join → role = MEMBER
    */
   async function handleSubmit() {
-    console.log('1. handleSubmit started, mode:', selectedMode.value)
-    console.log('2. fieldValue value:', fieldValue.value, typeof fieldValue.value)
     if (!validateField()) return
 
     isLoading.value = true
@@ -210,71 +209,51 @@
 
     try {
       if (selectedMode.value === 'create') {
-        console.log('3. About to call createGroup...')
         const result = await createGroup(fieldValue.value)
-        console.log('4. createGroup returned:', result)
 
-        const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-        storedUser.role = 'ADMIN'
-        storedUser.groupId = result.group_id
-        storedUser.groupName = fieldValue.value.trim()
-        localStorage.setItem('currentUser', JSON.stringify(storedUser))
+        // Використовуємо setActiveGroup замість прямого запису в localStorage —
+        // він синхронно оновлює і localStorage, і currentUser.value у всіх Views
+        setActiveGroup({
+          id: result.group_id,
+          name: fieldValue.value.trim(),
+          role: 'ADMIN',
+        })
       } else {
         await joinGroup(fieldValue.value)
 
-        // Бек у /join повертає тільки { message }, без даних групи.
-        // Тягнемо повний список і знаходимо щойно приєднану групу.
+        // Тягнемо реальну назву щойно приєднаної групи з беку
         const groups = await fetchMyGroups()
-
         const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-
-        // Знаходимо групу, якої не було як активної раніше — це і є щойно приєднана.
-        // Якщо такої не знайшлось (наприклад це перший join) — беремо останню зі списку.
         const joinedGroup =
           groups.find((g) => g.id !== storedUser.groupId) || groups[groups.length - 1]
 
         if (joinedGroup) {
-          storedUser.role = joinedGroup.role
-          storedUser.groupId = joinedGroup.id
-          storedUser.groupName = joinedGroup.name
-        } else {
-          storedUser.role = 'MEMBER'
+          setActiveGroup(joinedGroup) // role='MEMBER' прийде з беку у groupResponse
         }
-
-        localStorage.setItem('currentUser', JSON.stringify(storedUser))
       }
 
       router.push('/feed')
-      console.log('5. After createGroup logic')
     } catch (err) {
-      console.log('6. CAUGHT ERROR:', err)
-      console.log('7. Error response:', err.response)
-      console.log('8. Error response data:', err.response?.data)
-      console.log('9. Error response status:', err.response?.status)
-
       const status = err.response?.status
       const message = err.response?.data?.message
 
-      // Вже є учасником — отримуємо роль і йдемо на feed
       if (status === 400 && message === 'You are already a member of this group') {
+        // Якщо юзер уже учасник — теж оновлюємо стан і йдемо на feed
+        const groups = await fetchMyGroups()
         const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-        storedUser.role = 'MEMBER'
-        localStorage.setItem('currentUser', JSON.stringify(storedUser))
+        const existingGroup = groups.find((g) => g.id !== storedUser.groupId) || groups[0]
+        if (existingGroup) setActiveGroup(existingGroup)
         router.push('/feed')
         return
       }
 
-      if (status === 409) {
-        serverError.value = 'A group with this name already exists'
-      } else if (status === 410) {
+      if (status === 409) serverError.value = 'A group with this name already exists'
+      else if (status === 410)
         serverError.value = 'This invite link has expired. Ask Admin to generate a new one.'
-      } else if (status === 400) {
-        serverError.value = message || 'Invalid invite link'
-      } else if (status === 404) {
+      else if (status === 400) serverError.value = message || 'Invalid invite link'
+      else if (status === 404)
         serverError.value = 'Invite link not found. Check the link and try again.'
-      } else {
-        serverError.value = message || 'Something went wrong. Please try again.'
-      }
+      else serverError.value = message || 'Something went wrong. Please try again.'
     } finally {
       isLoading.value = false
     }

@@ -652,20 +652,34 @@
   const cardToDisconnect = ref(null)
   const isDisconnecting = ref(false)
 
-  /**
-   * Викликається з ConnectCardModal після успішного підключення.
-   * Бек повертає { id, masked_pan, status }.
-   */
   function handleCardConnected(card) {
-    const cardData = {
-      id: card.id,
-      bankName: 'Monobank',
-      masked_pan: card.masked_pan,
-      status: card.status,
+    try {
+      const cardData = {
+        id: card.id,
+        bankName: 'Monobank',
+        masked_pan: card.masked_pan,
+        status: card.status,
+      }
+      connectedCards.value.push(cardData)
+      addCardToStorage(groupId, cardData)
+    } catch (err) {
+      console.warn('Failed to update local card state:', err)
     }
-    connectedCards.value.push(cardData)
-    addCardToStorage(groupId, cardData)
   }
+  // /**
+  //  * Викликається з ConnectCardModal після успішного підключення.
+  //  * Бек повертає { id, masked_pan, status }.
+  //  */
+  // function handleCardConnected(card) {
+  //   const cardData = {
+  //     id: card.id,
+  //     bankName: 'Monobank',
+  //     masked_pan: card.masked_pan,
+  //     status: card.status,
+  //   }
+  //   connectedCards.value.push(cardData)
+  //   addCardToStorage(groupId, cardData)
+  // }
 
   /**
    * PROJ-63 FE-01: відкриває confirmation dialog перед disconnect.

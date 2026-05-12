@@ -4,8 +4,10 @@
       <!-- Стан 1: форма -->
       <template v-if="!isEmailSent">
         <div class="auth-card__header">
-          <h1 class="auth-card__title">Скидання паролю</h1>
-          <p class="auth-card__subtitle">Введіть email і ми надішлемо вам посилання для скидання</p>
+          <h1 class="auth-card__title">Password Reset</h1>
+          <p class="auth-card__subtitle">
+            Enter your email and we'll send you a link to reset your password
+          </p>
         </div>
 
         <form class="auth-form" novalidate @submit.prevent="handleSubmit">
@@ -26,8 +28,8 @@
           </Transition>
 
           <button type="submit" class="btn-gold" :disabled="isLoading || !email.trim()">
-            <span v-if="!isLoading">Надіслати посилання</span>
-            <span v-else aria-label="Завантаження...">
+            <span v-if="!isLoading">Send Reset Link</span>
+            <span v-else aria-label="Loading...">
               <svg class="spinner-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
                 <circle cx="10" cy="10" r="8" stroke="rgba(255,255,255,0.35)" stroke-width="2.5" />
                 <path
@@ -46,21 +48,21 @@
       <template v-else>
         <div class="success-state">
           <div class="success-state__icon" aria-hidden="true">✉️</div>
-          <h2 class="success-state__title">Перевірте пошту</h2>
+          <h2 class="success-state__title">Check Your Email</h2>
           <p class="success-state__text">
-            Ми надіслали посилання для скидання паролю на<br />
+            We've sent a password reset link to<br />
             <strong>{{ email }}</strong>
           </p>
           <p class="success-state__hint">
-            Не отримали? Перевірте папку «Спам» або
-            <button class="btn-text" @click="isEmailSent = false">спробуйте знову</button>
+            Didn't receive it? Check your spam folder or
+            <button class="btn-text" @click="isEmailSent = false">try again</button>
           </p>
         </div>
       </template>
 
       <!-- Посилання назад -->
       <div class="auth-card__back">
-        <router-link to="/login" class="auth-link">← Повернутися до входу</router-link>
+        <router-link to="/login" class="auth-link">← Back to Login</router-link>
       </div>
     </div>
   </div>
@@ -86,11 +88,11 @@
   function validateEmail() {
     emailError.value = ''
     if (!email.value.trim()) {
-      emailError.value = "Email є обов'язковим"
+      emailError.value = 'Email is required'
       return false
     }
     if (!EMAIL_REGEX.test(email.value)) {
-      emailError.value = 'Введіть коректний email'
+      emailError.value = 'Please enter a valid email'
       return false
     }
     return true
@@ -109,7 +111,7 @@
       await requestPasswordReset({ email: email.value.trim().toLowerCase() })
       isEmailSent.value = true
     } catch {
-      serverError.value = 'Щось пішло не так. Спробуйте ще раз'
+      serverError.value = 'Something went wrong. Please try again'
     } finally {
       isLoading.value = false
     }

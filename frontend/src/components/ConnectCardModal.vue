@@ -234,28 +234,67 @@
     isConnecting.value = true
     serverError.value = ''
 
+    // Network call окремо. catch ловить ТІЛЬКИ помилки запиту
+    let card
     try {
-      const card = await connectMonobankCard(storedUser.groupId, personalToken.value.trim())
-
-      // Передаємо повний об'єкт картки у Settings, щоб додати до списку
-      emit('connected', {
-        id: card.id,
-        masked_pan: card.masked_pan,
-        status: card.status, // "Active" з беку
-      })
-
-      emit('toast', {
-        message: `Card connected: ${card.masked_pan}`,
-        type: 'success',
-      })
-
-      close()
+      card = await connectMonobankCard(storedUser.groupId, personalToken.value.trim())
     } catch (err) {
       handleServerError(err)
-    } finally {
       isConnecting.value = false
+      return
     }
+
+    // Після цього рядка ми точно знаємо що запит успішний.
+    // emit-и виконуються поза try/catch — їхні помилки НЕ інтерпретуються як failed connect.
+    emit('connected', {
+      id: card.id,
+      masked_pan: card.masked_pan,
+      status: card.status,
+    })
+
+    emit('toast', {
+      message: `Card connected: ${card.masked_pan}`,
+      type: 'success',
+    })
+
+    isConnecting.value = false
+    close()
   }
+  // async function handleConnect() {
+  //   if (!validateToken()) return
+  //   if (!agreedToPrivacy.value) return
+
+  //   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+  //   if (!storedUser.groupId) {
+  //     serverError.value = 'Активну групу не знайдено. Будь ласка, увійдіть знову.'
+  //     return
+  //   }
+
+  //   isConnecting.value = true
+  //   serverError.value = ''
+
+  //   try {
+  //     const card = await connectMonobankCard(storedUser.groupId, personalToken.value.trim())
+
+  //     // Передаємо повний об'єкт картки у Settings, щоб додати до списку
+  //     emit('connected', {
+  //       id: card.id,
+  //       masked_pan: card.masked_pan,
+  //       status: card.status, // "Active" з беку
+  //     })
+
+  //     emit('toast', {
+  //       message: `Card connected: ${card.masked_pan}`,
+  //       type: 'success',
+  //     })
+
+  //     close()
+  //   } catch (err) {
+  //     handleServerError(err)
+  //   } finally {
+  //     isConnecting.value = false
+  //   }
+  // }
 
   /**
    * Mapping помилок з бекенду.

@@ -109,9 +109,7 @@
               <!-- Group Invite Code -->
               <div class="invite-section__label">
                 Group Invite Code
-                <span class="invite-section__label-note"
-                  >· Group.invite_code · Admin Only · Rule-02</span
-                >
+                <span class="invite-section__label-note">Only Admin can generate invite links</span>
               </div>
 
               <!-- Link box (FE-02) -->
@@ -237,7 +235,7 @@
                     stroke-width="1.2"
                   />
                 </svg>
-                Only Admin can generate invite links (Rule-02). Non-admin users receive 403 on GET
+                Only Admin can generate invite links. Non-admin users receive 403 on GET
                 /group/invite.
               </div>
 
@@ -309,31 +307,78 @@
           <div class="settings-section__header">
             <h2 class="settings-section__title">Connected Cards</h2>
           </div>
-          <div class="cards-list">
+
+          <!-- Empty state -->
+          <div v-if="connectedCards.length === 0" class="cards-empty">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+              <rect
+                x="4"
+                y="10"
+                width="32"
+                height="22"
+                rx="3"
+                stroke="#d6d3ce"
+                stroke-width="1.5"
+              />
+              <path d="M4 16H36" stroke="#d6d3ce" stroke-width="1.5" />
+            </svg>
+            <p>No cards connected yet.</p>
+            <span>Connect your Monobank card to start tracking family expenses automatically.</span>
+          </div>
+
+          <!-- FE-02: Active cards list -->
+          <div v-else class="cards-list">
             <div v-for="card in connectedCards" :key="card.id" class="card-item">
+              <div class="card-item__icon">
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                  <rect x="2" y="5" width="18" height="13" rx="2" fill="#0d0c0a" />
+                  <rect x="2" y="8" width="18" height="2" fill="#b8973a" />
+                </svg>
+              </div>
+
               <div class="card-item__info">
                 <div class="card-item__bank">{{ card.bankName }}</div>
-                <div class="card-item__pan">{{ card.maskedPan }}</div>
-                <div class="card-item__balance">{{ card.balance.toLocaleString('uk-UA') }} UAH</div>
+                <div class="card-item__pan">{{ card.masked_pan }}</div>
               </div>
+
               <div class="card-item__actions">
                 <span class="card-item__status">
-                  <span class="card-item__dot"></span> Connected
+                  <span class="card-item__dot"></span>
+                  {{ card.status }}
                 </span>
-                <button v-if="isAdmin" class="btn-remove" @click="disconnectCard(card)">
-                  Disconnect
-                </button>
+                <button class="btn-remove" @click="askDisconnect(card)">Disconnect</button>
               </div>
             </div>
           </div>
-          <button
-            v-if="isAdmin"
-            class="btn-gold"
-            style="margin-top: 16px"
-            @click="showToast('Connect Card modal — coming soon', 'info')"
-          >
+
+          <button class="btn-gold" style="margin-top: 16px" @click="isConnectCardOpen = true">
             + Connect Card
           </button>
+
+          <!-- PROJ-49: модалка підключення -->
+          <ConnectCardModal
+            :is-open="isConnectCardOpen"
+            @close="isConnectCardOpen = false"
+            @toast="showToast($event.message, $event.type)"
+            @connected="handleCardConnected"
+          />
+
+          <!-- PROJ-63 FE-01: підтвердження disconnect -->
+          <ConfirmDialog
+            :is-open="isConfirmOpen"
+            title="Disconnect this card?"
+            :message="
+              cardToDisconnect
+                ? `New transactions from ${cardToDisconnect.masked_pan} will not be synced. Existing transaction history will be preserved.`
+                : ''
+            "
+            confirm-text="Yes, disconnect"
+            cancel-text="Keep card"
+            variant="danger"
+            :is-loading="isDisconnecting"
+            @confirm="confirmDisconnect"
+            @cancel="cancelDisconnect"
+          />
         </section>
 
         <!-- NOTIFICATIONS section -->
@@ -388,9 +433,21 @@
 </template>
 
 <script setup>
-  import { ref, computed, watch } from 'vue'
+  import { ref, computed, watch, onMounted } from 'vue'
   import { useAuth } from '../composables/useAuth'
-  import { fetchGroupInviteLink, regenerateGroupInviteLink } from '../services/authService'
+  import {
+    fetchGroupInviteLink,
+    regenerateGroupInviteLink,
+    fetchGroupMembers,
+  } from '../services/authService'
+  import { disconnectMonobankCard } from '../services/cardService'
+  import {
+    getCardsFromStorage,
+    addCardToStorage,
+    removeCardFromStorage,
+  } from '../services/cardStorage'
+  import ConnectCardModal from '../components/ConnectCardModal.vue'
+  import ConfirmDialog from '../components/ConfirmDialog.vue'
   import { useRoute } from 'vue-router'
 
   const route = useRoute()
@@ -425,49 +482,69 @@
     { key: 'privacy', icon: '🛡', label: 'Privacy & Data' },
   ]
 
-  // TODO: підключити до GET /api/v1/group/{groupId}/members коли з'явиться endpoint
-  const groupMembers = ref([
-    {
-      id: 1,
-      name: 'Olena K.',
-      initials: 'OK',
-      role: 'ADMIN',
-      avatarVariant: 'gold',
-      email: 'olena@example.com',
-      joinedAt: 'Jan 10',
-      isCurrentUser: true,
-    },
-    {
-      id: 2,
-      name: 'Mykola K.',
-      initials: 'MK',
-      role: 'MEMBER',
-      avatarVariant: 'dark',
-      email: 'mykola@example.com',
-      joinedAt: 'Jan 12',
-      isCurrentUser: false,
-    },
-    {
-      id: 3,
-      name: 'Sofia K.',
-      initials: 'SK',
-      role: 'MEMBER',
-      avatarVariant: 'light',
-      email: 'sofia@example.com',
-      joinedAt: 'Jan 12',
-      isCurrentUser: false,
-    },
-  ])
+  // ─── Group Members з API ───
+  const groupMembers = ref([])
+  const isLoadingMembers = ref(false)
+
+  function formatJoinedDate(isoDate) {
+    if (!isoDate) return ''
+    return new Date(isoDate).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    })
+  }
+
+  function mapMemberFromApi(apiMember, currentUserEmail) {
+    const fullName = apiMember.full_name || apiMember.email || 'User'
+    const initials = fullName
+      .split(' ')
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+
+    const variants = ['gold', 'dark', 'light']
+    const variantIdx = (initials.charCodeAt(0) || 0) % variants.length
+
+    return {
+      id: apiMember.user_id || apiMember.id,
+      name: fullName,
+      initials,
+      role: apiMember.role,
+      avatarVariant: variants[variantIdx],
+      email: apiMember.email,
+      joinedAt: formatJoinedDate(apiMember.joined_at),
+      isCurrentUser: apiMember.email === storedUser.email,
+    }
+  }
+
+  async function loadGroupMembers() {
+    const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+    if (!storedUser.groupId) return
+
+    isLoadingMembers.value = true
+    try {
+      const data = await fetchGroupMembers(storedUser.groupId)
+      const members = Array.isArray(data) ? data : data.members || []
+      groupMembers.value = members.map((m) => mapMemberFromApi(m, storedUser.email))
+    } catch (err) {
+      showToast('Failed to load group members', 'error')
+    } finally {
+      isLoadingMembers.value = false
+    }
+  }
+
+  onMounted(() => {
+    loadGroupMembers()
+  })
 
   /**
    * Видаляє учасника з групи.
-   * @param {object} member
+   * TODO: підключити DELETE /api/v1/group/{groupId}/members/{userId} коли з'явиться
    */
   function removeMember(member) {
-    if (confirm(`Remove ${member.name} from the group?`)) {
-      groupMembers.value = groupMembers.value.filter((m) => m.id !== member.id)
-      showToast(`${member.name} removed from group`, 'success')
-    }
+    if (!confirm(`Remove ${member.name} from the group?`)) return
+    showToast('Remove member endpoint not available yet', 'info')
   }
 
   // ─── Invite link ───
@@ -561,23 +638,100 @@
       isSendingDirectInvite.value = false
     }
   }
-
   // ─── Cards ───
-  // TODO: підключити до GET /api/v1/group/{groupId}/cards коли з'явиться endpoint
-  const connectedCards = ref([
-    { id: 1, bankName: 'Monobank', maskedPan: '•••• •••• •••• 4521', balance: 12340 },
-    { id: 2, bankName: 'Monobank', maskedPan: '•••• •••• •••• 7732', balance: 3870 },
-  ])
+  const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+  const groupId = storedUser.groupId
+
+  // Завантажуємо з localStorage при монтуванні (TODO: замінити на API коли буде GET endpoint)
+  const connectedCards = ref(getCardsFromStorage(groupId))
+
+  const isConnectCardOpen = ref(false)
+
+  // Confirm dialog для disconnect (PROJ-63)
+  const isConfirmOpen = ref(false)
+  const cardToDisconnect = ref(null)
+  const isDisconnecting = ref(false)
+
+  function handleCardConnected(card) {
+    try {
+      const cardData = {
+        id: card.id,
+        bankName: 'Monobank',
+        masked_pan: card.masked_pan,
+        status: card.status,
+      }
+      connectedCards.value.push(cardData)
+      addCardToStorage(groupId, cardData)
+    } catch (err) {
+      console.warn('Failed to update local card state:', err)
+    }
+  }
+  // /**
+  //  * Викликається з ConnectCardModal після успішного підключення.
+  //  * Бек повертає { id, masked_pan, status }.
+  //  */
+  // function handleCardConnected(card) {
+  //   const cardData = {
+  //     id: card.id,
+  //     bankName: 'Monobank',
+  //     masked_pan: card.masked_pan,
+  //     status: card.status,
+  //   }
+  //   connectedCards.value.push(cardData)
+  //   addCardToStorage(groupId, cardData)
+  // }
 
   /**
-   * Відключає картку від групи.
-   * @param {object} card
+   * PROJ-63 FE-01: відкриває confirmation dialog перед disconnect.
    */
-  function disconnectCard(card) {
-    if (confirm(`Disconnect ${card.maskedPan}?`)) {
+  function askDisconnect(card) {
+    cardToDisconnect.value = card
+    isConfirmOpen.value = true
+  }
+
+  /**
+   * PROJ-63 FE-02: реальний disconnect через бек + toast + видалення з UI.
+   */
+  async function confirmDisconnect() {
+    if (!cardToDisconnect.value) return
+
+    const card = cardToDisconnect.value
+    isDisconnecting.value = true
+
+    try {
+      await disconnectMonobankCard(card.id)
+
+      // Прибираємо локально + з кешу
       connectedCards.value = connectedCards.value.filter((c) => c.id !== card.id)
-      showToast('Card disconnected. Existing transactions preserved.', 'success')
+      removeCardFromStorage(groupId, card.id)
+
+      showToast('Card disconnected successfully. Transaction history is preserved.', 'success')
+      isConfirmOpen.value = false
+      cardToDisconnect.value = null
+    } catch (err) {
+      const status = err.response?.status
+      const message = err.response?.data?.message
+
+      if (status === 403) {
+        showToast(message || 'You can only disconnect your own cards', 'error')
+      } else if (status === 404) {
+        // Картка вже видалена на беку — синхронізуємо локальний стан
+        connectedCards.value = connectedCards.value.filter((c) => c.id !== card.id)
+        removeCardFromStorage(groupId, card.id)
+        showToast('Card was already disconnected', 'info')
+        isConfirmOpen.value = false
+        cardToDisconnect.value = null
+      } else {
+        showToast(message || 'Failed to disconnect card', 'error')
+      }
+    } finally {
+      isDisconnecting.value = false
     }
+  }
+
+  function cancelDisconnect() {
+    isConfirmOpen.value = false
+    cardToDisconnect.value = null
   }
 
   // ─── Notifications ───
@@ -1330,5 +1484,69 @@
   .toast-leave-to {
     opacity: 0;
     transform: translateY(12px);
+  }
+
+  .cards-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 48px 20px;
+    background: #ffffff;
+    border: 1px dashed #d6d3ce;
+    border-radius: 12px;
+    text-align: center;
+  }
+
+  .cards-empty p {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0d0c0a;
+    margin: 8px 0 0;
+  }
+
+  .cards-empty span {
+    font-size: 12px;
+    color: #b0ada7;
+  }
+
+  .card-item {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #faf8f3, #fbf7ec);
+    border: 1px solid #f2e9c8;
+    border-radius: 12px;
+    margin-bottom: 10px;
+  }
+
+  .card-item__icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #fbf7ec, #f4f1e9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .card-item__info {
+    flex: 1;
+  }
+
+  .card-item__bank {
+    font-size: 11px;
+    font-weight: 700;
+    color: #9b7a25;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+
+  .card-item__pan {
+    font-size: 13px;
+    color: #6b6860;
+    font-family: 'DM Mono', 'Courier New', monospace;
   }
 </style>

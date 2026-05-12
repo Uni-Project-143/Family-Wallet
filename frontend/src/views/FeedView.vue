@@ -15,7 +15,7 @@
             {{ group.name }}
           </button>
           <!-- СТАЛО -->
-          <button v-if="isAdmin" class="navbar__group-tab navbar__group-tab--add">
+          <button class="navbar__group-tab navbar__group-tab--add" @click="goToGroupSetup">
             + New group
           </button>
         </div>
@@ -40,6 +40,25 @@
         <span class="navbar__user-name">{{ currentUserName }}</span>
         <span v-if="isAdmin" class="badge badge--admin">Admin</span>
         <span v-else class="badge badge--member">Member</span>
+
+        <!-- ↓ нова кнопка -->
+        <button class="logout-btn" :disabled="isLoading" @click="handleLogout" aria-label="Logout">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M6 14H3.5C2.67 14 2 13.33 2 12.5V3.5C2 2.67 2.67 2 3.5 2H6"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
+            <path
+              d="M11 11L14 8L11 5M14 8H6"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
       </div>
     </header>
 
@@ -93,12 +112,10 @@
               <span class="card-widget__bank">{{ card.bankName }}</span>
               <span class="card-widget__dot"></span>
             </div>
-            <div class="card-widget__pan">{{ card.maskedPan }}</div>
-            <div class="card-widget__balance">{{ formatCurrency(card.balance) }}</div>
+            <div class="card-widget__pan">{{ card.masked_pan }}</div>
+            <!-- <div class="card-widget__balance">{{ formatCurrency(card.balance) }}</div> -->
           </div>
-          <button v-if="isAdmin" class="connect-card-btn" @click="goToConnectCard">
-            + Connect Card
-          </button>
+          <button class="connect-card-btn" @click="goToConnectCard">+ Connect Card</button>
         </section>
       </aside>
 
@@ -325,24 +342,44 @@
       </div>
     </Transition>
   </div>
+  <ConnectCardModal
+    :is-open="isConnectCardOpen"
+    @close="isConnectCardOpen = false"
+    @toast="showToast($event.message, $event.type)"
+    @connected="handleCardConnected"
+  />
 </template>
 
 <script setup>
   import { ref, computed, onMounted, onUnmounted } from 'vue'
   import { useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
+  import { fetchGroupMembers } from '../services/authService'
   import InviteMemberModal from '../components/InviteMemberModal.vue'
+  import { getCardsFromStorage, addCardToStorage } from '../services/cardStorage'
+  import ConnectCardModal from '../components/ConnectCardModal.vue'
 
-  const isInviteModalOpen = ref(false)
+  // const { currentUser } = useAuth()
   const router = useRouter()
-  //const { currentUser, isAdmin } = useAuth()
-  const { currentUser } = useAuth()
-
   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
+  const connectedCards = ref(getCardsFromStorage(storedUser.groupId))
+  //const connectedCards = ref([])
+  const isInviteModalOpen = ref(false)
 
-  const currentUserName = computed(() => storedUser.fullName || currentUser.value?.fullName || '')
+  //const { currentUser, isAdmin } = useAuth()
+
+  const { isLoading, logout } = useAuth()
+
+  async function handleLogout() {
+    await logout()
+  }
+
+  // СТАЛО — все через useAuth
+  const { currentUser, isAdmin } = useAuth()
+
+  const currentUserName = computed(() => currentUser.value?.fullName || '')
   const currentUserInitials = computed(() => {
-    const name = storedUser.fullName || currentUser.value?.fullName || ''
+    const name = currentUser.value?.fullName || '?'
     if (!name) return '?'
     return name
       .split(' ')
@@ -358,39 +395,58 @@
   ])
 
   // Для ролі. Замість const isAdmin = ref(true)
-  const isAdmin = computed(() => storedUser.role === 'ADMIN')
+  // const isAdmin = computed(() => storedUser.role === 'ADMIN')
   const activeGroupId = ref(1)
-  const groupMembers = ref([
-    {
-      id: 1,
-      name: 'Olena K.',
-      initials: 'OK',
-      role: 'ADMIN',
-      avatarVariant: 'gold',
-      isCurrentUser: true,
-    },
-    {
-      id: 2,
-      name: 'Mykola K.',
-      initials: 'MK',
-      role: 'MEMBER',
-      avatarVariant: 'dark',
-      isCurrentUser: false,
-    },
-    {
-      id: 3,
-      name: 'Sofia K.',
-      initials: 'SK',
-      role: 'MEMBER',
-      avatarVariant: 'light',
-      isCurrentUser: false,
-    },
-  ])
+  // ─── Group Members з API ───
+  const groupMembers = ref([])
+  const isLoadingMembers = ref(false)
 
-  const connectedCards = ref([
-    { id: 1, bankName: 'Monobank', maskedPan: '•••• •••• •••• 4521', balance: 12340 },
-    { id: 2, bankName: 'Monobank', maskedPan: '•••• •••• •••• 7732', balance: 3870 },
-  ])
+  /**
+   * Транформує бекенд-формат у формат для UI.
+   * Бекенд повертає user_id, full_name, role, joined_at.
+   */
+  function mapMemberFromApi(apiMember, currentUserEmail) {
+    const fullName = apiMember.full_name || apiMember.email || 'User'
+    const initials = fullName
+      .split(' ')
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+
+    // Просте мапування для аватара — за першою літерою імені
+    const variants = ['gold', 'dark', 'light']
+    const variantIdx = (initials.charCodeAt(0) || 0) % variants.length
+
+    return {
+      id: apiMember.user_id || apiMember.id,
+      name: fullName,
+      initials,
+      role: apiMember.role,
+      avatarVariant: variants[variantIdx],
+      isCurrentUser: apiMember.email === currentUserEmail,
+    }
+  }
+
+  async function loadGroupMembers() {
+    if (!storedUser.groupId) return
+
+    isLoadingMembers.value = true
+    try {
+      const data = await fetchGroupMembers(storedUser.groupId)
+      const members = Array.isArray(data) ? data : data.members || []
+      groupMembers.value = members.map((m) => mapMemberFromApi(m, storedUser.email))
+    } catch (err) {
+      showToast('Failed to load group members', 'error')
+    } finally {
+      isLoadingMembers.value = false
+    }
+  }
+
+  onMounted(() => {
+    loadGroupMembers()
+    connectWebSocket()
+  })
 
   const isLoadingFeed = ref(false)
   const transactions = ref([
@@ -512,7 +568,9 @@
    * @param {number} amount
    * @returns {string}
    */
+  // СТАЛО
   function formatCurrency(amount) {
+    if (amount == null) return '— UAH'
     return amount.toLocaleString('uk-UA') + ' UAH'
   }
 
@@ -546,10 +604,57 @@
   //   showToast('Opening invite members section', 'info')
   // }
 
-  function goToConnectCard() {
-    router.push({ path: '/settings', query: { section: 'cards' } })
-    showToast('Opening connect card section', 'info')
+  //function goToConnectCard() {
+  //  router.push({ path: '/settings', query: { section: 'cards' } })
+  // showToast('Opening connect card section', 'info')
+  //}
+  /**
+   * Перехід на екран створення/приєднання до групи.
+   * Працює для всіх ролей — і Admin, і Member можуть створити свою власну сім'ю
+   * або приєднатись до іншої.
+   */
+  /**
+   * Перехід на екран керування групою — юзер сам обере create або join.
+   */
+  function goToGroupSetup() {
+    router.push('/group-setup')
   }
+
+  const isConnectCardOpen = ref(false)
+
+  function goToConnectCard() {
+    isConnectCardOpen.value = true // одразу відкриваємо модалку
+  }
+
+  function handleCardConnected(card) {
+    try {
+      const cardData = {
+        id: card.id,
+        bankName: 'Monobank',
+        masked_pan: card.masked_pan,
+        status: card.status,
+      }
+      connectedCards.value.push(cardData)
+      addCardToStorage(storedUser.groupId, cardData)
+    } catch (err) {
+      console.warn('Failed to update local card state:', err)
+      // Не пробрасуємо назад — модалка вже відобразила успіх
+    }
+  }
+
+  // /**
+  //  * Після успішного підключення оновлюємо локальний список і кеш.
+  //  */
+  // function handleCardConnected(card) {
+  //   const cardData = {
+  //     id: card.id,
+  //     bankName: 'Monobank',
+  //     masked_pan: card.masked_pan,
+  //     status: card.status,
+  //   }
+  //   connectedCards.value.push(cardData)
+  //   addCardToStorage(storedUser.groupId, cardData)
+  // }
 </script>
 
 <style scoped>
@@ -1303,5 +1408,30 @@
   .tx-list-enter-from {
     opacity: 0;
     transform: translateY(-12px);
+  }
+  .logout-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.18s;
+    margin-left: 4px;
+  }
+
+  .logout-btn:hover:not(:disabled) {
+    background: rgba(196, 64, 42, 0.18);
+    border-color: rgba(196, 64, 42, 0.4);
+    color: #ff8a72;
+  }
+
+  .logout-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 </style>

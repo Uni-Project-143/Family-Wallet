@@ -107,16 +107,34 @@
 
         <section class="sidebar__section">
           <div class="sidebar__section-title">Connected Cards</div>
-          <div v-for="card in connectedCards" :key="card.id" class="card-widget">
-            <div class="card-widget__header">
-              <span class="card-widget__bank">{{ card.bankName }}</span>
-              <span class="card-widget__dot"></span>
+
+          <template v-if="isLoadingCards">
+            <div class="card-widget-skeleton"></div>
+          </template>
+
+          <template v-else>
+            <div v-for="card in connectedCards" :key="card.id" class="card-widget">
+              <div class="card-widget__header">
+                <span class="card-widget__bank">Monobank</span>
+                <span
+                  class="card-widget__dot"
+                  :class="{ 'card-widget__dot--inactive': card.status === 'INACTIVE' }"
+                ></span>
+              </div>
+              <div class="card-widget__pan">{{ card.masked_pan }}</div>
             </div>
-            <div class="card-widget__pan">{{ card.masked_pan }}</div>
-            <!-- <div class="card-widget__balance">{{ formatCurrency(card.balance) }}</div> -->
-          </div>
-          <button class="connect-card-btn" @click="goToConnectCard">+ Connect Card</button>
+            <button class="connect-card-btn" @click="isConnectCardOpen = true">
+              + Connect Card
+            </button>
+          </template>
         </section>
+
+        <ConnectCardModal
+          :is-open="isConnectCardOpen"
+          @close="isConnectCardOpen = false"
+          @toast="showToast($event.message, $event.type)"
+          @connected="handleCardConnected"
+        />
       </aside>
 
       <!-- FEED MAIN -->
@@ -356,26 +374,45 @@
   import { useAuth } from '../composables/useAuth'
   import { fetchGroupMembers } from '../services/authService'
   import InviteMemberModal from '../components/InviteMemberModal.vue'
-  import { getCardsFromStorage, addCardToStorage } from '../services/cardStorage'
+  // import { getCardsFromStorage, addCardToStorage } from '../services/cardStorage'
   import ConnectCardModal from '../components/ConnectCardModal.vue'
+  import { fetchGroupCards } from '../services/cardService'
 
-  // const { currentUser } = useAuth()
   const router = useRouter()
   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-  const connectedCards = ref(getCardsFromStorage(storedUser.groupId))
-  //const connectedCards = ref([])
-  const isInviteModalOpen = ref(false)
+  // СТАЛО — все через useAuth
+  const { currentUser, isAdmin } = useAuth()
+  const connectedCards = ref([])
+  const isLoadingCards = ref(false)
 
-  //const { currentUser, isAdmin } = useAuth()
+  async function loadCards() {
+    if (!currentUser.value?.groupId) return
+    isLoadingCards.value = true
+    try {
+      connectedCards.value = await fetchGroupCards(currentUser.value.groupId)
+    } catch (err) {
+      console.warn('Failed to load cards:', err)
+    } finally {
+      isLoadingCards.value = false
+    }
+  }
+
+  onMounted(() => {
+    loadCards()
+  })
+
+  // Після успішного connect — перезавантажуємо список з беку
+  async function handleCardConnected() {
+    await loadCards()
+  }
+
+  const isInviteModalOpen = ref(false)
 
   const { isLoading, logout } = useAuth()
 
   async function handleLogout() {
     await logout()
   }
-
-  // СТАЛО — все через useAuth
-  const { currentUser, isAdmin } = useAuth()
 
   const currentUserName = computed(() => currentUser.value?.fullName || '')
   const currentUserInitials = computed(() => {
@@ -624,22 +661,6 @@
 
   function goToConnectCard() {
     isConnectCardOpen.value = true // одразу відкриваємо модалку
-  }
-
-  function handleCardConnected(card) {
-    try {
-      const cardData = {
-        id: card.id,
-        bankName: 'Monobank',
-        masked_pan: card.masked_pan,
-        status: card.status,
-      }
-      connectedCards.value.push(cardData)
-      addCardToStorage(storedUser.groupId, cardData)
-    } catch (err) {
-      console.warn('Failed to update local card state:', err)
-      // Не пробрасуємо назад — модалка вже відобразила успіх
-    }
   }
 
   // /**

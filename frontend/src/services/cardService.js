@@ -41,26 +41,17 @@ export async function disconnectMonobankCard(cardId) {
   const response = await apiClient.delete(`/api/v1/monobank/card/${cardId}`)
   return response.data
 }
-
-// /**
-//  * Список карток групи.
-//  * GET /api/v1/monobank/cards/{group_id}
-//  *
-//  * @param {string} groupId
-//  * @param {string} [status] — 'active' | 'inactive' | 'all' (default 'active')
-//  */
-// export async function fetchConnectedCards(groupId, status = 'active') {
-//   const response = await apiClient.get(`/api/v1/monobank/cards/${groupId}`, {
-//     params: { status },
-//   })
-//   return response.data
-// }
-
-// /**
-//  * Soft-delete картки. Транзакції залишаються.
-//  * DELETE /api/v1/monobank/card/{card_id}
-//  */
-// export async function disconnectMonobankCard(cardId) {
-//   const response = await apiClient.delete(`/api/v1/monobank/card/${cardId}`)
-//   return response.data
-// }
+/**
+ * Список карток усіх учасників групи.
+ * GET /api/v1/bank-cards/group/{group_id}
+ *
+ * Бек повертає всі картки групи без encrypted_token (це поле приховане).
+ * Доступно будь-якому учаснику групи.
+ *
+ * @param {string} groupId
+ * @returns {Promise<Array<{id, user_id, group_id, account_id, masked_pan, balance, status, transaction_ids}>>}
+ */
+export async function fetchGroupCards(groupId) {
+  const response = await apiClient.get(`/api/v1/bank-cards/group/${groupId}`)
+  return response.data
+}

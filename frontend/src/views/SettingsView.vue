@@ -308,8 +308,14 @@
             <h2 class="settings-section__title">Connected Cards</h2>
           </div>
 
+          <!-- Loading state -->
+          <div v-if="isLoadingCards" class="cards-loading">
+            <div class="card-skeleton"></div>
+            <div class="card-skeleton"></div>
+          </div>
+
           <!-- Empty state -->
-          <div v-if="connectedCards.length === 0" class="cards-empty">
+          <div v-else-if="connectedCards.length === 0" class="cards-empty">
             <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
               <rect
                 x="4"
@@ -326,7 +332,7 @@
             <span>Connect your Monobank card to start tracking family expenses automatically.</span>
           </div>
 
-          <!-- FE-02: Active cards list -->
+          <!-- Active cards list -->
           <div v-else class="cards-list">
             <div v-for="card in connectedCards" :key="card.id" class="card-item">
               <div class="card-item__icon">
@@ -337,7 +343,7 @@
               </div>
 
               <div class="card-item__info">
-                <div class="card-item__bank">{{ card.bankName }}</div>
+                <div class="card-item__bank">Monobank</div>
                 <div class="card-item__pan">{{ card.masked_pan }}</div>
               </div>
 
@@ -346,7 +352,14 @@
                   <span class="card-item__dot"></span>
                   {{ card.status }}
                 </span>
-                <button class="btn-remove" @click="askDisconnect(card)">Disconnect</button>
+                <!-- Disconnect доступний тільки власнику картки (бек поверне 403 для чужих) -->
+                <button
+                  v-if="card.user_id === currentUser?.id"
+                  class="btn-remove"
+                  @click="askDisconnect(card)"
+                >
+                  Disconnect
+                </button>
               </div>
             </div>
           </div>
@@ -440,12 +453,8 @@
     regenerateGroupInviteLink,
     fetchGroupMembers,
   } from '../services/authService'
-  import { disconnectMonobankCard } from '../services/cardService'
-  import {
-    getCardsFromStorage,
-    addCardToStorage,
-    removeCardFromStorage,
-  } from '../services/cardStorage'
+  import { fetchGroupCards, disconnectMonobankCard } from '../services/cardService'
+
   import ConnectCardModal from '../components/ConnectCardModal.vue'
   import ConfirmDialog from '../components/ConfirmDialog.vue'
   import { useRoute } from 'vue-router'
@@ -536,6 +545,7 @@
 
   onMounted(() => {
     loadGroupMembers()
+    loadCards()
   })
 
   /**
@@ -638,13 +648,10 @@
       isSendingDirectInvite.value = false
     }
   }
+
   // ─── Cards ───
-  const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-  const groupId = storedUser.groupId
-
-  // Завантажуємо з localStorage при монтуванні (TODO: замінити на API коли буде GET endpoint)
-  const connectedCards = ref(getCardsFromStorage(groupId))
-
+  const connectedCards = ref([])
+  const isLoadingCards = ref(false)
   const isConnectCardOpen = ref(false)
 
   // Confirm dialog для disconnect (PROJ-63)
@@ -652,34 +659,32 @@
   const cardToDisconnect = ref(null)
   const isDisconnecting = ref(false)
 
-  function handleCardConnected(card) {
+  /**
+   * Завантажує всі картки групи з беку.
+   * GET /api/v1/bank-cards/group/{group_id}
+   * Доступно будь-якому учаснику групи (бек повертає всі картки крім encrypted_token).
+   */
+  async function loadCards() {
+    if (!currentUser.value?.groupId) return
+    isLoadingCards.value = true
     try {
-      const cardData = {
-        id: card.id,
-        bankName: 'Monobank',
-        masked_pan: card.masked_pan,
-        status: card.status,
-      }
-      connectedCards.value.push(cardData)
-      addCardToStorage(groupId, cardData)
+      connectedCards.value = await fetchGroupCards(currentUser.value.groupId)
     } catch (err) {
-      console.warn('Failed to update local card state:', err)
+      console.warn('Failed to load cards:', err)
+      showToast('Failed to load connected cards', 'error')
+    } finally {
+      isLoadingCards.value = false
     }
   }
-  // /**
-  //  * Викликається з ConnectCardModal після успішного підключення.
-  //  * Бек повертає { id, masked_pan, status }.
-  //  */
-  // function handleCardConnected(card) {
-  //   const cardData = {
-  //     id: card.id,
-  //     bankName: 'Monobank',
-  //     masked_pan: card.masked_pan,
-  //     status: card.status,
-  //   }
-  //   connectedCards.value.push(cardData)
-  //   addCardToStorage(groupId, cardData)
-  // }
+
+  /**
+   * Викликається з ConnectCardModal після успішного підключення.
+   * Замість локального push — перезавантажуємо повний список з беку,
+   * щоб всі учасники групи бачили актуальний стан.
+   */
+  async function handleCardConnected() {
+    await loadCards()
+  }
 
   /**
    * PROJ-63 FE-01: відкриває confirmation dialog перед disconnect.
@@ -690,7 +695,9 @@
   }
 
   /**
-   * PROJ-63 FE-02: реальний disconnect через бек + toast + видалення з UI.
+   * PROJ-63 FE-02: реальний disconnect через бек.
+   * Бек робить HARD DELETE — картка фізично видаляється з БД.
+   * Після успіху перезавантажуємо список з беку.
    */
   async function confirmDisconnect() {
     if (!cardToDisconnect.value) return
@@ -701,9 +708,8 @@
     try {
       await disconnectMonobankCard(card.id)
 
-      // Прибираємо локально + з кешу
+      // Hard delete — просто прибираємо з UI, бек видалив документ з БД
       connectedCards.value = connectedCards.value.filter((c) => c.id !== card.id)
-      removeCardFromStorage(groupId, card.id)
 
       showToast('Card disconnected successfully. Transaction history is preserved.', 'success')
       isConfirmOpen.value = false
@@ -715,9 +721,8 @@
       if (status === 403) {
         showToast(message || 'You can only disconnect your own cards', 'error')
       } else if (status === 404) {
-        // Картка вже видалена на беку — синхронізуємо локальний стан
+        // Картка вже видалена — синхронізуємо UI
         connectedCards.value = connectedCards.value.filter((c) => c.id !== card.id)
-        removeCardFromStorage(groupId, card.id)
         showToast('Card was already disconnected', 'info')
         isConfirmOpen.value = false
         cardToDisconnect.value = null
@@ -1548,5 +1553,27 @@
     font-size: 13px;
     color: #6b6860;
     font-family: 'DM Mono', 'Courier New', monospace;
+  }
+  .cards-loading {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .card-skeleton {
+    height: 76px;
+    background: linear-gradient(90deg, #ede9de 25%, #f4f1e9 50%, #ede9de 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease infinite;
+    border-radius: 12px;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
   }
 </style>

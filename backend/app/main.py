@@ -18,6 +18,7 @@ from app.api import health, auth, group
 from app.api import monobank
 from app.api import transaction
 from app.api.bank_card import bank_card_router
+from app.api.feed import router as feed_router
 
 # ==========================================
 # Менеджер життєвого циклу (Lifespan)
@@ -66,4 +67,5 @@ app.include_router(group.router, prefix="/api/v1/group", tags=["Group"])
 app.include_router(transaction.router, prefix="/api/v1/transactions", tags=["Transactions"])
 app.include_router(bank_card_router)
 
+app.include_router(feed_router)
 app.include_router(monobank.router)

@@ -453,7 +453,7 @@
     regenerateGroupInviteLink,
     fetchGroupMembers,
   } from '../services/authService'
-  import { disconnectMonobankCard } from '../services/cardService'
+  import { fetchGroupCards, disconnectMonobankCard } from '../services/cardService'
 
   import ConnectCardModal from '../components/ConnectCardModal.vue'
   import ConfirmDialog from '../components/ConfirmDialog.vue'

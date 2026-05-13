@@ -663,22 +663,6 @@
     isConnectCardOpen.value = true // одразу відкриваємо модалку
   }
 
-  function handleCardConnected(card) {
-    try {
-      const cardData = {
-        id: card.id,
-        bankName: 'Monobank',
-        masked_pan: card.masked_pan,
-        status: card.status,
-      }
-      connectedCards.value.push(cardData)
-      addCardToStorage(storedUser.groupId, cardData)
-    } catch (err) {
-      console.warn('Failed to update local card state:', err)
-      // Не пробрасуємо назад — модалка вже відобразила успіх
-    }
-  }
-
   // /**
   //  * Після успішного підключення оновлюємо локальний список і кеш.
   //  */

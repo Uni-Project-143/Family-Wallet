@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import List, Optional
 from pydantic import Field
 import uuid
+import pymongo
 
 # ==========================================
 # --- Оновлені Snapshot Models ---
@@ -37,16 +38,27 @@ class BankCard(Document):
     class Settings:
         name = "bank_cards"
 
+
 class Transaction(Document):
     card_id: str
+    group_id: str
+    is_secret_gift: bool = False
+    target_user_id: Optional[str] = None
     amount: Decimal
     currency: str
     category_id: str
     description: str
     timestamp: datetime
     reactions: List[dict] = []
+
     class Settings:
         name = "transactions"
+        indexes = [
+            [
+                ("group_id", pymongo.ASCENDING),
+                ("timestamp", pymongo.DESCENDING)
+            ]
+        ]
 
 class Group(Document):
     name: str
@@ -189,6 +201,7 @@ class Forward:
 
         t1 = Transaction(
             card_id=str(card.id),
+            group_id=str(group.id),  # <--- ДОДАНО
             amount=Decimal("-450.00"),
             currency="UAH",
             category_id=str(cat_food.id),
@@ -199,15 +212,17 @@ class Forward:
 
         t2 = Transaction(
             card_id=str(card.id),
-            amount=Decimal("15000.00"),  # INCOME
+            group_id=str(group.id),  # <--- ДОДАНО
+            amount=Decimal("15000.00"),
             currency="UAH",
-            category_id=str(cat_gifts.id),  # Наприклад, подарунок
+            category_id=str(cat_gifts.id),
             description="Зарплата або переказ",
             timestamp=yesterday,
         )
 
         t3 = Transaction(
             card_id=str(card.id),
+            group_id=str(group.id),  # <--- ДОДАНО
             amount=Decimal("-35.00"),
             currency="UAH",
             category_id=str(cat_transport.id),
@@ -217,10 +232,13 @@ class Forward:
 
         t4 = Transaction(
             card_id=str(card.id),
+            group_id=str(group.id),  # <--- ДОДАНО
+            is_secret_gift=True,  # <--- ДОДАНО ДЛЯ ТЕСТУ (Secret Gift)
+            target_user_id=str(user_main.id),  # <--- ДОДАНО ДЛЯ ТЕСТУ
             amount=Decimal("-1200.00"),
             currency="UAH",
-            category_id=str(cat_food.id),
-            description="Ашан",
+            category_id=str(cat_gifts.id),
+            description="Сюрприз на День Народження",
             timestamp=last_week - timedelta(days=2),
         )
 

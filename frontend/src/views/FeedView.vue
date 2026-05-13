@@ -14,14 +14,12 @@
           >
             {{ group.name }}
           </button>
-          <!-- СТАЛО -->
           <button class="navbar__group-tab navbar__group-tab--add" @click="goToGroupSetup">
             + New group
           </button>
         </div>
       </div>
 
-      <!-- Центр: три вкладки -->
       <nav class="navbar__center">
         <router-link to="/feed" class="navbar__tab" active-class="navbar__tab--active"
           >Feed</router-link
@@ -34,14 +32,12 @@
         >
       </nav>
 
-      <!-- Права: аватар + ім'я + badge -->
       <div class="navbar__right">
         <div class="avatar avatar--sm avatar--gold">{{ currentUserInitials }}</div>
         <span class="navbar__user-name">{{ currentUserName }}</span>
         <span v-if="isAdmin" class="badge badge--admin">Admin</span>
         <span v-else class="badge badge--member">Member</span>
 
-        <!-- ↓ нова кнопка -->
         <button class="logout-btn" :disabled="isLoading" @click="handleLogout" aria-label="Logout">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path
@@ -85,7 +81,6 @@
               $
             </button>
           </div>
-          <!-- + Invite member — тільки Admin (US 1.3)        !!!!!!!!!!!!!!!!!!!!!!!! -->
           <button v-if="isAdmin" class="invite-btn" @click="isInviteModalOpen = true">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path
@@ -97,7 +92,6 @@
             </svg>
             Invite member
           </button>
-          <!-- 3б. Сам компонент модалки -->
           <InviteMemberModal
             :is-open="isInviteModalOpen"
             @close="isInviteModalOpen = false"
@@ -128,20 +122,16 @@
             </button>
           </template>
         </section>
-
-        <ConnectCardModal
-          :is-open="isConnectCardOpen"
-          @close="isConnectCardOpen = false"
-          @toast="showToast($event.message, $event.type)"
-          @connected="handleCardConnected"
-        />
       </aside>
 
       <!-- FEED MAIN -->
       <main class="feed-main">
         <div class="feed-main__header">
-          <h1 class="feed-main__title">Family Feed</h1>
-          <div class="feed-filters">
+          <div class="feed-main__title-row">
+            <h1 class="feed-main__title">Family Feed</h1>
+            <ConnectionIndicator :is-connected="wsConnected" />
+          </div>
+          <div class="feed-filters" v-if="memberFilters.length > 1">
             <button
               v-for="f in memberFilters"
               :key="f.value"
@@ -154,68 +144,43 @@
           </div>
         </div>
 
-        <template v-if="isLoadingFeed">
-          <div v-for="i in 3" :key="i" class="tx-card">
-            <div class="skeleton skeleton--circle"></div>
-            <div style="flex: 1">
-              <div class="skeleton skeleton--line" style="width: 35%"></div>
-              <div class="skeleton skeleton--line" style="width: 55%"></div>
-              <div class="skeleton skeleton--line" style="width: 28%"></div>
-            </div>
-          </div>
-        </template>
+        <!-- Skeleton під час initial load (PROJ-52 FE-03) -->
+        <FeedSkeleton v-if="isLoadingFeed" :count="5" />
 
+        <!-- Empty state (PROJ-52 FE-02) -->
+        <EmptyFeed
+          v-else-if="!filteredTransactions.length"
+          @connect-card="isConnectCardOpen = true"
+        />
+
+        <!-- Транзакції з infinite scroll (PROJ-52 FE-01) -->
         <template v-else>
-          <TransitionGroup name="tx-list" tag="div">
-            <div
-              v-for="tx in filteredTransactions"
-              :key="tx.id"
-              class="tx-card"
-              :class="{ 'tx-card--secret': tx.isSecretGift }"
-            >
-              <template v-if="tx.isSecretGift">
-                <div class="avatar avatar--md" style="opacity: 0.4">?</div>
-                <div class="tx-card__body">
-                  <div class="tx-card__name tx-card__name--muted">
-                    [Secret Gift Transaction — hidden]
-                  </div>
-                  <div class="tx-card__note"></div>
-                </div>
-                <div class="tx-card__amount tx-card__amount--muted">— UAH</div>
-              </template>
-              <template v-else>
-                <div class="avatar avatar--md" :class="`avatar--${tx.authorAvatarVariant}`">
-                  {{ tx.authorInitials }}
-                </div>
-                <div class="tx-card__body">
-                  <div class="tx-card__header">
-                    <div>
-                      <div class="tx-card__name">{{ tx.authorName }}</div>
-                      <div class="tx-card__category">{{ tx.categoryEmoji }} {{ tx.category }}</div>
-                      <div class="tx-card__desc">{{ tx.description }}</div>
-                      <div class="tx-card__date">{{ tx.timestamp }}</div>
-                    </div>
-                    <div class="tx-card__amount">
-                      {{ tx.amount }} <span class="tx-card__currency">UAH</span>
-                    </div>
-                  </div>
-                  <div class="tx-card__reactions">
-                    <button v-for="r in tx.reactions" :key="r.emoji" class="reaction-pill">
-                      {{ r.emoji }} {{ r.count }}
-                    </button>
-                    <button class="reaction-add">+ React</button>
-                  </div>
-                </div>
-              </template>
-            </div>
+          <TransitionGroup name="tx-list" tag="div" class="tx-list-wrap">
+            <TransactionCard v-for="tx in filteredTransactions" :key="tx.id" :transaction="tx" />
           </TransitionGroup>
-          <div v-if="filteredTransactions.length === 0" class="feed-empty">
-            <p>Підключіть картку Monobank, щоб бачити транзакції</p>
+
+          <!-- Sentinel для infinite scroll через Intersection Observer -->
+          <div ref="sentinelRef" class="feed-sentinel">
+            <div v-if="isLoadingMore" class="feed-sentinel__loader">
+              <svg class="spinner" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <circle cx="10" cy="10" r="8" stroke="rgba(184,151,58,0.3)" stroke-width="2" />
+                <path
+                  d="M10 2A8 8 0 0 1 18 10"
+                  stroke="#b8973a"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+              Loading more...
+            </div>
+            <div v-else-if="!hasMore && filteredTransactions.length > 0" class="feed-sentinel__end">
+              You've reached the end
+            </div>
           </div>
         </template>
       </main>
 
-      <!-- RIGHT PANEL -->
+      <!-- RIGHT PANEL (TODO: підключити до реальних endpoints коли з'являться) -->
       <aside class="right-panel">
         <section class="right-panel__section">
           <div class="right-panel__title">Spending by Category</div>
@@ -353,6 +318,14 @@
       </aside>
     </div>
 
+    <!-- Modals -->
+    <ConnectCardModal
+      :is-open="isConnectCardOpen"
+      @close="isConnectCardOpen = false"
+      @toast="showToast($event.message, $event.type)"
+      @connected="handleCardConnected"
+    />
+
     <!-- Toast -->
     <Transition name="toast">
       <div v-if="toast.isVisible" class="toast" :class="`toast--${toast.type}`" role="alert">
@@ -360,28 +333,106 @@
       </div>
     </Transition>
   </div>
-  <ConnectCardModal
-    :is-open="isConnectCardOpen"
-    @close="isConnectCardOpen = false"
-    @toast="showToast($event.message, $event.type)"
-    @connected="handleCardConnected"
-  />
 </template>
 
 <script setup>
-  import { ref, computed, onMounted, onUnmounted } from 'vue'
+  import { ref, computed, onMounted } from 'vue'
   import { useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
+  import { useFeedTransactions } from '../composables/useFeedTransactions'
+  import { useInfiniteScroll } from '../composables/useInfiniteScroll'
+  import { useWebSocket } from '../composables/useWebSocket'
   import { fetchGroupMembers } from '../services/authService'
-  import InviteMemberModal from '../components/InviteMemberModal.vue'
-  // import { getCardsFromStorage, addCardToStorage } from '../services/cardStorage'
-  import ConnectCardModal from '../components/ConnectCardModal.vue'
   import { fetchGroupCards } from '../services/cardService'
 
+  import InviteMemberModal from '../components/InviteMemberModal.vue'
+  import ConnectCardModal from '../components/ConnectCardModal.vue'
+  import TransactionCard from '../components/TransactionCard.vue'
+  import FeedSkeleton from '../components/FeedSkeleton.vue'
+  import EmptyFeed from '../components/EmptyFeed.vue'
+  import UserAvatar from '../components/UserAvatar.vue'
+  import ConnectionIndicator from '../components/ConnectionIndicator.vue'
+
   const router = useRouter()
-  const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-  // СТАЛО — все через useAuth
-  const { currentUser, isAdmin } = useAuth()
+  const { currentUser, isAdmin, isLoading, logout } = useAuth()
+
+  // ─── Navbar user info ───
+  const currentUserName = computed(() => currentUser.value?.fullName || '')
+  const currentUserInitials = computed(() => {
+    const name = currentUser.value?.fullName || '?'
+    if (!name) return '?'
+    return name
+      .split(' ')
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+  })
+
+  async function handleLogout() {
+    await logout()
+  }
+
+  // ─── Groups (поки тільки активна група, перемикання — окрема таска) ───
+  const groups = computed(() => [{ id: 1, name: currentUser.value?.groupName || 'Family' }])
+  const activeGroupId = ref(1)
+
+  function goToGroupSetup() {
+    router.push('/group-setup')
+  }
+
+  // ─── Modals ───
+  const isInviteModalOpen = ref(false)
+  const isConnectCardOpen = ref(false)
+
+  // ─── Group Members (sidebar) ───
+  const groupMembers = ref([])
+  const isLoadingMembers = ref(false)
+
+  function mapMemberFromApi(apiMember, currentUserEmail) {
+    const fullName = apiMember.full_name || apiMember.email || 'User'
+    const initials = fullName
+      .split(' ')
+      .map((w) => w[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
+
+    const variants = ['gold', 'dark', 'light']
+    const variantIdx = (initials.charCodeAt(0) || 0) % variants.length
+
+    return {
+      id: apiMember.user_id || apiMember.id,
+      name: fullName,
+      initials,
+      role: apiMember.role,
+      avatarVariant: variants[variantIdx],
+      isCurrentUser: apiMember.email === currentUserEmail,
+    }
+  }
+
+  async function loadGroupMembers() {
+    if (!currentUser.value?.groupId) return
+    isLoadingMembers.value = true
+    try {
+      const data = await fetchGroupMembers(currentUser.value.groupId)
+      const members = Array.isArray(data) ? data : data.members || []
+      groupMembers.value = members.map((m) => mapMemberFromApi(m, currentUser.value?.email))
+    } catch (err) {
+      // 404 — endpoint поки не реалізований, не показуємо toast
+      if (err.response?.status !== 404) {
+        showToast('Failed to load group members', 'error')
+      }
+    } finally {
+      isLoadingMembers.value = false
+    }
+  }
+
+  function openMoneyRequestModal(member) {
+    showToast(`Opening request to ${member.name}`, 'info')
+  }
+
+  // ─── Cards (sidebar) ───
   const connectedCards = ref([])
   const isLoadingCards = ref(false)
 
@@ -397,156 +448,74 @@
     }
   }
 
-  onMounted(() => {
-    loadCards()
-  })
-
-  // Після успішного connect — перезавантажуємо список з беку
   async function handleCardConnected() {
     await loadCards()
+    showToast('Card connected successfully', 'success')
   }
 
-  const isInviteModalOpen = ref(false)
-
-  const { isLoading, logout } = useAuth()
-
-  async function handleLogout() {
-    await logout()
-  }
-
-  const currentUserName = computed(() => currentUser.value?.fullName || '')
-  const currentUserInitials = computed(() => {
-    const name = currentUser.value?.fullName || '?'
-    if (!name) return '?'
-    return name
-      .split(' ')
-      .map((w) => w[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  })
-
-  const groups = ref([
-    { id: 1, name: storedUser.groupName || 'Family' },
-    { id: 2, name: 'Neighborhood' },
-  ])
-
-  // Для ролі. Замість const isAdmin = ref(true)
-  // const isAdmin = computed(() => storedUser.role === 'ADMIN')
-  const activeGroupId = ref(1)
-  // ─── Group Members з API ───
-  const groupMembers = ref([])
-  const isLoadingMembers = ref(false)
-
-  /**
-   * Транформує бекенд-формат у формат для UI.
-   * Бекенд повертає user_id, full_name, role, joined_at.
-   */
-  function mapMemberFromApi(apiMember, currentUserEmail) {
-    const fullName = apiMember.full_name || apiMember.email || 'User'
-    const initials = fullName
-      .split(' ')
-      .map((w) => w[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-
-    // Просте мапування для аватара — за першою літерою імені
-    const variants = ['gold', 'dark', 'light']
-    const variantIdx = (initials.charCodeAt(0) || 0) % variants.length
-
-    return {
-      id: apiMember.user_id || apiMember.id,
-      name: fullName,
-      initials,
-      role: apiMember.role,
-      avatarVariant: variants[variantIdx],
-      isCurrentUser: apiMember.email === currentUserEmail,
-    }
-  }
-
-  async function loadGroupMembers() {
-    if (!storedUser.groupId) return
-
-    isLoadingMembers.value = true
-    try {
-      const data = await fetchGroupMembers(storedUser.groupId)
-      const members = Array.isArray(data) ? data : data.members || []
-      groupMembers.value = members.map((m) => mapMemberFromApi(m, storedUser.email))
-    } catch (err) {
-      showToast('Failed to load group members', 'error')
-    } finally {
-      isLoadingMembers.value = false
-    }
-  }
-
-  onMounted(() => {
-    loadGroupMembers()
-    connectWebSocket()
-  })
-
-  const isLoadingFeed = ref(false)
-  const transactions = ref([
-    {
-      id: 1,
-      authorName: 'Olena K.',
-      authorInitials: 'OK',
-      authorAvatarVariant: 'gold',
-      category: 'Food & Groceries',
-      categoryEmoji: '🛒',
-      description: 'ATB Market',
-      timestamp: '2025-04-14 14:23',
-      amount: '−482',
-      isSecretGift: false,
-      reactions: [
-        { emoji: '😮', count: 2 },
-        { emoji: '👍', count: 1 },
-      ],
-    },
-    {
-      id: 2,
-      authorName: 'Mykola K.',
-      authorInitials: 'MK',
-      authorAvatarVariant: 'dark',
-      category: 'Transport',
-      categoryEmoji: '⛽',
-      description: 'WOG Station',
-      timestamp: '2025-04-14 11:05',
-      amount: '−1 200',
-      isSecretGift: false,
-      reactions: [{ emoji: '🔥', count: 3 }],
-    },
-    { id: 3, isSecretGift: true },
-    {
-      id: 4,
-      authorName: 'Sofia K.',
-      authorInitials: 'SK',
-      authorAvatarVariant: 'light',
-      category: 'Pharmacy',
-      categoryEmoji: '💊',
-      description: 'Apteka Dobryy Den',
-      timestamp: '2025-04-13 18:44',
-      amount: '−230',
-      isSecretGift: false,
-      reactions: [],
-    },
-  ])
+  // ─── Transactions feed (PROJ-52) ───
+  const {
+    transactions,
+    isLoading: isLoadingFeed,
+    isLoadingMore,
+    hasMore,
+    loadFirstPage,
+    loadMore,
+    prependTransaction,
+  } = useFeedTransactions(currentUser.value?.groupId)
 
   const activeFilter = ref('all')
-  const memberFilters = computed(() => [
-    { value: 'all', label: 'All' },
-    ...groupMembers.value.map((m) => ({ value: m.id, label: m.name.split(' ')[0] })),
-  ])
+
+  /**
+   * Фільтри з авторів транзакцій + GroupMembers (якщо endpoint доступний).
+   * Об'єднуємо обидва джерела щоб filter працював і коли endpoint /members 404.
+   */
+  const memberFilters = computed(() => {
+    const uniqueAuthors = new Map()
+
+    // 1. Автори з самих транзакцій (PROJ-53 поля)
+    transactions.value.forEach((tx) => {
+      if (tx.author_id && !uniqueAuthors.has(tx.author_id)) {
+        uniqueAuthors.set(tx.author_id, {
+          value: tx.author_id,
+          label: (tx.author_full_name || tx.author_email || 'User').split(' ')[0],
+        })
+      }
+    })
+
+    // 2. Доповнюємо учасниками з /members endpoint (якщо вантажились)
+    groupMembers.value.forEach((m) => {
+      if (m.id && !uniqueAuthors.has(m.id)) {
+        uniqueAuthors.set(m.id, {
+          value: m.id,
+          label: m.name.split(' ')[0],
+        })
+      }
+    })
+
+    return [{ value: 'all', label: 'All' }, ...uniqueAuthors.values()]
+  })
 
   const filteredTransactions = computed(() => {
     if (activeFilter.value === 'all') return transactions.value
-    return transactions.value.filter(
-      (tx) =>
-        tx.isSecretGift ||
-        tx.authorName === groupMembers.value.find((m) => m.id === activeFilter.value)?.name,
-    )
+    return transactions.value.filter((tx) => tx.author_id === activeFilter.value)
   })
 
+  // ─── Infinite scroll (PROJ-52 FE-01) ───
+  const { sentinelRef } = useInfiniteScroll(() => {
+    if (hasMore.value && !isLoadingMore.value) {
+      loadMore()
+    }
+  })
+
+  // ─── WebSocket для real-time (PROJ-50) ───
+  const { isConnected: wsConnected } = useWebSocket({
+    onTransaction: (tx) => {
+      prependTransaction(tx)
+    },
+  })
+
+  // ─── Right panel (TODO: підключити до реальних endpoints) ───
   const categoryBreakdown = ref([
     { name: 'Food & Groceries', pct: 35, color: '#C4862A' },
     { name: 'Transport', pct: 25, color: '#4A6FA5' },
@@ -582,100 +551,22 @@
     },
   ])
 
+  // ─── Toast ───
   const toast = ref({ isVisible: false, message: '', type: 'success' })
 
-  /**
-   * Показує toast-повідомлення.
-   * @param {string} message
-   * @param {'success'|'error'|'info'} type
-   */
   function showToast(message, type = 'success') {
     toast.value = { isVisible: true, message, type }
     setTimeout(() => {
       toast.value.isVisible = false
-    }, 4000)
+    }, 3000)
   }
 
-  function openMoneyRequestModal(member) {
-    showToast(`Opening request to ${member.name}`, 'info')
-  }
-
-  /**
-   * Форматує суму у гривнях.
-   * @param {number} amount
-   * @returns {string}
-   */
-  // СТАЛО
-  function formatCurrency(amount) {
-    if (amount == null) return '— UAH'
-    return amount.toLocaleString('uk-UA') + ' UAH'
-  }
-
-  let wsConnection = null
-
-  function connectWebSocket() {
-    // Вимикаємо WebSocket поки немає бекенду
-    if (import.meta.env.VITE_WS_ENABLED !== 'true') return
-    const token = localStorage.getItem('accessToken')
-    if (!token) return
-    try {
-      wsConnection = new WebSocket(
-        `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'}?token=${token}`,
-      )
-      wsConnection.onmessage = (event) => {
-        const data = JSON.parse(event.data)
-        if (data.type === 'new_transaction') transactions.value.unshift(data.transaction)
-      }
-    } catch {
-      // silent fallback
-    }
-  }
-
-  onMounted(() => connectWebSocket())
-  onUnmounted(() => {
-    if (wsConnection) wsConnection.close()
+  // ─── Mount ───
+  onMounted(() => {
+    loadGroupMembers()
+    loadCards()
+    loadFirstPage()
   })
-
-  // function goToInvite() {
-  //   router.push({ path: '/settings', query: { section: 'members' } })
-  //   showToast('Opening invite members section', 'info')
-  // }
-
-  //function goToConnectCard() {
-  //  router.push({ path: '/settings', query: { section: 'cards' } })
-  // showToast('Opening connect card section', 'info')
-  //}
-  /**
-   * Перехід на екран створення/приєднання до групи.
-   * Працює для всіх ролей — і Admin, і Member можуть створити свою власну сім'ю
-   * або приєднатись до іншої.
-   */
-  /**
-   * Перехід на екран керування групою — юзер сам обере create або join.
-   */
-  function goToGroupSetup() {
-    router.push('/group-setup')
-  }
-
-  const isConnectCardOpen = ref(false)
-
-  function goToConnectCard() {
-    isConnectCardOpen.value = true // одразу відкриваємо модалку
-  }
-
-  // /**
-  //  * Після успішного підключення оновлюємо локальний список і кеш.
-  //  */
-  // function handleCardConnected(card) {
-  //   const cardData = {
-  //     id: card.id,
-  //     bankName: 'Monobank',
-  //     masked_pan: card.masked_pan,
-  //     status: card.status,
-  //   }
-  //   connectedCards.value.push(cardData)
-  //   addCardToStorage(storedUser.groupId, cardData)
-  // }
 </script>
 
 <style scoped>
@@ -700,7 +591,6 @@
     top: 0;
     z-index: 100;
   }
-
   .navbar__left {
     display: flex;
     align-items: center;
@@ -741,7 +631,6 @@
     color: rgba(184, 151, 58, 0.6);
   }
 
-  /* Центровані таби */
   .navbar__center {
     display: flex;
     gap: 2px;
@@ -751,7 +640,6 @@
     padding: 4px;
     justify-self: center;
   }
-
   .navbar__tab {
     padding: 7px 20px;
     border-radius: 6px;
@@ -763,7 +651,6 @@
     white-space: nowrap;
     border: 1px solid transparent;
   }
-
   .navbar__tab:hover {
     color: rgba(255, 255, 255, 0.85);
   }
@@ -786,6 +673,30 @@
     color: rgba(255, 255, 255, 0.85);
   }
 
+  .logout-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.18s;
+    margin-left: 4px;
+  }
+  .logout-btn:hover:not(:disabled) {
+    background: rgba(196, 64, 42, 0.18);
+    border-color: rgba(196, 64, 42, 0.4);
+    color: #ff8a72;
+  }
+  .logout-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
   /* ── Layout ── */
   .feed-layout {
     display: flex;
@@ -806,8 +717,6 @@
     flex-direction: column;
     gap: 24px;
   }
-  /* .sidebar__section {
-  } */
   .sidebar__section-title {
     font-size: 10px;
     font-weight: 700;
@@ -923,17 +832,23 @@
     background: #2a6b2a;
     box-shadow: 0 0 0 2px #eef7ee;
   }
+  .card-widget__dot--inactive {
+    background: #b0ada7;
+    box-shadow: 0 0 0 2px #eae8e4;
+  }
   .card-widget__pan {
     font-size: 12px;
     color: #6b6860;
-    margin-bottom: 4px;
     font-family: 'DM Mono', 'Courier New', monospace;
   }
-  .card-widget__balance {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: 17px;
-    font-weight: 600;
-    color: #0d0c0a;
+
+  .card-widget-skeleton {
+    height: 56px;
+    background: linear-gradient(90deg, #ede9de 25%, #f4f1e9 50%, #ede9de 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease infinite;
+    border-radius: 12px;
+    margin-bottom: 8px;
   }
 
   .connect-card-btn {
@@ -967,11 +882,16 @@
     background: #faf8f3;
   }
   .feed-main__header {
+    margin-bottom: 18px;
+  }
+
+  .feed-main__title-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
+    gap: 14px;
+    margin-bottom: 12px;
   }
+
   .feed-main__title {
     font-family: 'Cormorant Garamond', Georgia, serif;
     font-size: 26px;
@@ -980,6 +900,7 @@
     color: #0d0c0a;
     margin: 0;
   }
+
   .feed-filters {
     display: flex;
     gap: 4px;
@@ -987,6 +908,7 @@
     border: 1px solid #eae8e4;
     border-radius: 9999px;
     padding: 4px;
+    width: fit-content;
   }
   .feed-filter-chip {
     padding: 5px 16px;
@@ -1008,191 +930,35 @@
     color: #fff;
   }
 
-  .live-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    margin-bottom: 18px;
-    background: #eef7ee;
-    border: 1px solid #8bc88b;
-    border-radius: 9999px;
-    padding: 4px 12px;
-  }
-  .live-badge__dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #2a6b2a;
-    animation: pulse 2s ease infinite;
-  }
-  @keyframes pulse {
-    0%,
-    100% {
-      box-shadow: 0 0 0 3px rgba(42, 107, 42, 0.15);
-    }
-    50% {
-      box-shadow: 0 0 0 6px rgba(42, 107, 42, 0.05);
-    }
-  }
-  .live-badge__text {
-    font-size: 10px;
-    font-weight: 600;
-    color: #2a6b2a;
-    letter-spacing: 0.5px;
+  .tx-list-wrap {
+    display: flex;
+    flex-direction: column;
   }
 
-  .tx-card {
-    background: #fff;
-    border: 1px solid #eae8e4;
-    border-radius: 12px;
-    padding: 16px 18px;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: flex-start;
-    gap: 14px;
-    box-shadow: 0 1px 2px rgba(13, 12, 10, 0.06);
-    transition:
-      box-shadow 0.18s,
-      transform 0.18s;
-  }
-  .tx-card:hover {
-    box-shadow: 0 2px 8px rgba(13, 12, 10, 0.08);
-    transform: translateY(-1px);
-  }
-  .tx-card--secret {
-    border-style: dashed;
-    border-color: #d6d3ce;
-    opacity: 0.55;
-    background: #f4f1e9;
-  }
-  .tx-card--secret:hover {
-    transform: none;
-  }
-  .tx-card__body {
-    flex: 1;
-  }
-  .tx-card__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-  }
-  .tx-card__name {
-    font-size: 13px;
-    font-weight: 600;
-    color: #0d0c0a;
-    margin-bottom: 4px;
-  }
-  .tx-card__name--muted {
-    color: #b0ada7;
-  }
-  .tx-card__note {
-    font-size: 11px;
-    color: #b0ada7;
-    margin-top: 4px;
-  }
-  .tx-card__category {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 2px 10px;
-    border-radius: 9999px;
-    background: #fbf7ec;
-    border: 1px solid #f2e9c8;
-    font-size: 11px;
-    font-weight: 500;
-    color: #9b7a25;
-    margin-bottom: 3px;
-  }
-  .tx-card__desc {
-    font-size: 12px;
-    color: #6b6860;
-    margin-bottom: 2px;
-  }
-  .tx-card__date {
-    font-size: 11px;
-    color: #b0ada7;
-    font-family: 'DM Mono', 'Courier New', monospace;
-  }
-  .tx-card__amount {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: 18px;
-    font-weight: 600;
-    color: #0d0c0a;
-    text-align: right;
-    white-space: nowrap;
-  }
-  .tx-card__amount--muted {
-    color: #b0ada7;
-  }
-  .tx-card__currency {
-    font-size: 12px;
-    font-weight: 400;
-    color: #b0ada7;
-    margin-left: 2px;
-  }
-  .tx-card__reactions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 10px;
-    flex-wrap: wrap;
-  }
-  .reaction-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
-    border-radius: 9999px;
-    background: #f4f1e9;
-    border: 1px solid #eae8e4;
-    font-size: 12px;
-    cursor: pointer;
-    transition: all 0.18s;
-    font-family: 'DM Sans', system-ui, sans-serif;
-  }
-  /* Hover на emoji реакціях */
-  .reaction-pill:hover {
-    background: #fbf7ec;
-    border-color: #f2e9c8;
-  }
-  .reaction-add {
-    padding: 4px 10px;
-    border-radius: 9999px;
-    border: 1px dashed #d6d3ce;
-    font-size: 11px;
-    color: #b0ada7;
-    background: none;
-    font-family: 'DM Sans', system-ui, sans-serif;
-    cursor: pointer;
-    transition: all 0.18s;
-  }
-  .reaction-add:hover {
-    color: #9b7a25;
-    border-color: #dfc876;
-    background: #fbf7ec;
-  }
-  .feed-empty {
+  .feed-sentinel {
+    padding: 24px 0;
     text-align: center;
-    padding: 60px 20px;
+  }
+  .feed-sentinel__loader {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #9b7a25;
+  }
+  .feed-sentinel__end {
+    font-size: 12px;
     color: #b0ada7;
-    font-size: 14px;
+    font-style: italic;
   }
 
-  .skeleton {
-    background: linear-gradient(90deg, #ede9de 25%, #f4f1e9 50%, #ede9de 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.6s ease infinite;
-    border-radius: 4px;
+  .spinner {
+    animation: spin 0.8s linear infinite;
   }
-  .skeleton--circle {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  .skeleton--line {
-    height: 12px;
-    margin-bottom: 8px;
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
   @keyframes shimmer {
     0% {
@@ -1203,7 +969,7 @@
     }
   }
 
-  /* ── Right panel ── */
+  /* ── Right panel (TODO: real endpoints) ── */
   .right-panel {
     width: 280px;
     background: #fff;
@@ -1346,11 +1112,6 @@
     height: 32px;
     font-size: 11px;
   }
-  .avatar--md {
-    width: 40px;
-    height: 40px;
-    font-size: 14px;
-  }
   .avatar--gold {
     background: linear-gradient(135deg, #f2e9c8, #dfc876);
     color: #7a5e1a;
@@ -1423,36 +1184,20 @@
     transform: translateY(12px);
   }
 
-  .tx-list-enter-active {
-    transition: all 0.3s ease;
+  /* ── Transitions ── */
+  .tx-list-enter-active,
+  .tx-list-leave-active {
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .tx-list-enter-from {
     opacity: 0;
-    transform: translateY(-12px);
+    transform: translateY(-20px) scale(0.98);
   }
-  .logout-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.04);
-    color: rgba(255, 255, 255, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.18s;
-    margin-left: 4px;
+  .tx-list-leave-to {
+    opacity: 0;
+    transform: translateX(-20px);
   }
-
-  .logout-btn:hover:not(:disabled) {
-    background: rgba(196, 64, 42, 0.18);
-    border-color: rgba(196, 64, 42, 0.4);
-    color: #ff8a72;
-  }
-
-  .logout-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+  .tx-list-move {
+    transition: transform 0.4s ease;
   }
 </style>

@@ -7,6 +7,7 @@ from app.models.group_membership import GroupMembership
 from app.models.category import Category
 from app.schemas.feed import FeedResponse, FeedTransactionItem
 from beanie import PydanticObjectId
+import urllib.parse
 
 router = APIRouter(prefix="/api/v1/feed", tags=["Feed"])
 
@@ -53,7 +54,6 @@ async def get_unified_feed(
     # 6. Збагачення даними юзерів (ім'я/аватар/категорії)
     items = []
     for tx in transactions:
-        # ВИПРАВЛЕНО БАГ 2: Шукаємо картку за ObjectId
         card = None
         if tx.card_id:
             try:
@@ -61,7 +61,6 @@ async def get_unified_feed(
             except Exception:
                 pass
 
-        # ВИПРАВЛЕНО БАГ 3: Безпечне отримання Юзера
         owner = None
         if card and card.user_id:
             try:
@@ -69,7 +68,6 @@ async def get_unified_feed(
             except Exception:
                 pass
 
-        # ДОДАНО: Підтягуємо категорію для іконки
         category = None
         if tx.category_id and tx.category_id != "None" and tx.category_id.strip() != "":
             try:
@@ -77,15 +75,36 @@ async def get_unified_feed(
             except Exception:
                 pass
 
+        # ==========================================
+        # НОВА ЛОГІКА ІДЕНТИФІКАЦІЇ (Fallback Logic)
+        # ==========================================
+        if owner:
+            # Якщо full_name пусте, беремо email, якщо і він пустий - "Без імені"
+            display_name = owner.full_name or getattr(owner, 'email', None) or "Без імені"
+
+            # Якщо є avatar_url з бази - беремо його. Якщо ні - генеруємо аватар з ініціалами.
+            avatar_url = getattr(owner, 'avatar_url', None)
+            if avatar_url:
+                avatar = avatar_url
+            else:
+                # url-encode для безпечної передачі українських літер та пробілів
+                safe_name = urllib.parse.quote(display_name)
+                avatar = f"https://ui-avatars.com/api/?name={safe_name}&background=random&color=fff&size=128"
+        else:
+            # Negative AC: Транзакція без прив'язки до user
+            display_name = "Невідомий учасник"
+            # Сірий аватар зі знаком питання
+            avatar = "https://ui-avatars.com/api/?name=?&background=808080&color=fff&size=128"
+
         # Формуємо фінальний об'єкт для фронтенду
         items.append(FeedTransactionItem(
             id=str(tx.id),
-            amount=float(tx.amount), # Конвертуємо Decimal у float
+            amount=float(tx.amount),
             currency=tx.currency,
             description=tx.description or "Без опису",
             timestamp=tx.timestamp,
-            display_name=owner.full_name if owner else "Unknown",
-            avatar=getattr(owner, 'avatar_url', None) if owner else None,
+            display_name=display_name,  # <-- Оновлено
+            avatar=avatar,  # <-- Оновлено
             card_masked_pan=card.masked_pan if card else "****",
             author_id=str(owner.id) if owner else None,
             category_name=category.name if category else "Інше",

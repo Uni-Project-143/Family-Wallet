@@ -378,6 +378,18 @@
   import ConnectCardModal from '../components/ConnectCardModal.vue'
   import { fetchGroupCards } from '../services/cardService'
 
+<<<<<<< Updated upstream
+=======
+  import InviteMemberModal from '../components/InviteMemberModal.vue'
+  import ConnectCardModal from '../components/ConnectCardModal.vue'
+  import TransactionCard from '../components/TransactionCard.vue'
+  import FeedSkeleton from '../components/FeedSkeleton.vue'
+  import EmptyFeed from '../components/EmptyFeed.vue'
+  import UserAvatar from '../components/UserAvatar.vue'
+  import ConnectionIndicator from '../components/ConnectionIndicator.vue'
+  import { usePersistentState } from '../composables/usePersistentState'
+
+>>>>>>> Stashed changes
   const router = useRouter()
   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
   // СТАЛО — все через useAuth
@@ -408,6 +420,7 @@
 
   const isInviteModalOpen = ref(false)
 
+<<<<<<< Updated upstream
   const { isLoading, logout } = useAuth()
 
   async function handleLogout() {
@@ -437,6 +450,9 @@
   // ─── Group Members з API ───
   const groupMembers = ref([])
   const isLoadingMembers = ref(false)
+=======
+  const activeFilter = usePersistentState('feed:activeFilter', 'all')
+>>>>>>> Stashed changes
 
   /**
    * Транформує бекенд-формат у формат для UI.

@@ -2,7 +2,7 @@
   <div class="conn-indicator" :class="{ 'conn-indicator--offline': !isConnected }">
     <span class="conn-indicator__dot"></span>
     <span class="conn-indicator__label">
-      {{ isConnected ? 'Live' : 'Reconnecting...' }}
+      {{ isConnected ? 'Live' : 'Offline' }}
     </span>
   </div>
 </template>
@@ -26,6 +26,7 @@
     font-weight: 600;
     color: #2a6b2a;
     letter-spacing: 0.5px;
+    font-family: 'DM Sans', system-ui, sans-serif;
   }
 
   .conn-indicator__dot {
@@ -33,7 +34,7 @@
     height: 6px;
     border-radius: 50%;
     background: #2a6b2a;
-    animation: pulse 2s ease infinite;
+    animation: conn-pulse 2s ease infinite;
   }
 
   .conn-indicator--offline {
@@ -44,9 +45,10 @@
 
   .conn-indicator--offline .conn-indicator__dot {
     background: #c48a2a;
+    animation: none;
   }
 
-  @keyframes pulse {
+  @keyframes conn-pulse {
     0%,
     100% {
       box-shadow: 0 0 0 2px rgba(42, 107, 42, 0.15);

@@ -458,6 +458,7 @@
   import ConnectCardModal from '../components/ConnectCardModal.vue'
   import ConfirmDialog from '../components/ConfirmDialog.vue'
   import { useRoute } from 'vue-router'
+  import { usePersistentState } from '../composables/usePersistentState'
 
   const route = useRoute()
   const activeSection = ref(route.query.section || 'members')
@@ -740,7 +741,7 @@
   }
 
   // ─── Notifications ───
-  const notifPreferences = ref([
+  const notifPreferences = usePersistentState('settings:notifPrefs', [
     {
       key: 'gift_unlock',
       label: 'Gift Event unlock reminders',

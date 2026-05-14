@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 from bson.decimal128 import Decimal128
+import pymongo
 
 class Transaction(Document):
     card_id: str
@@ -13,6 +14,12 @@ class Transaction(Document):
     description: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     reactions: List[dict] = []
+    group_id: str = Field(..., description="ID групи для швидкої фільтрації стрічки")
+    is_secret_gift: bool = Field(default=False, description="Чи є це секретним подарунком")
+    target_user_id: Optional[str] = Field(default=None,
+                                          description="ID того, кому призначений подарунок")
+
+    # ----------------
 
     # Рятівний валідатор для MongoDB Decimal128
     @field_validator('amount', mode='before')
@@ -24,3 +31,9 @@ class Transaction(Document):
 
     class Settings:
         name = "transactions"
+        indexes = [
+            [
+                ("group_id", pymongo.ASCENDING),
+                ("timestamp", pymongo.DESCENDING)
+            ]
+        ]

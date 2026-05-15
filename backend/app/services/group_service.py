@@ -10,7 +10,6 @@ from app.repositories.invite_repository import InviteRepository
 from app.exceptions import ForbiddenAccessError, InvalidInviteError, InviteExpiredError
 from app.schemas.group import GroupResponse
 
-# 1. ДОДАНО: імпорт клієнта бази даних для роботи з транзакціями
 from app.config.database import db_client
 
 class GroupService:

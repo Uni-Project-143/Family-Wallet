@@ -15,7 +15,16 @@ class TestRegister:
     @patch("app.api.auth.AuthService.register", new_callable=AsyncMock)
     def test_register_happy_path_returns_201_with_token(self, mock_register):
         """Новий email → 201 + access_token у відповіді."""
-        mock_register.return_value = {"access_token": "fake-jwt-token-123", "token_type": "bearer"}
+        mock_register.return_value = {
+            "access_token": "fake-jwt-token-123",
+            "token_type": "bearer",
+            "user": {
+                "id": "507f1f77bcf86cd799439011",
+                "email": "new@example.com",
+                "fullName": "Новий Користувач",  # <-- ВИПРАВЛЕНО НА fullName
+                "avatar_url": None
+            }
+        }
 
         res = client.post(
             "/api/v1/auth/register",
@@ -73,7 +82,16 @@ class TestLogin:
     @patch("app.api.auth.AuthService.login", new_callable=AsyncMock)
     def test_login_happy_path_returns_200_with_token(self, mock_login):
         """Правильні credentials → 200 + access_token."""
-        mock_login.return_value = {"access_token": "fake-jwt-token-123", "token_type": "bearer"}
+        mock_login.return_value = {
+            "access_token": "fake-jwt-token-123",
+            "token_type": "bearer",
+            "user": {
+                "id": "507f1f77bcf86cd799439011",
+                "email": "test@example.com",
+                "fullName": "Test User",  # <-- ВИПРАВЛЕНО НА fullName
+                "avatar_url": None
+            }
+        }
 
         res = client.post(
             "/api/v1/auth/login",

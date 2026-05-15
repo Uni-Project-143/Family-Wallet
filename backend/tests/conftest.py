@@ -1,23 +1,26 @@
 """
 conftest.py — спільна конфігурація для всього тестового suite.
-
-Відключає реальне підключення до Beanie/MongoDB при старті FastAPI,
-щоб TestClient не вимагав живої бази.
 """
 
 import pytest
 from unittest.mock import AsyncMock, patch
 
-
 @pytest.fixture(scope="session", autouse=True)
-def disable_beanie_init():
-    """Перехоплює beanie.init_beanie при startup FastAPI."""
-    with patch("beanie.init_beanie", new_callable=AsyncMock):
+def disable_db_for_integration_tests(request):
+    """
+    Відключає підключення до бази ТІЛЬКИ для інтеграційних тестів.
+    Юніт-тести потребують ініціалізованих моделей Beanie для перевірки атрибутів.
+    """
+    # Отримуємо шляхи всіх тестів, які зараз запускаються
+    test_paths = [str(p.path) for p in request.session.items]
+
+    # Якщо ми запускаємо ТІЛЬКИ юніт-тести (в шляху є папка 'unit')
+    # Дозволяємо Beanie нормально зареєструвати моделі в пам'яті
+    if all("unit" in path for path in test_paths):
         yield
+        return
 
-
-@pytest.fixture(scope="session", autouse=True)
-def disable_db_connection():
-    """Перехоплює підключення до MongoDB Atlas при старті."""
+    # Інакше (якщо запускаємо інтеграційні тести або всі разом) - глушимо підключення
     with patch("app.config.database.AsyncIOMotorClient"):
-        yield
+        with patch("beanie.init_beanie", new_callable=AsyncMock):
+            yield

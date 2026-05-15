@@ -10,6 +10,8 @@ from app.repositories.invite_repository import InviteRepository
 from app.exceptions import ForbiddenAccessError, InvalidInviteError, InviteExpiredError
 from app.schemas.group import GroupResponse
 
+# 1. ДОДАНО: імпорт клієнта бази даних для роботи з транзакціями
+from app.config.database import db_client
 
 class GroupService:
     BASE_URL = "https://family-wallet.com"
@@ -37,17 +39,20 @@ class GroupService:
 
     @classmethod
     async def create_group(cls, name: str, user_id: ObjectId) -> dict:
-        new_group = Group(name=name, created_by=user_id)
-        await GroupRepository.create_group(new_group)
+        # 2. ДОДАНО: Транзакція БД для атомарного створення групи та адміна
+        async with await db_client.start_session() as session:
+            async with session.start_transaction():
+                new_group = Group(name=name, created_by=user_id)
+                await GroupRepository.create_group(new_group, session=session)
 
-        membership = GroupMembership(user_id=user_id, group_id=new_group.id, role="ADMIN")
-        await GroupRepository.add_member(membership)
+                membership = GroupMembership(user_id=user_id, group_id=new_group.id, role="ADMIN")
+                await GroupRepository.add_member(membership, session=session)
 
-        return {
-            "message": "Group created successfully",
-            "group_id": str(new_group.id),
-            "name": new_group.name,
-        }
+                return {
+                    "message": "Group created successfully",
+                    "group_id": str(new_group.id),
+                    "name": new_group.name,
+                }
 
     @classmethod
     async def get_invite_link(cls, group_id_str: str, user_id: ObjectId) -> dict:
@@ -114,11 +119,14 @@ class GroupService:
         if existing_member:
             raise InvalidInviteError("You are already a member of this group")
 
-        new_membership = GroupMembership(user_id=user_id, group_id=invite.group_id, role="MEMBER")
-        await GroupRepository.add_member(new_membership)
+        # 3. ДОДАНО: Транзакція БД для атомарного приєднання та оновлення інвайту
+        async with await db_client.start_session() as session:
+            async with session.start_transaction():
+                new_membership = GroupMembership(user_id=user_id, group_id=invite.group_id, role="MEMBER")
+                await GroupRepository.add_member(new_membership, session=session)
 
-        invite.used_at = datetime.utcnow()
-        await InviteRepository.save(invite)
+                invite.used_at = datetime.utcnow()
+                await InviteRepository.save(invite, session=session)
 
         return {"message": "You have successfully joined the family!"}
 

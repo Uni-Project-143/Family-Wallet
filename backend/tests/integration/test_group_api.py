@@ -53,3 +53,33 @@ class TestGroupEndpoints:
 
         # FastAPI має автоматично відбити запит із 422 Unprocessable Entity
         assert response.status_code == 422
+
+
+
+    @patch("app.api.group.GroupService.get_user_groups", new_callable=AsyncMock)
+    def test_get_my_groups_returns_200(self, mock_get_groups):
+        """Перевіряємо отримання списку своїх груп"""
+        # Імітуємо відповідь сервісу
+        mock_get_groups.return_value = [
+            {"id": "607f1f77bcf86cd799439011", "name": "Моя Сім'я", "role": "ADMIN"}
+        ]
+
+        response = client.get("/api/v1/group/me")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["name"] == "Моя Сім'я"
+
+    @patch("app.api.group.GroupService.join_group", new_callable=AsyncMock)
+    def test_join_group_success_200(self, mock_join):
+        """Перевіряємо успішне приєднання до групи за лінкою"""
+        mock_join.return_value = {"message": "You have successfully joined the family!"}
+
+        response = client.post(
+            "/api/v1/group/join",
+            json={"invite_link": "https://family-wallet.com/join/valid-token-123"}
+        )
+
+        assert response.status_code == 200
+        assert "successfully joined" in response.json()["message"]

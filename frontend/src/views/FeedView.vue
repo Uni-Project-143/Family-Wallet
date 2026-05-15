@@ -137,10 +137,10 @@
         />
       </aside>
 
-      <!-- FEED MAIN -->
       <main class="feed-main">
         <div class="feed-main__header">
           <h1 class="feed-main__title">Family Feed</h1>
+          <ConnectionIndicator :is-connected="wsConnected" />
           <div class="feed-filters">
             <button
               v-for="f in memberFilters"
@@ -154,64 +154,29 @@
           </div>
         </div>
 
-        <template v-if="isLoadingFeed">
-          <div v-for="i in 3" :key="i" class="tx-card">
-            <div class="skeleton skeleton--circle"></div>
-            <div style="flex: 1">
-              <div class="skeleton skeleton--line" style="width: 35%"></div>
-              <div class="skeleton skeleton--line" style="width: 55%"></div>
-              <div class="skeleton skeleton--line" style="width: 28%"></div>
-            </div>
-          </div>
-        </template>
+        <!-- Skeleton під час першого завантаження (FE-03) -->
+        <FeedSkeleton v-if="isLoadingFeed" :count="5" />
 
+        <!-- Empty: ще жодної картки в групі (FE-02 + AC negative) -->
+        <EmptyFeed
+          v-else-if="connectedCards.length === 0"
+          @connect-card="isConnectCardOpen = true"
+        />
+
+        <!-- Картки є, але транзакцій 0 -->
+        <div v-else-if="transactions.length === 0" class="feed-empty">
+          <p>No transactions yet. Awaiting the first transaction from Monobank.</p>
+        </div>
+
+        <!-- Список (FE-01) -->
         <template v-else>
-          <TransitionGroup name="tx-list" tag="div">
-            <div
-              v-for="tx in filteredTransactions"
-              :key="tx.id"
-              class="tx-card"
-              :class="{ 'tx-card--secret': tx.isSecretGift }"
-            >
-              <template v-if="tx.isSecretGift">
-                <div class="avatar avatar--md" style="opacity: 0.4">?</div>
-                <div class="tx-card__body">
-                  <div class="tx-card__name tx-card__name--muted">
-                    [Secret Gift Transaction — hidden]
-                  </div>
-                  <div class="tx-card__note"></div>
-                </div>
-                <div class="tx-card__amount tx-card__amount--muted">— UAH</div>
-              </template>
-              <template v-else>
-                <div class="avatar avatar--md" :class="`avatar--${tx.authorAvatarVariant}`">
-                  {{ tx.authorInitials }}
-                </div>
-                <div class="tx-card__body">
-                  <div class="tx-card__header">
-                    <div>
-                      <div class="tx-card__name">{{ tx.authorName }}</div>
-                      <div class="tx-card__category">{{ tx.categoryEmoji }} {{ tx.category }}</div>
-                      <div class="tx-card__desc">{{ tx.description }}</div>
-                      <div class="tx-card__date">{{ tx.timestamp }}</div>
-                    </div>
-                    <div class="tx-card__amount">
-                      {{ tx.amount }} <span class="tx-card__currency">UAH</span>
-                    </div>
-                  </div>
-                  <div class="tx-card__reactions">
-                    <button v-for="r in tx.reactions" :key="r.emoji" class="reaction-pill">
-                      {{ r.emoji }} {{ r.count }}
-                    </button>
-                    <button class="reaction-add">+ React</button>
-                  </div>
-                </div>
-              </template>
-            </div>
+          <TransitionGroup name="tx-list" tag="div" class="tx-list">
+            <TransactionCard v-for="tx in filteredTransactions" :key="tx.id" :transaction="tx" />
           </TransitionGroup>
-          <div v-if="filteredTransactions.length === 0" class="feed-empty">
-            <p>Підключіть картку Monobank, щоб бачити транзакції</p>
-          </div>
+
+          <div ref="sentinelRef" class="tx-sentinel" aria-hidden="true" />
+
+          <div v-if="isLoadingMore" class="tx-loading-more">Loading more...</div>
         </template>
       </main>
 
@@ -369,14 +334,20 @@
 </template>
 
 <script setup>
-  import { ref, computed, onMounted, onUnmounted } from 'vue'
+  import { ref, computed, onMounted } from 'vue'
   import { useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
+  import { useFeedTransactions } from '../composables/useFeedTransactions'
+  import { useInfiniteScroll } from '../composables/useInfiniteScroll'
+  import { useWebSocket } from '../composables/useWebSocket'
   import { fetchGroupMembers } from '../services/authService'
-  import InviteMemberModal from '../components/InviteMemberModal.vue'
-  // import { getCardsFromStorage, addCardToStorage } from '../services/cardStorage'
-  import ConnectCardModal from '../components/ConnectCardModal.vue'
   import { fetchGroupCards } from '../services/cardService'
+  import InviteMemberModal from '../components/InviteMemberModal.vue'
+  import ConnectCardModal from '../components/ConnectCardModal.vue'
+  import TransactionCard from '../components/TransactionCard.vue'
+  import FeedSkeleton from '../components/FeedSkeleton.vue'
+  import EmptyFeed from '../components/EmptyFeed.vue'
+  import ConnectionIndicator from '../components/ConnectionIndicator.vue'
 
   const router = useRouter()
   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
@@ -397,14 +368,28 @@
     }
   }
 
-  onMounted(() => {
-    loadCards()
-  })
-
   // Після успішного connect — перезавантажуємо список з беку
   async function handleCardConnected() {
     await loadCards()
   }
+  // ─── Feed (PROJ-52) ───
+  const {
+    transactions,
+    isLoading: isLoadingFeed,
+    isLoadingMore,
+    hasMore,
+    loadFirstPage,
+    loadMore,
+    prependTransaction,
+  } = useFeedTransactions(() => currentUser.value?.groupId)
+
+  // ─── WebSocket для real-time (PROJ-50). Поки VITE_WS_ENABLED=false — no-op. ───
+  const { isConnected: wsConnected } = useWebSocket({
+    onTransaction: prependTransaction,
+  })
+
+  // ─── Infinite scroll (PROJ-52 FE-01) ───
+  const { sentinelRef } = useInfiniteScroll(loadMore)
 
   const isInviteModalOpen = ref(false)
 
@@ -481,70 +466,28 @@
   }
 
   onMounted(() => {
+    loadCards()
     loadGroupMembers()
-    connectWebSocket()
+    loadFirstPage()
   })
 
-  const isLoadingFeed = ref(false)
-  const transactions = ref([
-    {
-      id: 1,
-      authorName: 'Olena K.',
-      authorInitials: 'OK',
-      authorAvatarVariant: 'gold',
-      category: 'Food & Groceries',
-      categoryEmoji: '🛒',
-      description: 'ATB Market',
-      timestamp: '2025-04-14 14:23',
-      amount: '−482',
-      isSecretGift: false,
-      reactions: [
-        { emoji: '😮', count: 2 },
-        { emoji: '👍', count: 1 },
-      ],
-    },
-    {
-      id: 2,
-      authorName: 'Mykola K.',
-      authorInitials: 'MK',
-      authorAvatarVariant: 'dark',
-      category: 'Transport',
-      categoryEmoji: '⛽',
-      description: 'WOG Station',
-      timestamp: '2025-04-14 11:05',
-      amount: '−1 200',
-      isSecretGift: false,
-      reactions: [{ emoji: '🔥', count: 3 }],
-    },
-    { id: 3, isSecretGift: true },
-    {
-      id: 4,
-      authorName: 'Sofia K.',
-      authorInitials: 'SK',
-      authorAvatarVariant: 'light',
-      category: 'Pharmacy',
-      categoryEmoji: '💊',
-      description: 'Apteka Dobryy Den',
-      timestamp: '2025-04-13 18:44',
-      amount: '−230',
-      isSecretGift: false,
-      reactions: [],
-    },
-  ])
-
   const activeFilter = ref('all')
-  const memberFilters = computed(() => [
-    { value: 'all', label: 'All' },
-    ...groupMembers.value.map((m) => ({ value: m.id, label: m.name.split(' ')[0] })),
-  ])
+  const memberFilters = computed(() => {
+    const unique = new Map()
+    for (const tx of transactions.value) {
+      if (tx.author_id && !unique.has(tx.author_id)) {
+        unique.set(tx.author_id, tx.display_name?.split(' ')[0] || 'Unknown')
+      }
+    }
+    return [
+      { value: 'all', label: 'All' },
+      ...Array.from(unique, ([value, label]) => ({ value, label })),
+    ]
+  })
 
   const filteredTransactions = computed(() => {
     if (activeFilter.value === 'all') return transactions.value
-    return transactions.value.filter(
-      (tx) =>
-        tx.isSecretGift ||
-        tx.authorName === groupMembers.value.find((m) => m.id === activeFilter.value)?.name,
-    )
+    return transactions.value.filter((tx) => tx.author_id === activeFilter.value)
   })
 
   const categoryBreakdown = ref([
@@ -605,36 +548,36 @@
    * @param {number} amount
    * @returns {string}
    */
-  // СТАЛО
-  function formatCurrency(amount) {
-    if (amount == null) return '— UAH'
-    return amount.toLocaleString('uk-UA') + ' UAH'
-  }
 
-  let wsConnection = null
+  // function formatCurrency(amount) {
+  //   if (amount == null) return '— UAH'
+  //   return amount.toLocaleString('uk-UA') + ' UAH'
+  // }
 
-  function connectWebSocket() {
-    // Вимикаємо WebSocket поки немає бекенду
-    if (import.meta.env.VITE_WS_ENABLED !== 'true') return
-    const token = localStorage.getItem('accessToken')
-    if (!token) return
-    try {
-      wsConnection = new WebSocket(
-        `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'}?token=${token}`,
-      )
-      wsConnection.onmessage = (event) => {
-        const data = JSON.parse(event.data)
-        if (data.type === 'new_transaction') transactions.value.unshift(data.transaction)
-      }
-    } catch {
-      // silent fallback
-    }
-  }
+  // let wsConnection = null
 
-  onMounted(() => connectWebSocket())
-  onUnmounted(() => {
-    if (wsConnection) wsConnection.close()
-  })
+  // function connectWebSocket() {
+  //   // Вимикаємо WebSocket поки немає бекенду
+  //   if (import.meta.env.VITE_WS_ENABLED !== 'true') return
+  //   const token = localStorage.getItem('accessToken')
+  //   if (!token) return
+  //   try {
+  //     wsConnection = new WebSocket(
+  //       `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'}?token=${token}`,
+  //     )
+  //     wsConnection.onmessage = (event) => {
+  //       const data = JSON.parse(event.data)
+  //       if (data.type === 'new_transaction') transactions.value.unshift(data.transaction)
+  //     }
+  //   } catch {
+  //     // silent fallback
+  //   }
+  // }
+
+  // onMounted(() => connectWebSocket())
+  // onUnmounted(() => {
+  //   if (wsConnection) wsConnection.close()
+  // })
 
   // function goToInvite() {
   //   router.push({ path: '/settings', query: { section: 'members' } })
@@ -1454,5 +1397,17 @@
   .logout-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+  .tx-sentinel {
+    height: 1px;
+    width: 100%;
+  }
+
+  .tx-loading-more {
+    padding: 16px;
+    text-align: center;
+    font-size: 12px;
+    color: #b0ada7;
+    font-family: 'DM Sans', system-ui, sans-serif;
   }
 </style>

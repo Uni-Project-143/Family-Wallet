@@ -1,16 +1,14 @@
 <template>
   <div class="tx-card">
-    <UserAvatar
-      :avatar-url="transaction.author_avatar_url"
-      :full-name="transaction.author_full_name"
-      :email="transaction.author_email"
-      size="md"
-    />
+    <UserAvatar :avatar-url="transaction.avatar" :full-name="transaction.display_name" size="md" />
 
     <div class="tx-card__body">
       <div class="tx-card__header">
         <div>
-          <div class="tx-card__name">{{ authorDisplayName }}</div>
+          <div class="tx-card__name">
+            {{ authorDisplayName }}
+            <span v-if="transaction.is_secret_gift" class="tx-card__gift-badge">Gift</span>
+          </div>
 
           <div class="tx-card__category">
             <span v-if="transaction.category_emoji">{{ transaction.category_emoji }}</span>
@@ -48,9 +46,7 @@
   })
 
   const authorDisplayName = computed(() => {
-    return (
-      props.transaction.author_full_name || props.transaction.author_email || 'Невідомий учасник'
-    )
+    return props.transaction.display_name || 'Невідомий учасник'
   })
 
   const isIncome = computed(() => Number(props.transaction.amount) > 0)
@@ -192,5 +188,19 @@
   .reaction-pill:hover {
     background: #fbf7ec;
     border-color: #f2e9c8;
+  }
+  .tx-card__gift-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 8px;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #b8973a, #c9a84c);
+    color: #fff;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    vertical-align: middle;
   }
 </style>

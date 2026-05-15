@@ -1,26 +1,15 @@
-import apiClient from './apiClient'
-
 /**
- * Список транзакцій поточного юзера.
- * GET /api/v1/transactions/?filters
+ * Список транзакцій групи з фільтрами і сортуванням.
+ * GET /api/v1/transactions/group/{group_id}?...filters
  *
- * Поки бек не має endpoint /transactions/group/{id}, використовуємо особистий.
- * Коли з'явиться group endpoint — замінити URL.
+ * Призначений для сторінки детального перегляду транзакцій
+ * з фільтрацією за категорією, типом, сумою, датами.
  *
+ * @param {string} groupId
  * @param {object} filters
- * @param {string} [filters.category_id]
- * @param {'INCOME'|'EXPENSE'} [filters.tx_type]
- * @param {number} [filters.min_amount]
- * @param {number} [filters.max_amount]
- * @param {string} [filters.start_date]  YYYY-MM-DD
- * @param {string} [filters.end_date]    YYYY-MM-DD
- * @param {'amount'|'timestamp'|'category_id'} [filters.sort_by='timestamp']
- * @param {'asc'|'desc'} [filters.sort_order='desc']
- * @param {number} [filters.page=1]
- * @param {number} [filters.size=20]
  * @returns {Promise<{items, total, page, size, pages}>}
  */
-export async function fetchMyTransactions(filters = {}) {
+export async function fetchGroupTransactions(groupId, filters = {}) {
   const params = new URLSearchParams()
 
   if (filters.category_id) params.set('category_id', filters.category_id)
@@ -35,6 +24,11 @@ export async function fetchMyTransactions(filters = {}) {
   params.set('page', filters.page || 1)
   params.set('size', filters.size || 20)
 
-  const response = await apiClient.get(`/api/v1/transactions/?${params.toString()}`)
+  const response = await apiClient.get(`/api/v1/transactions/group/${groupId}?${params.toString()}`)
+  return response.data
+}
+export async function fetchFeed(groupId, page = 1, limit = 20) {
+  const params = new URLSearchParams({ page, limit })
+  const response = await apiClient.get(`/api/v1/feed/${groupId}?${params.toString()}`)
   return response.data
 }

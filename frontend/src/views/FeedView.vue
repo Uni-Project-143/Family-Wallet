@@ -472,10 +472,18 @@
   })
 
   const activeFilter = ref('all')
-  const memberFilters = computed(() => [
-    { value: 'all', label: 'All' },
-    ...groupMembers.value.map((m) => ({ value: m.id, label: m.name.split(' ')[0] })),
-  ])
+  const memberFilters = computed(() => {
+    const unique = new Map()
+    for (const tx of transactions.value) {
+      if (tx.author_id && !unique.has(tx.author_id)) {
+        unique.set(tx.author_id, tx.display_name?.split(' ')[0] || 'Unknown')
+      }
+    }
+    return [
+      { value: 'all', label: 'All' },
+      ...Array.from(unique, ([value, label]) => ({ value, label })),
+    ]
+  })
 
   const filteredTransactions = computed(() => {
     if (activeFilter.value === 'all') return transactions.value

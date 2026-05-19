@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { loginUser, registerUser, fetchMyGroups, logoutUser } from '../services/authService'
+import { scheduleAfterRegistration } from '../utils/cardReminder'
 
 const STORAGE_TOKEN_KEY = 'accessToken'
 const STORAGE_USER_KEY = 'currentUser'
@@ -64,6 +65,9 @@ export function useAuth() {
       }
 
       persistAuthSession(data.access_token, userInfo)
+      persistAuthSession(data.access_token, userInfo)
+      scheduleAfterRegistration() // запланувати reminder через 5 хв
+
       router.push('/group-setup')
     } catch (err) {
       const status = err.response?.status

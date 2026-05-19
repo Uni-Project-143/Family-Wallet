@@ -1,4 +1,5 @@
 import apiClient from './apiClient'
+import { scheduleAfterDisconnect } from '../utils/cardReminder'
 
 /**
  * Підключити картку Monobank.
@@ -39,6 +40,7 @@ export async function connectMonobankCard(groupId, personalToken) {
  */
 export async function disconnectMonobankCard(cardId) {
   const response = await apiClient.delete(`/api/v1/monobank/card/${cardId}`)
+  scheduleAfterDisconnect() // після disconnect — reminder через 5 хв
   return response.data
 }
 /**

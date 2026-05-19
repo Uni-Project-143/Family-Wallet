@@ -331,6 +331,11 @@
     @toast="showToast($event.message, $event.type)"
     @connected="handleCardConnected"
   />
+  <ConnectCardReminderModal
+    :is-open="isReminderOpen"
+    @connect-now="handleReminderConnect"
+    @later="handleReminderLater"
+  />
 </template>
 
 <script setup>
@@ -348,6 +353,10 @@
   import FeedSkeleton from '../components/FeedSkeleton.vue'
   import EmptyFeed from '../components/EmptyFeed.vue'
   import ConnectionIndicator from '../components/ConnectionIndicator.vue'
+
+  import { watch, onUnmounted } from 'vue' // дописати watch і onUnmounted до існуючого імпорту з 'vue'
+  import ConnectCardReminderModal from '../components/ConnectCardReminderModal.vue'
+  import { scheduleLater, dismissForever, getScheduledTime } from '../utils/cardReminder'
 
   const router = useRouter()
   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
@@ -465,10 +474,11 @@
     }
   }
 
-  onMounted(() => {
-    loadCards()
+  onMounted(async () => {
+    await loadCards()
     loadGroupMembers()
     loadFirstPage()
+    initCardReminder()
   })
 
   const activeFilter = ref('all')
@@ -601,6 +611,67 @@
   }
 
   const isConnectCardOpen = ref(false)
+
+  // ─── Card connection reminder ───
+  const isReminderOpen = ref(false)
+  let reminderTimer = null
+
+  function initCardReminder() {
+    // Якщо юзер уже має картки — нагадування не потрібне взагалі
+    if (connectedCards.value.length > 0) {
+      dismissForever()
+      return
+    }
+
+    const scheduledAt = getScheduledTime()
+    if (!scheduledAt) return
+
+    const remaining = scheduledAt - Date.now()
+
+    if (remaining <= 0) {
+      // Час уже настав (наприклад юзер повернувся через годину після реєстрації)
+      isReminderOpen.value = true
+      return
+    }
+
+    // Чекаємо до моменту показу
+    reminderTimer = setTimeout(() => {
+      reminderTimer = null
+      if (connectedCards.value.length === 0) {
+        isReminderOpen.value = true
+      }
+    }, remaining)
+  }
+
+  function handleReminderConnect() {
+    isReminderOpen.value = false
+    isConnectCardOpen.value = true
+  }
+
+  function handleReminderLater() {
+    isReminderOpen.value = false
+    scheduleLater() // +30 хв
+    initCardReminder() // перезапускаємо таймер на новий інтервал
+  }
+
+  // Якщо картка з'явилась (через будь-який шлях) — закриваємо reminder назавжди
+  watch(
+    () => connectedCards.value.length,
+    (len) => {
+      if (len > 0) {
+        isReminderOpen.value = false
+        if (reminderTimer) {
+          clearTimeout(reminderTimer)
+          reminderTimer = null
+        }
+        dismissForever()
+      }
+    },
+  )
+
+  onUnmounted(() => {
+    if (reminderTimer) clearTimeout(reminderTimer)
+  })
 
   function goToConnectCard() {
     isConnectCardOpen.value = true // одразу відкриваємо модалку

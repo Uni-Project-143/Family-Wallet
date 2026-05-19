@@ -13,22 +13,16 @@
           v-model="email"
           label="EMAIL ADDRESS"
           type="email"
-          autocomplete="new-password"
-          placeholder="olena@example.com"
-          :error-message="fieldErrors.email"
-          @blur="validateEmailField"
-          @input="onEmailInput"
+          autocomplete="email"
+          placeholder=""
         />
 
         <BaseInput
           v-model="password"
           label="PASSWORD"
           type="password"
-          autocomplete="new-password"
-          placeholder="At least 8 characters, 1 uppercase letter"
-          :error-message="fieldErrors.password"
-          @blur="validatePasswordField"
-          @input="onPasswordInput"
+          autocomplete="current-password"
+          placeholder=""
         />
 
         <!-- Серверна помилка: єдине повідомлення без підказки яке поле (Negative AC) -->
@@ -79,80 +73,22 @@
   import BaseInput from '../components/BaseInput.vue'
   import { useAuth } from '../composables/useAuth'
 
-  const emailTouched = ref(false)
-  const passwordTouched = ref(false)
-
   const { login, isLoading, authError } = useAuth()
 
   const email = ref('')
   const password = ref('')
 
-  const fieldErrors = ref({
-    email: '',
-    password: '',
-  })
-
-  const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
-
   /**
-   * Валідація поля email.
-   * @returns {boolean}
+   * Кнопка активна якщо обидва поля непорожні.
+   * Формат email і складність пароля НЕ перевіряємо на логіні —
+   * це підказки зловмиснику. Бек поверне 401 → один загальний message.
    */
-  function validateEmailField() {
-    emailTouched.value = true
-    fieldErrors.value.email = ''
-    if (!email.value.trim()) {
-      fieldErrors.value.email = 'Email is required'
-      return false
-    }
-    if (!EMAIL_REGEX.test(email.value)) {
-      fieldErrors.value.email = 'Enter a valid Gmail address (@gmail.com)'
-      return false
-    }
-    return true
-  }
-
-  /**
-   * Валідація поля password.
-   * @returns {boolean}
-   */
-  function validatePasswordField() {
-    passwordTouched.value = true
-    fieldErrors.value.password = ''
-    if (!password.value) {
-      fieldErrors.value.password = 'Password is required'
-      return false
-    }
-    if (password.value.length < 8) {
-      fieldErrors.value.password = 'Password must contain at least 8 characters'
-      return false
-    }
-    if (!/[A-Z]/.test(password.value)) {
-      fieldErrors.value.password = 'Password must contain at least one uppercase letter'
-      return false
-    }
-    return true
-  }
-  function onEmailInput() {
-    if (emailTouched.value) validateEmailField()
-  }
-
-  function onPasswordInput() {
-    if (passwordTouched.value) validatePasswordField()
-  }
-
   const canSubmit = computed(() => {
     return email.value.trim().length > 0 && password.value.length > 0
   })
 
-  /**
-   * Обробка відправки форми логіну.
-   */
   async function handleSubmit() {
-    const isEmailValid = validateEmailField()
-    const isPasswordValid = validatePasswordField()
-    if (!isEmailValid || !isPasswordValid) return
-
+    if (!canSubmit.value) return
     await login({
       email: email.value.trim().toLowerCase(),
       password: password.value,

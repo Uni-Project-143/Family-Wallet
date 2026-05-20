@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 from decimal import Decimal
 
 class BankCardResponse(BaseModel):
@@ -11,6 +11,7 @@ class BankCardResponse(BaseModel):
     balance: Decimal
     status: str
     transaction_ids: List[str] = Field(default_factory=list)
+    owner_full_name: Optional[str] = None
 
     class Config:
         from_attributes = True

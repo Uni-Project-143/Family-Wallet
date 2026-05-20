@@ -35,19 +35,33 @@ async def get_cards_by_group(
             detail="Доступ заборонено: ви не є учасником цієї групи"
         )
 
-    # 2. Отримання ВСІХ карток групи (саме те, що просив PM)
+    # 2. Отримання ВСІХ карток групи
     cards = await BankCard.find({"group_id": group_id}).to_list()
 
-    # 3. Мапінг даних у безпечну схему
-    return [
-        BankCardResponse(
-            id=str(card.id),
-            user_id=str(card.user_id),
-            group_id=str(card.group_id),
-            account_id=card.account_id,
-            masked_pan=card.masked_pan,
-            balance=card.balance,
-            status=card.status,
-            transaction_ids=[str(tid) for tid in card.transaction_ids]
-        ) for card in cards
-    ]
+    # 3. Мапінг даних у безпечну схему із завантаженням імені власника (JOIN)
+    response_cards = []
+    for card in cards:
+        owner = None
+        if card.user_id:
+            try:
+                # Шукаємо юзера-власника картки в базі даних
+                owner = await User.get(PydanticObjectId(card.user_id))
+            except Exception:
+                pass
+
+        # Формуємо відповідь, додаючи ім'я для фронтенду
+        response_cards.append(
+            BankCardResponse(
+                id=str(card.id),
+                user_id=str(card.user_id),
+                group_id=str(card.group_id),
+                account_id=card.account_id,
+                masked_pan=card.masked_pan,
+                balance=card.balance,
+                status=card.status,
+                transaction_ids=[str(tid) for tid in card.transaction_ids],
+                owner_full_name=owner.full_name if owner else "Невідомий власник"  # <--- НАША ЗМІНА
+            )
+        )
+
+    return response_cards

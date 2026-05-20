@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import List, Any
+from typing import List, Any, Optional
 from beanie import Document
 from pydantic import field_validator
 from bson import Decimal128
@@ -13,6 +13,7 @@ class BankCard(Document):
     balance: Decimal = Decimal("0.00")
     status: str = "ACTIVE"
     transaction_ids: List[str] = []
+    owner_full_name: Optional[str] = None
 
     # Додаємо цей валідатор, щоб Pydantic розумів числа з MongoDB
     @field_validator("balance", mode="before")

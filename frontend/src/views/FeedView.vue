@@ -122,6 +122,9 @@
                 ></span>
               </div>
               <div class="card-widget__pan">{{ card.masked_pan }}</div>
+              <div v-if="cardOwnerName(card)" class="card-widget__owner">
+                {{ cardOwnerName(card) }}
+              </div>
             </div>
             <button class="connect-card-btn" @click="isConnectCardOpen = true">
               + Connect Card
@@ -559,53 +562,6 @@
    * @returns {string}
    */
 
-  // function formatCurrency(amount) {
-  //   if (amount == null) return '— UAH'
-  //   return amount.toLocaleString('uk-UA') + ' UAH'
-  // }
-
-  // let wsConnection = null
-
-  // function connectWebSocket() {
-  //   // Вимикаємо WebSocket поки немає бекенду
-  //   if (import.meta.env.VITE_WS_ENABLED !== 'true') return
-  //   const token = localStorage.getItem('accessToken')
-  //   if (!token) return
-  //   try {
-  //     wsConnection = new WebSocket(
-  //       `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'}?token=${token}`,
-  //     )
-  //     wsConnection.onmessage = (event) => {
-  //       const data = JSON.parse(event.data)
-  //       if (data.type === 'new_transaction') transactions.value.unshift(data.transaction)
-  //     }
-  //   } catch {
-  //     // silent fallback
-  //   }
-  // }
-
-  // onMounted(() => connectWebSocket())
-  // onUnmounted(() => {
-  //   if (wsConnection) wsConnection.close()
-  // })
-
-  // function goToInvite() {
-  //   router.push({ path: '/settings', query: { section: 'members' } })
-  //   showToast('Opening invite members section', 'info')
-  // }
-
-  //function goToConnectCard() {
-  //  router.push({ path: '/settings', query: { section: 'cards' } })
-  // showToast('Opening connect card section', 'info')
-  //}
-  /**
-   * Перехід на екран створення/приєднання до групи.
-   * Працює для всіх ролей — і Admin, і Member можуть створити свою власну сім'ю
-   * або приєднатись до іншої.
-   */
-  /**
-   * Перехід на екран керування групою — юзер сам обере create або join.
-   */
   function goToGroupSetup() {
     router.push('/group-setup')
   }
@@ -675,6 +631,10 @@
 
   function goToConnectCard() {
     isConnectCardOpen.value = true // одразу відкриваємо модалку
+  }
+
+  function cardOwnerName(card) {
+    return card.owner_full_name || null
   }
 
   // /**
@@ -1480,5 +1440,11 @@
     font-size: 12px;
     color: #b0ada7;
     font-family: 'DM Sans', system-ui, sans-serif;
+  }
+  .card-widget__owner {
+    font-size: 11px;
+    color: #6b6860;
+    margin-top: 4px;
+    letter-spacing: 0.2px;
   }
 </style>

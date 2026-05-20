@@ -1,3 +1,5 @@
+import apiClient from './apiClient'
+
 /**
  * Список транзакцій групи з фільтрами і сортуванням.
  * GET /api/v1/transactions/group/{group_id}?...filters

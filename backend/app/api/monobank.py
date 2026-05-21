@@ -9,6 +9,8 @@ from app.models.user import User
 from app.models.transaction import Transaction
 from app.schemas.monobank import ConnectMonobankRequest, ConnectMonobankResponse, MonobankWebhookRequest
 from app.models.bank_card import BankCard
+from app.core.websockets import ws_manager
+
 router = APIRouter(prefix="/api/v1/monobank", tags=["Monobank Integration"])
 
 
@@ -95,6 +97,19 @@ async def handle_monobank_webhook(payload: MonobankWebhookRequest):
     card.balance = Decimal(str(mono_tx.balance / 100))
     await card.save()
 
-    # TODO: BE-03 (WebSockets push піде сюди)
+    ws_payload = {
+        "event": "new_transaction",
+        "data": {
+            "id": str(new_transaction.id),
+            "amount": float(new_transaction.amount),
+            "currency": new_transaction.currency,
+            "description": new_transaction.description,
+            "category_id": new_transaction.category_id,
+            "timestamp": new_transaction.timestamp.isoformat(),
+        }
+    }
+
+    # Магія: пушимо в кімнату групи (Real-time!)
+    await ws_manager.broadcast_to_group(str(card.group_id), ws_payload)
 
     return {"status": "success"}

@@ -16,6 +16,10 @@ export function scheduleAfterDisconnect() {
   setSchedule(FIVE_MIN_MS)
 }
 
+export function scheduleAfterJoin() {
+  setSchedule(FIVE_MIN_MS)
+}
+
 export function scheduleLater() {
   setSchedule(THIRTY_MIN_MS)
 }

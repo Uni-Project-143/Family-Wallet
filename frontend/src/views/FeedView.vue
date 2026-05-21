@@ -423,6 +423,10 @@
       .slice(0, 2)
   })
 
+  const hasOwnCard = computed(() =>
+    connectedCards.value.some((c) => c.user_id === currentUser.value?.id),
+  )
+
   const groups = ref([
     { id: 1, name: storedUser.groupName || 'Family' },
     { id: 2, name: 'Neighborhood' },
@@ -573,8 +577,7 @@
   let reminderTimer = null
 
   function initCardReminder() {
-    // Якщо юзер уже має картки — нагадування не потрібне взагалі
-    if (connectedCards.value.length > 0) {
+    if (hasOwnCard.value) {
       dismissForever()
       return
     }
@@ -585,15 +588,13 @@
     const remaining = scheduledAt - Date.now()
 
     if (remaining <= 0) {
-      // Час уже настав (наприклад юзер повернувся через годину після реєстрації)
       isReminderOpen.value = true
       return
     }
 
-    // Чекаємо до моменту показу
     reminderTimer = setTimeout(() => {
       reminderTimer = null
-      if (connectedCards.value.length === 0) {
+      if (!hasOwnCard.value) {
         isReminderOpen.value = true
       }
     }, remaining)
@@ -611,19 +612,16 @@
   }
 
   // Якщо картка з'явилась (через будь-який шлях) — закриваємо reminder назавжди
-  watch(
-    () => connectedCards.value.length,
-    (len) => {
-      if (len > 0) {
-        isReminderOpen.value = false
-        if (reminderTimer) {
-          clearTimeout(reminderTimer)
-          reminderTimer = null
-        }
-        dismissForever()
+  watch(hasOwnCard, (has) => {
+    if (has) {
+      isReminderOpen.value = false
+      if (reminderTimer) {
+        clearTimeout(reminderTimer)
+        reminderTimer = null
       }
-    },
-  )
+      dismissForever()
+    }
+  })
 
   onUnmounted(() => {
     if (reminderTimer) clearTimeout(reminderTimer)

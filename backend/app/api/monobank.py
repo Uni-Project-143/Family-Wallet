@@ -192,7 +192,8 @@ async def get_monobank_client_info(request: ClientInfoRequest):
                     account_id=acc.get("id"),
                     masked_pan=masked_pan,
                     type=acc.get("type", "unknown"),
-                    balance=Decimal(str(acc.get("balance", 0) / 100))  # Переводимо копійки в гривні
+                    balance=Decimal(str(acc.get("balance", 0) / 100)),
+                    currency=980
                 ))
 
         return cards

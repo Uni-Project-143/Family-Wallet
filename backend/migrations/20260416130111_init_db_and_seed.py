@@ -133,10 +133,28 @@ class Forward:
     @free_fall_migration(document_models=ALL_MODELS)
     async def create_and_seed(self, session):
         # 1. Categories (Baseline)
-        cat_food = Category(name="Food", icon="fastfood", color="#FF5733")
-        cat_transport = Category(name="Transport", icon="directions_bus", color="#3357FF")
-        cat_gifts = Category(name="Gifts", icon="redeem", color="#FF33A1")
-        await Category.insert_many([cat_food, cat_transport, cat_gifts], session=session)
+        cat_food = Category(name="Продукти", icon="🛒", color="#FF5733", mcc_list=[5411, 5499])
+
+        # 5812 - Ресторани, 5814 - Фастфуд
+        cat_cafe = Category(name="Кафе та ресторани", icon="🍔", color="#FFC300",
+                            mcc_list=[5812, 5814, 5811])
+
+        # 4111 - Метро/Трамвай, 4121 - Таксі, 4131 - Автобуси
+        cat_transport = Category(name="Транспорт", icon="🚗", color="#33FF57",
+                                 mcc_list=[4111, 4121, 4131, 4789])
+
+        # 7832 - Кіно, 7922 - Квитки
+        cat_entertainment = Category(name="Розваги", icon="🎬", color="#3357FF",
+                                     mcc_list=[7832, 7922, 7999])
+
+        # 5947 - Магазини подарунків
+        cat_gifts = Category(name="Подарунки", icon="🎁", color="#FF33A1", mcc_list=[5947])
+
+        cat_transfers = Category(name="Перекази", icon="💸", color="#808080", mcc_list=[4829])
+
+        await Category.insert_many(
+            [cat_food, cat_cafe, cat_transport, cat_entertainment, cat_gifts, cat_transfers], session=session)
+
 
         # 2. Users (Seed Data)
         user_main = User(

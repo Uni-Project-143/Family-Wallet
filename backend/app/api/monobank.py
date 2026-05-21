@@ -60,7 +60,6 @@ async def connect_monobank_card(
         user_id=str(current_user.id),
         group_id=request.group_id,
         encrypted_token=request.personal_token,
-        # TODO: в ідеалі це треба шифрувати перед збереженням
         account_id=request.account_id,
         masked_pan=request.masked_pan,
         balance=request.balance,

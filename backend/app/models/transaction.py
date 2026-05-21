@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 from bson.decimal128 import Decimal128
+from pymongo import IndexModel
 import pymongo
 
 class Transaction(Document):
@@ -18,6 +19,8 @@ class Transaction(Document):
     is_secret_gift: bool = Field(default=False, description="Чи є це секретним подарунком")
     target_user_id: Optional[str] = Field(default=None,
                                           description="ID того, кому призначений подарунок")
+    mono_id: Optional[str] = None
+    mcc: Optional[int] = None
 
     # ----------------
 
@@ -32,8 +35,7 @@ class Transaction(Document):
     class Settings:
         name = "transactions"
         indexes = [
-            [
-                ("group_id", pymongo.ASCENDING),
-                ("timestamp", pymongo.DESCENDING)
-            ]
+            IndexModel([("group_id", pymongo.ASCENDING), ("timestamp", pymongo.DESCENDING)]),
+            # UNIQUE індекс для захисту від дублікатів (sparse=True дозволяє мати null для старих транзакцій)
+            IndexModel([("mono_id", pymongo.ASCENDING)], unique=True, sparse=True)
         ]

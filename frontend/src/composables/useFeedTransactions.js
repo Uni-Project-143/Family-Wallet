@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { fetchFeed } from '../services/transactionService'
 
-const PAGE_SIZE = 2
+const PAGE_SIZE = 20
 
 /**
  * Composable для стрічки транзакцій групи (PROJ-52).

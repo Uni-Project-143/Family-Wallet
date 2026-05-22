@@ -1,22 +1,21 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch, toValue } from 'vue'
 
 /**
  * WebSocket-клієнт з auto-reconnect і ping/pong heartbeat.
  *
- * Endpoint: ws://localhost:8000/ws?token={JWT}
+ * Endpoint: ws://localhost:8000/ws/feed/{group_id}
  *
  * Очікувані повідомлення:
- *   { type: 'new_transaction', transaction: {...} }
- *   { type: 'ping' }  // сервер може слати щоб тримати з'єднання
+ *   { event: 'new_transaction', data: {...} }
  */
-export function useWebSocket({ onTransaction } = {}) {
+export function useWebSocket({ groupId, onTransaction } = {}) {
   const isConnected = ref(false)
   const reconnectAttempts = ref(0)
   let ws = null
   let reconnectTimer = null
   let pingInterval = null
 
-  const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'
+  const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000/ws/feed'
   const ENABLED = import.meta.env.VITE_WS_ENABLED === 'true'
 
   function connect() {
@@ -25,30 +24,33 @@ export function useWebSocket({ onTransaction } = {}) {
       return
     }
 
-    const token = localStorage.getItem('accessToken')
-    if (!token) return
+    const gid = toValue(groupId)
+    if (!gid) {
+      console.info('WebSocket: no group_id yet, skipping connect')
+      return
+    }
 
     try {
-      ws = new WebSocket(`${WS_URL}?token=${encodeURIComponent(token)}`)
+      ws = new WebSocket(`${WS_BASE_URL}/${gid}`)
 
       ws.onopen = () => {
         isConnected.value = true
         reconnectAttempts.value = 0
-        console.info('WebSocket connected')
+        console.info(`WebSocket connected to group ${gid}`)
 
-        // Heartbeat — кожні 30 сек шлемо ping
+        // Heartbeat — кожні 30 сек шлемо ping (бек ігнорує payload, просто тримає з'єднання)
         pingInterval = setInterval(() => {
           if (ws?.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'ping' }))
+            ws.send('ping')
           }
         }, 30000)
       }
 
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data)
-          if (data.type === 'new_transaction' && data.transaction) {
-            onTransaction?.(data.transaction)
+          const msg = JSON.parse(event.data)
+          if (msg.event === 'new_transaction') {
+            onTransaction?.(msg.data)
           }
         } catch (err) {
           console.warn('WS message parse error:', err)
@@ -57,7 +59,10 @@ export function useWebSocket({ onTransaction } = {}) {
 
       ws.onclose = () => {
         isConnected.value = false
-        clearInterval(pingInterval)
+        if (pingInterval) {
+          clearInterval(pingInterval)
+          pingInterval = null
+        }
         scheduleReconnect()
       }
 
@@ -100,7 +105,21 @@ export function useWebSocket({ onTransaction } = {}) {
     isConnected.value = false
   }
 
-  onMounted(connect)
+  onMounted(() => {
+    // Якщо groupId переданий як getter (функція) — чекаємо доки значення з'явиться
+    if (typeof groupId === 'function') {
+      watch(
+        () => toValue(groupId),
+        (gid) => {
+          if (gid && !ws) connect()
+        },
+        { immediate: true },
+      )
+    } else if (groupId) {
+      connect()
+    }
+  })
+
   onUnmounted(disconnect)
 
   return {

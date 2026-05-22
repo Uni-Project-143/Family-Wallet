@@ -158,7 +158,7 @@
         </div>
 
         <!-- Skeleton під час першого завантаження (FE-03) -->
-        <FeedSkeleton v-if="isLoadingFeed" :count="5" />
+        <FeedSkeleton v-if="isLoadingFeed && transactions.length === 0" :count="5" />
 
         <!-- Empty: ще жодної картки в групі (FE-02 + AC negative) -->
         <EmptyFeed
@@ -392,13 +392,21 @@
     hasMore,
     loadFirstPage,
     loadMore,
-    prependTransaction,
+    // prependTransaction,
   } = useFeedTransactions(() => currentUser.value?.groupId)
 
   // ─── WebSocket для real-time (PROJ-50). Поки VITE_WS_ENABLED=false — no-op. ───
   const { isConnected: wsConnected } = useWebSocket({
-    onTransaction: prependTransaction,
+    groupId: () => currentUser.value?.groupId,
+    onTransaction: handleWsTransaction,
   })
+
+  function handleWsTransaction() {
+    // Backend шле тільки сирі поля транзакції (без display_name, avatar, category_emoji).
+    // Тому рефетч першої сторінки — отримуємо вже збагачені дані з /api/v1/feed.
+    loadFirstPage()
+    showToast('New transaction', 'info')
+  }
 
   // ─── Infinite scroll (PROJ-52 FE-01) ───
   const { sentinelRef } = useInfiniteScroll(loadMore)

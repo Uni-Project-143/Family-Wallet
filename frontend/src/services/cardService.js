@@ -2,29 +2,29 @@ import apiClient from './apiClient'
 import { scheduleAfterDisconnect } from '../utils/cardReminder'
 
 /**
- * Підключити картку Monobank.
- * POST /api/v1/monobank/connect
- *
- * Бекенд:
- * 1. Перевіряє членство юзера у групі (403 якщо ні)
- * 2. Валідує токен через GET https://api.monobank.ua/personal/client-info
- * 3. Перевіряє унікальність account_id (409 якщо вже підключено)
- * 4. Шифрує токен AES-256-GCM
- * 5. Реєструє webhook у Monobank
- * 6. Зберігає BankCard у БД
- *
- * @param {string} groupId
- * @param {string} personalToken
- * @returns {Promise<{ id: string, masked_pan: string, status: string, message: string }>}
+ * Step 1: отримати список карток Monobank за API token.
+ * Бек обмеження: 1 запит на 60 секунд.
  */
-export async function connectMonobankCard(groupId, personalToken) {
-  const response = await apiClient.post('/api/v1/monobank/connect', {
-    group_id: groupId,
+export async function fetchMonobankCards(personalToken) {
+  const response = await apiClient.post('/api/v1/monobank/client-info', {
     personal_token: personalToken,
   })
   return response.data
 }
 
+/**
+ * Step 2: підключити обрану картку до групи.
+ */
+export async function connectMonobankCard(groupId, personalToken, card) {
+  const response = await apiClient.post('/api/v1/monobank/connect', {
+    group_id: groupId,
+    personal_token: personalToken,
+    account_id: card.account_id,
+    masked_pan: card.masked_pan,
+    balance: card.balance,
+  })
+  return response.data
+}
 /**
  * Відключити картку (hard delete на беку).
  * DELETE /api/v1/monobank/card/{card_id}

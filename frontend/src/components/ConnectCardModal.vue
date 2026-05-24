@@ -3,7 +3,7 @@
     <Transition name="overlay">
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
         <Transition name="modal">
-          <div v-if="isOpen" class="modal-card" role="dialog" aria-modal="true">
+          <div v-if="isOpen" ref="modalRootRef" class="modal-card" role="dialog" aria-modal="true">
             <button class="modal-close" @click="close" aria-label="Close">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
@@ -215,10 +215,6 @@
                     </div>
                     <div class="card-row__pan">{{ card.masked_pan }}</div>
                   </div>
-                  <div class="card-row__balance">
-                    {{ formatBalance(card.balance) }}
-                    <span class="card-row__currency">UAH</span>
-                  </div>
                 </label>
               </div>
 
@@ -268,12 +264,16 @@
 <script setup>
   import { ref, computed, watch } from 'vue'
   import { fetchMonobankCards, connectMonobankCard } from '../services/cardService'
+  import { useFocusTrap } from '../composables/useFocusTrap'
 
   const props = defineProps({
     isOpen: { type: Boolean, default: false },
   })
 
   const emit = defineEmits(['close', 'toast', 'connected'])
+
+  const modalRootRef = ref(null)
+  useFocusTrap(modalRootRef, () => props.isOpen)
 
   // ─── Form state ───
   const personalToken = ref('')

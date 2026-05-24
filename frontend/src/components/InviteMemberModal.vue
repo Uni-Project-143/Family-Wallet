@@ -3,7 +3,7 @@
     <Transition name="overlay">
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
         <Transition name="modal">
-          <div v-if="isOpen" class="modal-card" role="dialog" aria-modal="true">
+          <div v-if="isOpen" ref="modalRootRef" class="modal-card" role="dialog" aria-modal="true">
             <!-- Close button -->
             <button class="modal-close" @click="close" aria-label="Close">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -224,6 +224,7 @@
 <script setup>
   import { ref, computed } from 'vue'
   import { fetchGroupInviteLink, regenerateGroupInviteLink } from '../services/authService'
+  import { useFocusTrap } from '../composables/useFocusTrap'
 
   const props = defineProps({
     isOpen: {
@@ -233,6 +234,9 @@
   })
 
   const emit = defineEmits(['close', 'toast'])
+
+  const modalRootRef = ref(null)
+  useFocusTrap(modalRootRef, () => props.isOpen)
 
   const inviteUrl = ref('')
   const expiresAt = ref(null)

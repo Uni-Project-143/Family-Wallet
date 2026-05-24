@@ -24,7 +24,20 @@
           autocomplete="current-password"
           placeholder=""
         />
-
+        <Transition name="fade-down">
+          <div v-if="isFormBlocked" class="auth-form__rate-limit" role="alert">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5" />
+              <path
+                d="M8 4.5V8L10.5 10"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+            </svg>
+            {{ blockMessage }}
+          </div>
+        </Transition>
         <!-- Серверна помилка: єдине повідомлення без підказки яке поле (Negative AC) -->
         <Transition name="fade-down">
           <div v-if="authError" class="auth-form__server-error" role="alert">
@@ -69,14 +82,65 @@
 </template>
 
 <script setup>
-  import { ref, computed } from 'vue'
+  // import { ref, computed } from 'vue'
+  // import BaseInput from '../components/BaseInput.vue'
+  // import { useAuth } from '../composables/useAuth'
+
+  // const { login, isLoading, authError } = useAuth()
+
+  // const email = ref('')
+  // const password = ref('')
+
+  import { ref, computed, watch, onUnmounted } from 'vue'
   import BaseInput from '../components/BaseInput.vue'
   import { useAuth } from '../composables/useAuth'
+  import { recordFailedAttempt, isBlocked, getRemainingBlockMs } from '../utils/authRateLimit'
 
   const { login, isLoading, authError } = useAuth()
 
   const email = ref('')
   const password = ref('')
+
+  // ─── Rate limit (per email) ───
+  const blockKey = computed(() => `login:${email.value.trim().toLowerCase()}`)
+  const isFormBlocked = ref(false)
+  const remainingMs = ref(0)
+  let countdownInterval = null
+
+  function refreshBlockStatus() {
+    isFormBlocked.value = isBlocked(blockKey.value)
+    remainingMs.value = getRemainingBlockMs(blockKey.value)
+  }
+
+  const blockMessage = computed(() => {
+    if (!isFormBlocked.value) return ''
+    const m = Math.floor(remainingMs.value / 60000)
+    const s = Math.floor((remainingMs.value % 60000) / 1000)
+    return `Too many failed attempts. Try again in ${m}:${String(s).padStart(2, '0')}.`
+  })
+
+  // Перевіряємо блок щоразу коли email змінюється (інший key)
+  watch(blockKey, refreshBlockStatus, { immediate: true })
+
+  // Запускаємо таймер countdown коли форма заблокована
+  watch(isFormBlocked, (blocked) => {
+    if (blocked && !countdownInterval) {
+      countdownInterval = setInterval(() => {
+        refreshBlockStatus()
+        if (!isFormBlocked.value && countdownInterval) {
+          clearInterval(countdownInterval)
+          countdownInterval = null
+        }
+      }, 1000)
+    } else if (!blocked && countdownInterval) {
+      clearInterval(countdownInterval)
+      countdownInterval = null
+    }
+  })
+
+  onUnmounted(() => {
+    if (countdownInterval) clearInterval(countdownInterval)
+  })
 
   /**
    * Кнопка активна якщо обидва поля непорожні.
@@ -84,15 +148,22 @@
    * це підказки зловмиснику. Бек поверне 401 → один загальний message.
    */
   const canSubmit = computed(() => {
-    return email.value.trim().length > 0 && password.value.length > 0
+    return email.value.trim().length > 0 && password.value.length > 0 && !isFormBlocked.value
   })
 
   async function handleSubmit() {
     if (!canSubmit.value) return
+
     await login({
       email: email.value.trim().toLowerCase(),
       password: password.value,
     })
+
+    // Бек повернув помилку — фіксуємо невдалу спробу
+    if (authError.value) {
+      recordFailedAttempt(blockKey.value)
+      refreshBlockStatus()
+    }
   }
 </script>
 
@@ -250,5 +321,17 @@
   .fade-down-leave-to {
     opacity: 0;
     transform: translateY(-4px);
+  }
+
+  .auth-form__rate-limit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    background: #fef5e8;
+    border: 1px solid #e8b56e;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #b97f1a;
   }
 </style>

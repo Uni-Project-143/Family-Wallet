@@ -345,6 +345,9 @@
               <div class="card-item__info">
                 <div class="card-item__bank">Monobank</div>
                 <div class="card-item__pan">{{ card.masked_pan }}</div>
+                <div v-if="card.owner_full_name" class="card-item__owner">
+                  {{ card.owner_full_name }}
+                </div>
               </div>
 
               <div class="card-item__actions">
@@ -352,7 +355,7 @@
                   <span class="card-item__dot"></span>
                   {{ card.status }}
                 </span>
-                <!-- Disconnect доступний тільки власнику картки (бек поверне 403 для чужих) -->
+                <button class="btn-details" @click="openCardDetails(card)">Details</button>
                 <button
                   v-if="card.user_id === currentUser?.id"
                   class="btn-remove"
@@ -391,6 +394,11 @@
             :is-loading="isDisconnecting"
             @confirm="confirmDisconnect"
             @cancel="cancelDisconnect"
+          />
+          <CardDetailsModal
+            :is-open="isCardDetailsOpen"
+            :card="selectedCardForDetails"
+            @close="closeCardDetails"
           />
         </section>
 
@@ -459,6 +467,7 @@
   import ConfirmDialog from '../components/ConfirmDialog.vue'
   import { useRoute } from 'vue-router'
   import { usePersistentState } from '../composables/usePersistentState'
+  import CardDetailsModal from '../components/CardDetailsModal.vue'
 
   const route = useRoute()
   const activeSection = ref(route.query.section || 'members')
@@ -657,6 +666,19 @@
 
   // Confirm dialog для disconnect (PROJ-63)
   const isConfirmOpen = ref(false)
+  const isCardDetailsOpen = ref(false)
+  const selectedCardForDetails = ref(null)
+
+  function openCardDetails(card) {
+    selectedCardForDetails.value = card
+    isCardDetailsOpen.value = true
+  }
+
+  function closeCardDetails() {
+    isCardDetailsOpen.value = false
+    selectedCardForDetails.value = null
+  }
+
   const cardToDisconnect = ref(null)
   const isDisconnecting = ref(false)
 
@@ -1555,6 +1577,14 @@
     color: #6b6860;
     font-family: 'DM Mono', 'Courier New', monospace;
   }
+
+  .card-item__owner {
+    font-size: 12px;
+    color: #6b6860;
+    margin-top: 4px;
+    letter-spacing: 0.2px;
+  }
+
   .cards-loading {
     display: flex;
     flex-direction: column;
@@ -1567,6 +1597,24 @@
     background-size: 200% 100%;
     animation: shimmer 1.6s ease infinite;
     border-radius: 12px;
+  }
+
+  .btn-details {
+    padding: 6px 14px;
+    background: #ffffff;
+    color: #9b7a25;
+    border: 1.5px solid #dfc876;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+
+  .btn-details:hover {
+    background: #fbf7ec;
+    border-color: #b8973a;
   }
 
   @keyframes shimmer {

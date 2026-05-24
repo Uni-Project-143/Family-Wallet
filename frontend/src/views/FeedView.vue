@@ -125,6 +125,7 @@
               <div v-if="cardOwnerName(card)" class="card-widget__owner">
                 {{ cardOwnerName(card) }}
               </div>
+              <button class="card-widget__details" @click="openCardDetails(card)">Details</button>
             </div>
             <button class="connect-card-btn" @click="isConnectCardOpen = true">
               + Connect Card
@@ -339,6 +340,11 @@
     @connect-now="handleReminderConnect"
     @later="handleReminderLater"
   />
+  <CardDetailsModal
+    :is-open="isCardDetailsOpen"
+    :card="selectedCardForDetails"
+    @close="closeCardDetails"
+  />
 </template>
 
 <script setup>
@@ -360,6 +366,7 @@
   import { watch, onUnmounted } from 'vue' // дописати watch і onUnmounted до існуючого імпорту з 'vue'
   import ConnectCardReminderModal from '../components/ConnectCardReminderModal.vue'
   import { scheduleLater, dismissForever, getScheduledTime } from '../utils/cardReminder'
+  import CardDetailsModal from '../components/CardDetailsModal.vue'
 
   const router = useRouter()
   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
@@ -579,6 +586,19 @@
   }
 
   const isConnectCardOpen = ref(false)
+
+  const isCardDetailsOpen = ref(false)
+  const selectedCardForDetails = ref(null)
+
+  function openCardDetails(card) {
+    selectedCardForDetails.value = card
+    isCardDetailsOpen.value = true
+  }
+
+  function closeCardDetails() {
+    isCardDetailsOpen.value = false
+    selectedCardForDetails.value = null
+  }
 
   // ─── Card connection reminder ───
   const isReminderOpen = ref(false)
@@ -1452,5 +1472,25 @@
     color: #6b6860;
     margin-top: 4px;
     letter-spacing: 0.2px;
+  }
+
+  .card-widget__details {
+    width: 100%;
+    margin-top: 10px;
+    padding: 6px 10px;
+    background: transparent;
+    color: #9b7a25;
+    border: 1px solid #dfc876;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+  .card-widget__details:hover {
+    background: #fbf7ec;
+    border-color: #b8973a;
+    color: #9b7a25;
   }
 </style>

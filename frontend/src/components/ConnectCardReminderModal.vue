@@ -3,7 +3,13 @@
     <Transition name="overlay">
       <div v-if="isOpen" class="reminder-overlay" @click.self="$emit('later')">
         <Transition name="modal">
-          <div v-if="isOpen" class="reminder-card" role="dialog" aria-modal="true">
+          <div
+            v-if="isOpen"
+            ref="modalRootRef"
+            class="reminder-card"
+            role="dialog"
+            aria-modal="true"
+          >
             <div class="reminder-icon" aria-hidden="true">
               <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
                 <rect
@@ -36,11 +42,17 @@
 </template>
 
 <script setup>
-  defineProps({
+  import { ref } from 'vue'
+  import { useFocusTrap } from '../composables/useFocusTrap'
+
+  const props = defineProps({
     isOpen: { type: Boolean, default: false },
   })
 
-  defineEmits(['connect-now', 'later'])
+  const emit = defineEmits(['connect-now', 'later'])
+
+  const modalRootRef = ref(null)
+  useFocusTrap(modalRootRef, () => props.isOpen)
 </script>
 
 <style scoped>

@@ -20,6 +20,7 @@ from app.api import transaction
 from app.api.bank_card import bank_card_router
 from app.api.feed import router as feed_router
 from app.api.ws import router as ws_router
+from app.api.gift import router as gift_router
 
 # ==========================================
 # Менеджер життєвого циклу (Lifespan)
@@ -72,3 +73,7 @@ app.include_router(feed_router)
 app.include_router(monobank.router)
 
 app.include_router(ws_router)
+
+app.include_router(gift_router)
+
+#

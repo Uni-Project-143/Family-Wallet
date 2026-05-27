@@ -1371,4 +1371,100 @@
     opacity: 0;
     transform: scale(0.94) translateY(12px);
   }
+
+  @media (max-width: 768px) {
+    .navbar {
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      height: auto;
+      padding: 10px 14px;
+      gap: 8px 10px;
+    }
+    .navbar__left {
+      grid-row: 1;
+      grid-column: 1;
+    }
+    .navbar__right {
+      grid-row: 1;
+      grid-column: 2;
+      gap: 6px;
+    }
+    .navbar__center {
+      grid-row: 2;
+      grid-column: 1 / -1;
+      justify-self: center;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .navbar__center::-webkit-scrollbar {
+      display: none;
+    }
+    .navbar__logo {
+      font-size: 15px;
+    }
+    .navbar__tab {
+      padding: 6px 14px;
+      font-size: 12px;
+    }
+    .navbar__user-name {
+      display: none;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .navbar {
+      padding: 8px 12px;
+    }
+    .navbar__tab {
+      padding: 5px 12px;
+      font-size: 11px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .title {
+      font-size: 26px;
+    }
+    .stepper {
+      margin-bottom: 24px;
+    }
+    .step__line {
+      width: 40px;
+    }
+    .step__circle {
+      width: 32px;
+      height: 32px;
+      font-size: 13px;
+    }
+    .step__label {
+      font-size: 10px;
+    }
+    .success-card {
+      padding: 32px 24px 24px;
+    }
+    .success-title {
+      font-size: 22px;
+    }
+    .invite-link-box {
+      flex-direction: column;
+    }
+    .invite-link-box__url {
+      border-right: none;
+      border-bottom: 1px solid #f2e9c8;
+      font-size: 11px;
+    }
+    .btn-copy {
+      width: 100%;
+      padding: 12px;
+      justify-content: center;
+    }
+    .actions {
+      flex-direction: column-reverse;
+    }
+    .btn-secondary,
+    .btn-gold {
+      flex: none;
+      width: 100%;
+    }
+  }
 </style>

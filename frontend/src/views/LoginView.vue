@@ -334,4 +334,23 @@
     font-size: 13px;
     color: #b97f1a;
   }
+
+  @media (max-width: 560px) {
+    .auth-card,
+    .login-card,
+    .register-card,
+    .select-group-card {
+      max-width: 100%;
+      width: calc(100% - 32px);
+      padding: 28px 22px;
+    }
+    .auth-title,
+    .form-title {
+      font-size: 24px;
+    }
+    /* Стандартні input fields fall back на 100% width */
+    .i-field {
+      font-size: 16px; /* 16px+ не зум-ом на iOS */
+    }
+  }
 </style>

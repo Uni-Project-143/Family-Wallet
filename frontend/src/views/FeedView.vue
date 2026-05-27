@@ -1493,4 +1493,114 @@
     border-color: #b8973a;
     color: #9b7a25;
   }
+
+  @media (max-width: 768px) {
+    .navbar {
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      height: auto;
+      padding: 10px 14px;
+      gap: 8px 10px;
+    }
+    .navbar__left {
+      grid-row: 1;
+      grid-column: 1;
+    }
+    .navbar__right {
+      grid-row: 1;
+      grid-column: 2;
+      gap: 6px;
+    }
+    .navbar__center {
+      grid-row: 2;
+      grid-column: 1 / -1;
+      justify-self: center;
+      -webkit-overflow-scrolling: touch;
+    }
+    .navbar__center::-webkit-scrollbar {
+      display: none;
+    }
+    .navbar__logo {
+      font-size: 15px;
+    }
+    .navbar__tab {
+      padding: 6px 14px;
+      font-size: 12px;
+    }
+    .navbar__user-name {
+      display: none;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .navbar {
+      padding: 8px 12px;
+    }
+    .navbar__tab {
+      padding: 5px 12px;
+      font-size: 11px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .feed-page {
+      min-height: auto;
+      height: auto;
+      overflow: visible;
+    }
+    .feed-layout {
+      flex: none;
+      flex-direction: column;
+      height: auto;
+      overflow: visible;
+    }
+    .sidebar,
+    .right-panel,
+    .feed-main {
+      width: 100%;
+      flex: none;
+    }
+    .feed-main {
+      order: 1;
+      padding: 16px;
+    }
+    .right-panel {
+      order: 2;
+      border-left: none;
+      border-top: 1px solid #eae8e4;
+    }
+    .sidebar {
+      order: 3;
+      border-right: none;
+      border-top: 1px solid #eae8e4;
+    }
+    .feed-main__header {
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .feed-filters {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .navbar__groups {
+      display: none;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .feed-main__title {
+      font-size: 22px;
+    }
+    .tx-card {
+      padding: 14px;
+      gap: 10px;
+    }
+    .tx-card__amount {
+      font-size: 16px;
+    }
+    .tx-card__name {
+      font-size: 12px;
+    }
+  }
 </style>

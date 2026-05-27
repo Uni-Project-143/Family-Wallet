@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 class CreateGiftRequest(BaseModel):
     # Field(..., min_length=1) гарантує, що порожня назва викине помилку
     name: str = Field(..., min_length=1, description="Name is required")
+    goal_amount: float
     target_user_id: str
     group_id: str
     unlock_date: datetime

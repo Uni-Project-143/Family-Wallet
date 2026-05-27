@@ -40,3 +40,8 @@ async def regenerate_invite_link(group_id: str, current_user: User = Depends(get
 async def join_group(request: JoinGroupRequest, current_user: User = Depends(get_current_user)):
     """Приєднання до групи за invite_link (для ролі MEMBER)."""
     return await GroupService.join_group(request.invite_link, current_user.id)
+
+@router.get("/{group_id}/members", status_code=status.HTTP_200_OK)
+async def get_group_members(group_id: str, current_user: User = Depends(get_current_user)):
+    """Повертає список учасників групи (ID та імена) для вибору Target User"""
+    return await GroupService.get_group_members(group_id, str(current_user.id))

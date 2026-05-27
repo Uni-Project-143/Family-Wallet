@@ -4,6 +4,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 
 from app.models.category import Category
+from app.models.gift_event import GiftEvent
 # Імпортуємо моделі
 from app.models.user import User
 from app.models.invite import InviteToken
@@ -32,5 +33,5 @@ async def init_db():
     """Функція підключає моделі Beanie до MongoDB при старті сервера."""
     await init_beanie(
         database=db_client[DB_NAME],
-        document_models=[User, Group, GroupMembership, InviteToken, BlacklistedToken, BankCard, Transaction, Category]
+        document_models=[User, Group, GroupMembership, InviteToken, BlacklistedToken, BankCard, Transaction, Category, GiftEvent]
     )

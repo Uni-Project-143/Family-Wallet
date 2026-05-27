@@ -1,6 +1,8 @@
 from datetime import datetime
 from bson import ObjectId
 from urllib.parse import urlparse
+from fastapi import HTTPException
+from beanie import PydanticObjectId
 
 from app.models.group import Group
 from app.models.group_membership import GroupMembership
@@ -9,6 +11,7 @@ from app.repositories.group_repository import GroupRepository
 from app.repositories.invite_repository import InviteRepository
 from app.exceptions import ForbiddenAccessError, InvalidInviteError, InviteExpiredError
 from app.schemas.group import GroupResponse
+from app.models.user import User
 
 from app.config.database import db_client
 
@@ -155,3 +158,35 @@ class GroupService:
                 )
             )
         return result
+
+    @staticmethod
+    async def get_group_members(group_id: str, current_user_id: str):
+        try:
+            group_oid = PydanticObjectId(group_id)
+            user_oid = PydanticObjectId(current_user_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Невалідний формат ID групи")
+
+        # 1. Безпека: перевіряємо, чи юзер, який робить запит, взагалі є в цій групі
+        is_member = await GroupMembership.find_one({
+            "user_id": user_oid,
+            "group_id": group_oid
+        })
+        if not is_member:
+            raise HTTPException(status_code=403, detail="Доступ заборонено: ви не у цій групі")
+
+        # 2. Дістаємо всіх учасників групи
+        memberships = await GroupMembership.find({"group_id": group_oid}).to_list()
+
+        users_data = []
+        for m in memberships:
+            user = await User.get(PydanticObjectId(str(m.user_id)))
+            if user:
+                display_name = user.full_name or getattr(user, 'email', None) or "Без імені"
+                users_data.append({
+                    "id": str(user.id),
+                    "name": display_name,
+                    "avatar": getattr(user, 'avatar_url', None)
+                })
+
+        return users_data

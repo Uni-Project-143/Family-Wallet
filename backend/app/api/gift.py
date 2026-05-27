@@ -72,7 +72,7 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
 
     # 1. Negative AC: 404 для cancelled або неіснуючих
     if not gift or gift.status == GiftStatus.CANCELLED:
-        raise HTTPException(status_code=404, detail="Подарунок не знайдено")
+        raise HTTPException(status_code=404, detail="Подарунок не значено")
 
     # 2. PROJ-58: ІЗОЛЯЦІЯ TARGET USER
     is_target_user = gift.target_user_id == str(current_user.id)
@@ -82,23 +82,16 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
     is_locked = now_utc < gift_unlock_date
 
     if is_target_user and is_locked:
-        raise HTTPException(status_code=403,
-                            detail="Сюрприз! Ви поки не можете бачити цю сторінку.")
+        raise HTTPException(status_code=403, detail="Сюрприз! Ви поки не можете бачити цю сторінку.")
 
-    # ==========================================
     # 3. БОЙОВА ЛОГІКА: Підрахунок грошей та донорів
-    # ==========================================
-    # Шукаємо всі транзакції, які належать до цього подарунка
     gift_transactions = await Transaction.find(Transaction.gift_id == str(gift.id)).to_list()
 
     collected_amount = Decimal("0.0")
-    donor_user_ids = set()  # Використовуємо set, щоб донори не повторювалися
+    donor_user_ids = set()
 
     for tx in gift_transactions:
-        # Додаємо суму (беремо модуль abs(), бо витрата з картки Монобанку приходить з мінусом)
         collected_amount += abs(tx.amount)
-
-        # Знаходимо ID юзера через його картку
         if tx.card_id:
             try:
                 card = await BankCard.get(PydanticObjectId(tx.card_id))
@@ -107,7 +100,6 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
             except Exception:
                 continue
 
-    # Формуємо красивий масив донорів для фронтенду
     donors_list = []
     for donor_id in donor_user_ids:
         try:
@@ -121,12 +113,23 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
         except Exception:
             continue
 
-    # 4. Повертаємо фінальний результат
+    # ==========================================
+    # КРИТИЧНО: Цей блок стоїть ЖОРСТКО НА ОДНОМУ РІВНІ з циклами for!
+    # Навіть якщо донорів немає, Python обов'язково виконає цей код.
+    # ==========================================
+    target_user = await User.get(PydanticObjectId(gift.target_user_id))
+    organizer = await User.get(PydanticObjectId(gift.organizer_id))
+
+    target_name = target_user.full_name or getattr(target_user, 'email', None) or "Без імені" if target_user else "Невідомий"
+    organizer_name = organizer.full_name or getattr(organizer, 'email', None) or "Без імені" if organizer else "Невідомий"
+
     return {
         "id": str(gift.id),
         "name": gift.name,
         "target_user_id": gift.target_user_id,
+        "target_user_name": target_name,
         "organizer_id": gift.organizer_id,
+        "organizer_name": organizer_name,
         "unlock_date": gift.unlock_date,
         "status": gift.status,
         "goal_amount": getattr(gift, 'goal_amount', 0),

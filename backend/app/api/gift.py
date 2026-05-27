@@ -1,10 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timezone
+from beanie import PydanticObjectId
+from decimal import Decimal
+
 from app.api.auth import get_current_user
 from app.models.user import User
 from app.models.group_membership import GroupMembership
+from app.models.transaction import Transaction
+from app.models.bank_card import BankCard
 from app.models.gift_event import GiftEvent, GiftStatus
 from app.schemas.gift import CreateGiftRequest, CreateGiftResponse
-from beanie import PydanticObjectId
+
 
 router = APIRouter(prefix="/api/v1/gift", tags=["Secret Gift"])
 
@@ -32,7 +38,7 @@ async def create_gift_event(
     if not organizer_membership:
         raise HTTPException(status_code=403, detail="You are not a member of this group.")
 
-    # 3. Перевірка, чи Target User є учасником групи (BE-02)
+    # 3. Перевірка, чи Target User є учасником групи
     target_membership = await GroupMembership.find_one({
         "user_id": target_oid,
         "group_id": group_oid
@@ -40,16 +46,90 @@ async def create_gift_event(
     if not target_membership:
         raise HTTPException(status_code=400, detail="The recipient is not a member of this group.")
 
-    # 4. Створення події (BE-01)
+    # 4. Створення події
     new_gift = GiftEvent(
         name=request.name,
         organizer_id=str(current_user.id),
         target_user_id=request.target_user_id,
         group_id=request.group_id,
+        goal_amount=request.goal_amount,
         unlock_date=request.unlock_date,
         status=GiftStatus.ACTIVE
     )
     await new_gift.insert()
 
-    # Повертаємо 201 Created (вказано в декораторі) + gift_id
     return CreateGiftResponse(status="success", gift_id=str(new_gift.id))
+
+
+@router.get("/{gift_id}/details", status_code=status.HTTP_200_OK)
+async def get_gift_details(gift_id: str, current_user: User = Depends(get_current_user)):
+    try:
+        gift_oid = PydanticObjectId(gift_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Невалідний формат ID")
+
+    gift = await GiftEvent.get(gift_oid)
+
+    # 1. Negative AC: 404 для cancelled або неіснуючих
+    if not gift or gift.status == GiftStatus.CANCELLED:
+        raise HTTPException(status_code=404, detail="Подарунок не знайдено")
+
+    # 2. PROJ-58: ІЗОЛЯЦІЯ TARGET USER
+    is_target_user = gift.target_user_id == str(current_user.id)
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    gift_unlock_date = gift.unlock_date.replace(tzinfo=None)
+
+    is_locked = now_utc < gift_unlock_date
+
+    if is_target_user and is_locked:
+        raise HTTPException(status_code=403,
+                            detail="Сюрприз! Ви поки не можете бачити цю сторінку.")
+
+    # ==========================================
+    # 3. БОЙОВА ЛОГІКА: Підрахунок грошей та донорів
+    # ==========================================
+    # Шукаємо всі транзакції, які належать до цього подарунка
+    gift_transactions = await Transaction.find(Transaction.gift_id == str(gift.id)).to_list()
+
+    collected_amount = Decimal("0.0")
+    donor_user_ids = set()  # Використовуємо set, щоб донори не повторювалися
+
+    for tx in gift_transactions:
+        # Додаємо суму (беремо модуль abs(), бо витрата з картки Монобанку приходить з мінусом)
+        collected_amount += abs(tx.amount)
+
+        # Знаходимо ID юзера через його картку
+        if tx.card_id:
+            try:
+                card = await BankCard.get(PydanticObjectId(tx.card_id))
+                if card and card.user_id:
+                    donor_user_ids.add(card.user_id)
+            except Exception:
+                continue
+
+    # Формуємо красивий масив донорів для фронтенду
+    donors_list = []
+    for donor_id in donor_user_ids:
+        try:
+            donor = await User.get(PydanticObjectId(donor_id))
+            if donor:
+                donors_list.append({
+                    "id": str(donor.id),
+                    "name": donor.full_name or getattr(donor, 'email', None) or "Без імені",
+                    "avatar": getattr(donor, 'avatar_url', None)
+                })
+        except Exception:
+            continue
+
+    # 4. Повертаємо фінальний результат
+    return {
+        "id": str(gift.id),
+        "name": gift.name,
+        "target_user_id": gift.target_user_id,
+        "organizer_id": gift.organizer_id,
+        "unlock_date": gift.unlock_date,
+        "status": gift.status,
+        "goal_amount": getattr(gift, 'goal_amount', 0),
+        "collected_amount": float(collected_amount),
+        "donors": donors_list
+    }

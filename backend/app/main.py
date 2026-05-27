@@ -5,6 +5,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.core.limiter import limiter
+import asyncio
 
 # Імпортуємо налаштування та обробники
 from app.middleware.logging import log_requests_middleware
@@ -21,6 +22,7 @@ from app.api.bank_card import bank_card_router
 from app.api.feed import router as feed_router
 from app.api.ws import router as ws_router
 from app.api.gift import router as gift_router
+from app.services.gift_service import GiftService
 
 # ==========================================
 # Менеджер життєвого циклу (Lifespan)
@@ -33,7 +35,12 @@ async def lifespan(app: FastAPI):
     print("База даних успішно підключена та моделі зареєстровані!")
     yield
     # (Тут код, який виконується при вимкненні сервера)
+    cron_task = asyncio.create_task(GiftService.reveal_gifts_cron())
+    print("Cron job для Secret Gift запущено!")
 
+    yield
+
+    cron_task.cancel()
 # ==========================================
 # Ініціалізація додатку
 # ==========================================
@@ -76,4 +83,4 @@ app.include_router(ws_router)
 
 app.include_router(gift_router)
 
-#
+

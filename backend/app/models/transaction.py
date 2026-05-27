@@ -19,6 +19,8 @@ class Transaction(Document):
     is_secret_gift: bool = Field(default=False, description="Чи є це секретним подарунком")
     target_user_id: Optional[str] = Field(default=None,
                                           description="ID того, кому призначений подарунок")
+    gift_id: Optional[str] = Field(default=None,
+                                   description="ID конкретної події Secret Gift")  # <--- ДОДАЙ ЦЕ
     mono_id: Optional[str] = None
     mcc: Optional[int] = None
 

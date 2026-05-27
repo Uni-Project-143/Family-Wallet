@@ -13,6 +13,7 @@ class GiftEvent(Document):
     organizer_id: str
     target_user_id: str
     group_id: str
+    goal_amount: float
     unlock_date: datetime
     status: GiftStatus = GiftStatus.ACTIVE
     secret_mode: bool = True

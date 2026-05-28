@@ -40,28 +40,28 @@ async def get_unified_feed(
         print(f"DEBUG: Шукаю user={current_user.id} в group={group_oid}")
         raise HTTPException(status_code=403, detail="Ви не є учасником цієї групи")
 
-        # 4. Фільтр Secret Gift (PROJ-58: Ізоляція Target User)
-        now = datetime.now(timezone.utc)
+    # 4. Фільтр Secret Gift (PROJ-58: Ізоляція Target User)
+    now = datetime.now(timezone.utc)
 
-        # Крок А: Шукаємо подарунки, де юзер є іменинником, але час ще НЕ настав
-        locked_gifts = await GiftEvent.find(
-            GiftEvent.target_user_id == str(current_user.id),
-            GiftEvent.unlock_date > now
-        ).to_list()
+    # Крок А: Шукаємо подарунки, де юзер є іменинником, але час ще НЕ настав
+    locked_gifts = await GiftEvent.find(
+        GiftEvent.target_user_id == str(current_user.id),
+        GiftEvent.unlock_date > now
+    ).to_list()
 
         # Витягуємо їхні ID у список
-        locked_gift_ids = [str(g.id) for g in locked_gifts]
+    locked_gift_ids = [str(g.id) for g in locked_gifts]
 
         # Крок Б: Формуємо запит.
-        query = {
-            "group_id": clean_group_id,
-            "$nor": [
-                # 1. Захист для старих транзакцій (без прив'язки до події)
-                {"is_secret_gift": True, "target_user_id": str(current_user.id), "gift_id": None},
-                # 2. Нове правило (BE-02): Приховуємо транзакції, якщо вони належать до заблокованих подій
-                {"gift_id": {"$in": locked_gift_ids}}
-            ]
-        }
+    query = {
+        "group_id": clean_group_id,
+         "$nor": [
+            # 1. Захист для старих транзакцій (без прив'язки до події)
+            {"is_secret_gift": True, "target_user_id": str(current_user.id), "gift_id": None},
+            # 2. Нове правило (BE-02): Приховуємо транзакції, якщо вони належать до заблокованих подій
+            {"gift_id": {"$in": locked_gift_ids}}
+        ]
+    }
 
     # 5. Отримання даних з пагінацією (BE-02)
     skip = (page - 1) * limit

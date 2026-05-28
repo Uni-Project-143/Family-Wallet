@@ -386,7 +386,7 @@
   const membersError = ref('')
 
   function mapMemberFromApi(apiMember) {
-    const fullName = apiMember.full_name || apiMember.email || 'User'
+    const fullName = apiMember.name || 'User'
     const initials = fullName
       .split(' ')
       .map((w) => w[0])
@@ -398,10 +398,11 @@
     const variantIdx = (initials.charCodeAt(0) || 0) % variants.length
 
     return {
-      id: apiMember.user_id || apiMember.id,
+      id: apiMember.id,
       name: fullName,
       initials,
       avatarVariant: variants[variantIdx],
+      avatar: apiMember.avatar || null,
     }
   }
 

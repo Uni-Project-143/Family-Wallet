@@ -513,8 +513,8 @@
     })
   }
 
-  function mapMemberFromApi(apiMember, currentUserEmail) {
-    const fullName = apiMember.full_name || apiMember.email || 'User'
+  function mapMemberFromApi(apiMember, currentUserId) {
+    const fullName = apiMember.name || 'User'
     const initials = fullName
       .split(' ')
       .map((w) => w[0])
@@ -526,14 +526,14 @@
     const variantIdx = (initials.charCodeAt(0) || 0) % variants.length
 
     return {
-      id: apiMember.user_id || apiMember.id,
+      id: apiMember.id,
       name: fullName,
       initials,
-      role: apiMember.role,
+      role: apiMember.role || 'MEMBER',
       avatarVariant: variants[variantIdx],
-      email: apiMember.email,
-      joinedAt: formatJoinedDate(apiMember.joined_at),
-      isCurrentUser: apiMember.email === storedUser.email,
+      email: apiMember.email || '—',
+      joinedAt: apiMember.joined_at ? formatJoinedDate(apiMember.joined_at) : '—',
+      isCurrentUser: apiMember.id === currentUserId,
     }
   }
 
@@ -545,7 +545,7 @@
     try {
       const data = await fetchGroupMembers(storedUser.groupId)
       const members = Array.isArray(data) ? data : data.members || []
-      groupMembers.value = members.map((m) => mapMemberFromApi(m, storedUser.email))
+      groupMembers.value = members.map((m) => mapMemberFromApi(m, currentUser.value?.id))
     } catch (err) {
       showToast('Failed to load group members', 'error')
     } finally {

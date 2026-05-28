@@ -66,12 +66,14 @@
         <div class="donors-section">
           <div class="donors-section__title">From your family</div>
           <div class="donors-list">
-            <div v-for="donor in gift.donors" :key="donor.user_id" class="donor-row">
-              <div class="avatar avatar--sm" :class="`avatar--${avatarVariant(donor.full_name)}`">
-                {{ getInitials(donor.full_name) }}
+            <div v-for="donor in gift.donors" :key="donor.id" class="donor-row">
+              <div class="avatar avatar--sm" :class="`avatar--${avatarVariant(donor.name)}`">
+                {{ getInitials(donor.name) }}
               </div>
-              <span class="donor-row__name">{{ donor.full_name }}</span>
-              <span class="donor-row__amount">{{ formatAmount(donor.amount) }} UAH</span>
+              <span class="donor-row__name">{{ donor.name }}</span>
+              <span v-if="donor.amount" class="donor-row__amount">
+                {{ formatAmount(donor.amount) }} UAH
+              </span>
             </div>
           </div>
         </div>
@@ -142,11 +144,11 @@
         <div v-if="gift.donors?.length" class="donors-section">
           <div class="donors-section__title">Contributors</div>
           <div class="donors-list">
-            <div v-for="donor in gift.donors" :key="donor.user_id" class="donor-row">
-              <div class="avatar avatar--sm" :class="`avatar--${avatarVariant(donor.full_name)}`">
-                {{ getInitials(donor.full_name) }}
+            <div v-for="donor in gift.donors" :key="donor.id" class="donor-row">
+              <div class="avatar avatar--sm" :class="`avatar--${avatarVariant(donor.name)}`">
+                {{ getInitials(donor.name) }}
               </div>
-              <span class="donor-row__name">{{ donor.full_name }}</span>
+              <span class="donor-row__name">{{ donor.name }}</span>
               <span class="donor-row__amount">{{ formatAmount(donor.amount) }} UAH</span>
             </div>
           </div>

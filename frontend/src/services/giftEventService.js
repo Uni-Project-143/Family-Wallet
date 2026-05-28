@@ -1,5 +1,7 @@
 import apiClient from './apiClient'
 
+//Service-шар з 4-ма API-функціями
+
 /**
  * POST /api/v1/gift/create — створює нову gift event (PROJ-55, PROJ-56).
  * @param {object} payload - { name, target_user_id, unlock_date (ISO UTC), goal_amount, group_id }
@@ -20,13 +22,26 @@ export async function fetchGiftEventDetails(giftId) {
 }
 
 /**
- * POST /api/v1/gift/{id}/invite — генерує invite link для запрошення донорів (PROJ-57).
- * @returns {Promise<{invite_url: string, token: string, expires_at?: string}>}
+ * POST /api/v1/gift/{id}/invite — генерує invite link (PROJ-57).
+ * TODO: backend endpoint not implemented yet. Returning placeholder URL
+ * built from gift_id. Replace with real apiClient.post call when ready.
  */
 export async function generateGiftInviteLink(giftId) {
-  const response = await apiClient.post(`/api/v1/gift/${giftId}/invite`)
-  return response.data
+  return {
+    invite_url: `https://family-wallet.com/gift/join/${giftId}`,
+    token: giftId,
+    expires_at: null,
+  }
 }
+
+// /**
+//  * POST /api/v1/gift/{id}/invite — генерує invite link для запрошення донорів (PROJ-57).
+//  * @returns {Promise<{invite_url: string, token: string, expires_at?: string}>}
+//  */
+// export async function generateGiftInviteLink(giftId) {
+//   const response = await apiClient.post(`/api/v1/gift/${giftId}/invite`)
+//   return response.data
+// }
 
 /**
  * GET /api/v1/gift/group/{group_id} — список gift events групи.

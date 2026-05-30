@@ -19,6 +19,12 @@ load_dotenv()
 MONGO_URL = os.getenv("MONGO_ATLAS")
 DB_NAME = os.getenv("DB_NAME", "FamilyWallet")
 
+if not MONGO_URL:
+    raise RuntimeError(
+        "MONGO_ATLAS env variable is not set. "
+        "Define connection string to MongoDB Atlas before starting the app."
+    )
+
 # ==========================================================
 # 🛠️ ХАК (Monkey Patch) ДЛЯ ВИРІШЕННЯ КОНФЛІКТУ BEANIE ТА MOTOR
 # Додаємо порожній метод, щоб Beanie не видавав TypeError

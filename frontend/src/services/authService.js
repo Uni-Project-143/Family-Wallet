@@ -1,26 +1,24 @@
 import apiClient from './apiClient'
+import { scheduleAfterJoin } from '../utils/cardReminder'
 
 /**
- * Реєстрація — POST /api/v1/auth/register
- * Swagger schema: { email, password, fullName }
- * confirmPassword НЕ відправляємо — перевіряється лише на фронті
- * @param {{ fullName, email, password }} payload
- * @returns {{ access_token, token_type }}
+ * Реєстрація.
+ * POST /api/v1/auth/register
  */
 export async function registerUser(payload) {
   const response = await apiClient.post('/api/v1/auth/register', {
     fullName: payload.fullName,
     email: payload.email,
     password: payload.password,
-    confirmPassword: payload.password, // ← додаю цей рядок
+    confirmPassword: payload.confirmPassword,
   })
   return response.data
 }
 
 /**
- * Авторизація — POST /api/v1/auth/login
- * @param {{ email, password }} credentials
- * @returns {{ access_token, token_type }}
+ * Логін.
+ * POST /api/v1/auth/login
+ * @returns {{ access_token: string, token_type: string }}
  */
 export async function loginUser(credentials) {
   const response = await apiClient.post('/api/v1/auth/login', {
@@ -31,31 +29,18 @@ export async function loginUser(credentials) {
 }
 
 /**
- * Створення групи — POST /api/v1/groups
- * Swagger schema: { name }
- * @param {{ name }} payload
- * @returns {{ group_id, name, message }}
- */
-export async function createGroup(payload) {
-  const response = await apiClient.post('/api/v1/group', {
-    name: payload.name,
-  })
-  return response.data
-}
-
-/**
- * Мої групи — GET /api/v1/groups
- * @returns {{ groups: [] }}
+ * Список груп поточного юзера.
+ * GET /api/v1/group/me
+ * @returns {Promise<Array<{id: string, name: string, role: 'ADMIN'|'MEMBER'}>>}
  */
 export async function fetchMyGroups() {
-  const response = await apiClient.get('/api/v1/group')
+  const response = await apiClient.get('/api/v1/group/me')
   return response.data
 }
 
 /**
- * Invite link — GET /api/v1/groups/{id}/invite
- * @param {string} groupId
- * @returns {{ invite_link, token, expires_at }}
+ * Generate / get active invite link.
+ * GET /api/v1/group/{groupId}/invite
  */
 export async function fetchGroupInviteLink(groupId) {
   const response = await apiClient.get(`/api/v1/group/${groupId}/invite`)
@@ -63,9 +48,8 @@ export async function fetchGroupInviteLink(groupId) {
 }
 
 /**
- * Перегенерація invite link — POST /api/v1/group/{group_id}/invite/regenerate
- * @param {string} groupId
- * @returns {{ invite_link, token, expires_at }}
+ * Regenerate invite link (old links invalidated).
+ * POST /api/v1/group/{groupId}/invite/regenerate
  */
 export async function regenerateGroupInviteLink(groupId) {
   const response = await apiClient.post(`/api/v1/group/${groupId}/invite/regenerate`)
@@ -73,14 +57,24 @@ export async function regenerateGroupInviteLink(groupId) {
 }
 
 /**
- * Приєднання до групи — POST /api/v1/group/join
- * @param {{ invite_link }} payload
- * @returns {{ message }}
+ * Створити групу.
+ * POST /api/v1/group/
  */
-export async function joinGroup(payload) {
-  const response = await apiClient.post(`/api/v1/group/join`, {
-    invite_link: payload.inviteLink,
+export async function createGroup(name) {
+  const response = await apiClient.post('/api/v1/group/', { name })
+  scheduleAfterJoin()
+  return response.data
+}
+
+/**
+ * Приєднатись до групи за invite-лінком.
+ * POST /api/v1/group/join
+ */
+export async function joinGroup(inviteLink) {
+  const response = await apiClient.post('/api/v1/group/join', {
+    invite_link: inviteLink, // ← snake_case, як чекає бек
   })
+  scheduleAfterJoin()
   return response.data
 }
 /**
@@ -92,5 +86,38 @@ export async function requestPasswordReset(payload) {
   const response = await apiClient.post('/api/v1/auth/forgot-password', {
     email: payload.email,
   })
+  return response.data
+}
+// /**
+//  * Список учасників групи.
+//  * GET /api/v1/group/{group_id}/members
+//  */
+// export async function fetchGroupMembers(groupId) {
+//   const response = await apiClient.get(`/api/v1/group/${groupId}/members`)
+//   return response.data
+// }
+export async function fetchGroupMembers(groupId) {
+  try {
+    const response = await apiClient.get(`/api/v1/group/${groupId}/members`)
+    return response.data
+  } catch (err) {
+    if (err.response?.status === 404) {
+      // endpoint поки не реалізований — повертаємо порожній масив
+      return []
+    }
+    throw err
+  }
+}
+/**
+ * Logout — додає поточний JWT токен у чорний список на беку.
+ * POST /api/v1/auth/logout
+ *
+ * Бекенд читає токен з заголовку Authorization (apiClient додає автоматично),
+ * додає його у колекцію blacklisted_tokens — після цього токен стає невалідним.
+ *
+ * @returns {Promise<{ message: string }>}
+ */
+export async function logoutUser() {
+  const response = await apiClient.post('/api/v1/auth/logout')
   return response.data
 }

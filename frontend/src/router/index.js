@@ -79,7 +79,13 @@ const routes = [
   {
     path: '/gift-events',
     name: 'GiftEvents',
-    component: () => import('../views/FeedView.vue'), // тимчасово — поки немає своєї сторінки
+    component: () => import('../views/GiftEventsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/select-group',
+    name: 'SelectGroup',
+    component: () => import('../views/SelectGroupView.vue'),
     meta: { requiresAuth: true },
   },
 ]

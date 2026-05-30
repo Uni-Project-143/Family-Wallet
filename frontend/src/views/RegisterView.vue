@@ -79,7 +79,20 @@
           </label>
           <p v-if="fieldErrors.gdpr" class="field-error">{{ fieldErrors.gdpr }}</p>
         </div>
-
+        <Transition name="fade-down">
+          <div v-if="isFormBlocked" class="auth-form__rate-limit" role="alert">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5" />
+              <path
+                d="M8 4.5V8L10.5 10"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+            </svg>
+            {{ blockMessage }}
+          </div>
+        </Transition>
         <!-- Серверна помилка (наприклад, 409 Conflict) -->
         <Transition name="fade-down">
           <div v-if="authError" class="auth-form__server-error" role="alert">
@@ -129,11 +142,57 @@
 </template>
 
 <script setup>
+  // import BaseInput from '../components/BaseInput.vue'
+  // import { useAuth } from '../composables/useAuth'
+  // import { ref, computed, watch } from 'vue'
+
+  // const { register, isLoading, authError } = useAuth()
+
   import BaseInput from '../components/BaseInput.vue'
   import { useAuth } from '../composables/useAuth'
-  import { ref, computed, watch } from 'vue'
+  import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+  import { recordFailedAttempt, isBlocked, getRemainingBlockMs } from '../utils/authRateLimit'
 
   const { register, isLoading, authError } = useAuth()
+
+  // ─── Rate limit (global for register process) ───
+  const BLOCK_KEY = 'register'
+  const isFormBlocked = ref(false)
+  const remainingMs = ref(0)
+  let countdownInterval = null
+
+  function refreshBlockStatus() {
+    isFormBlocked.value = isBlocked(BLOCK_KEY)
+    remainingMs.value = getRemainingBlockMs(BLOCK_KEY)
+  }
+
+  const blockMessage = computed(() => {
+    if (!isFormBlocked.value) return ''
+    const m = Math.floor(remainingMs.value / 60000)
+    const s = Math.floor((remainingMs.value % 60000) / 1000)
+    return `Too many failed registration attempts. Try again in ${m}:${String(s).padStart(2, '0')}.`
+  })
+
+  onMounted(refreshBlockStatus)
+
+  watch(isFormBlocked, (blocked) => {
+    if (blocked && !countdownInterval) {
+      countdownInterval = setInterval(() => {
+        refreshBlockStatus()
+        if (!isFormBlocked.value && countdownInterval) {
+          clearInterval(countdownInterval)
+          countdownInterval = null
+        }
+      }, 1000)
+    } else if (!blocked && countdownInterval) {
+      clearInterval(countdownInterval)
+      countdownInterval = null
+    }
+  })
+
+  onUnmounted(() => {
+    if (countdownInterval) clearInterval(countdownInterval)
+  })
 
   // Поля форми — зберігаються навіть при навігації (FE збереження стану через composable)
   const fullName = ref('')
@@ -264,7 +323,8 @@
       password.value.length >= 8 &&
       /[A-Z]/.test(password.value) &&
       confirmPassword.value === password.value &&
-      hasGdprConsent.value
+      hasGdprConsent.value &&
+      !isFormBlocked.value
     )
   })
   /**
@@ -277,7 +337,14 @@
       fullName: fullName.value.trim(),
       email: email.value.trim().toLowerCase(),
       password: password.value,
+      confirmPassword: confirmPassword.value,
     })
+
+    // Бек повернув помилку (409, 422 тощо) — фіксуємо невдалу спробу
+    if (authError.value) {
+      recordFailedAttempt(BLOCK_KEY)
+      refreshBlockStatus()
+    }
   }
 </script>
 
@@ -488,5 +555,17 @@
   .fade-down-leave-to {
     opacity: 0;
     transform: translateY(-4px);
+  }
+
+  .auth-form__rate-limit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    background: #fef5e8;
+    border: 1px solid #e8b56e;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #b97f1a;
   }
 </style>

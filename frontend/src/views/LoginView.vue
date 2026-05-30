@@ -13,24 +13,31 @@
           v-model="email"
           label="EMAIL ADDRESS"
           type="email"
-          autocomplete="new-password"
-          placeholder="olena@example.com"
-          :error-message="fieldErrors.email"
-          @blur="validateEmailField"
-          @input="onEmailInput"
+          autocomplete="email"
+          placeholder=""
         />
 
         <BaseInput
           v-model="password"
           label="PASSWORD"
           type="password"
-          autocomplete="new-password"
-          placeholder="At least 8 characters, 1 uppercase letter"
-          :error-message="fieldErrors.password"
-          @blur="validatePasswordField"
-          @input="onPasswordInput"
+          autocomplete="current-password"
+          placeholder=""
         />
-
+        <Transition name="fade-down">
+          <div v-if="isFormBlocked" class="auth-form__rate-limit" role="alert">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5" />
+              <path
+                d="M8 4.5V8L10.5 10"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+            </svg>
+            {{ blockMessage }}
+          </div>
+        </Transition>
         <!-- Серверна помилка: єдине повідомлення без підказки яке поле (Negative AC) -->
         <Transition name="fade-down">
           <div v-if="authError" class="auth-form__server-error" role="alert">
@@ -75,88 +82,88 @@
 </template>
 
 <script setup>
-  import { ref, computed } from 'vue'
+  // import { ref, computed } from 'vue'
+  // import BaseInput from '../components/BaseInput.vue'
+  // import { useAuth } from '../composables/useAuth'
+
+  // const { login, isLoading, authError } = useAuth()
+
+  // const email = ref('')
+  // const password = ref('')
+
+  import { ref, computed, watch, onUnmounted } from 'vue'
   import BaseInput from '../components/BaseInput.vue'
   import { useAuth } from '../composables/useAuth'
-
-  const emailTouched = ref(false)
-  const passwordTouched = ref(false)
+  import { recordFailedAttempt, isBlocked, getRemainingBlockMs } from '../utils/authRateLimit'
 
   const { login, isLoading, authError } = useAuth()
 
   const email = ref('')
   const password = ref('')
 
-  const fieldErrors = ref({
-    email: '',
-    password: '',
+  // ─── Rate limit (per email) ───
+  const blockKey = computed(() => `login:${email.value.trim().toLowerCase()}`)
+  const isFormBlocked = ref(false)
+  const remainingMs = ref(0)
+  let countdownInterval = null
+
+  function refreshBlockStatus() {
+    isFormBlocked.value = isBlocked(blockKey.value)
+    remainingMs.value = getRemainingBlockMs(blockKey.value)
+  }
+
+  const blockMessage = computed(() => {
+    if (!isFormBlocked.value) return ''
+    const m = Math.floor(remainingMs.value / 60000)
+    const s = Math.floor((remainingMs.value % 60000) / 1000)
+    return `Too many failed attempts. Try again in ${m}:${String(s).padStart(2, '0')}.`
   })
 
-  const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
+  // Перевіряємо блок щоразу коли email змінюється (інший key)
+  watch(blockKey, refreshBlockStatus, { immediate: true })
+
+  // Запускаємо таймер countdown коли форма заблокована
+  watch(isFormBlocked, (blocked) => {
+    if (blocked && !countdownInterval) {
+      countdownInterval = setInterval(() => {
+        refreshBlockStatus()
+        if (!isFormBlocked.value && countdownInterval) {
+          clearInterval(countdownInterval)
+          countdownInterval = null
+        }
+      }, 1000)
+    } else if (!blocked && countdownInterval) {
+      clearInterval(countdownInterval)
+      countdownInterval = null
+    }
+  })
+
+  onUnmounted(() => {
+    if (countdownInterval) clearInterval(countdownInterval)
+  })
 
   /**
-   * Валідація поля email.
-   * @returns {boolean}
+   * Кнопка активна якщо обидва поля непорожні.
+   * Формат email і складність пароля НЕ перевіряємо на логіні —
+   * це підказки зловмиснику. Бек поверне 401 → один загальний message.
    */
-  function validateEmailField() {
-    emailTouched.value = true
-    fieldErrors.value.email = ''
-    if (!email.value.trim()) {
-      fieldErrors.value.email = 'Email is required'
-      return false
-    }
-    if (!EMAIL_REGEX.test(email.value)) {
-      fieldErrors.value.email = 'Enter a valid Gmail address (@gmail.com)'
-      return false
-    }
-    return true
-  }
-
-  /**
-   * Валідація поля password.
-   * @returns {boolean}
-   */
-  function validatePasswordField() {
-    passwordTouched.value = true
-    fieldErrors.value.password = ''
-    if (!password.value) {
-      fieldErrors.value.password = 'Password is required'
-      return false
-    }
-    if (password.value.length < 8) {
-      fieldErrors.value.password = 'Password must contain at least 8 characters'
-      return false
-    }
-    if (!/[A-Z]/.test(password.value)) {
-      fieldErrors.value.password = 'Password must contain at least one uppercase letter'
-      return false
-    }
-    return true
-  }
-  function onEmailInput() {
-    if (emailTouched.value) validateEmailField()
-  }
-
-  function onPasswordInput() {
-    if (passwordTouched.value) validatePasswordField()
-  }
-
   const canSubmit = computed(() => {
-    return email.value.trim().length > 0 && password.value.length > 0
+    return email.value.trim().length > 0 && password.value.length > 0 && !isFormBlocked.value
   })
 
-  /**
-   * Обробка відправки форми логіну.
-   */
   async function handleSubmit() {
-    const isEmailValid = validateEmailField()
-    const isPasswordValid = validatePasswordField()
-    if (!isEmailValid || !isPasswordValid) return
+    if (!canSubmit.value) return
 
     await login({
       email: email.value.trim().toLowerCase(),
       password: password.value,
     })
+
+    // Бек повернув помилку — фіксуємо невдалу спробу
+    if (authError.value) {
+      recordFailedAttempt(blockKey.value)
+      refreshBlockStatus()
+    }
   }
 </script>
 
@@ -314,5 +321,17 @@
   .fade-down-leave-to {
     opacity: 0;
     transform: translateY(-4px);
+  }
+
+  .auth-form__rate-limit {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    background: #fef5e8;
+    border: 1px solid #e8b56e;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #b97f1a;
   }
 </style>

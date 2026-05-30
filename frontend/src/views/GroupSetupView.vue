@@ -132,10 +132,11 @@
   import { ref, computed } from 'vue'
   import { useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
-  import { createGroup, joinGroup } from '../services/authService'
+  import { createGroup, joinGroup, fetchMyGroups } from '../services/authService'
 
   const router = useRouter()
-  const { currentUser } = useAuth()
+  const { currentUser, setActiveGroup } = useAuth()
+  // const { currentUser } = useAuth()
 
   const currentUserName = computed(() => currentUser.value?.fullName || 'User')
 
@@ -208,19 +209,27 @@
 
     try {
       if (selectedMode.value === 'create') {
-        const data = await createGroup({ name: fieldValue.value.trim() })
+        const result = await createGroup(fieldValue.value)
 
-        const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-        storedUser.role = 'ADMIN'
-        storedUser.groupId = data.group_id
-        storedUser.groupName = fieldValue.value.trim()
-        localStorage.setItem('currentUser', JSON.stringify(storedUser))
+        // Використовуємо setActiveGroup замість прямого запису в localStorage —
+        // він синхронно оновлює і localStorage, і currentUser.value у всіх Views
+        setActiveGroup({
+          id: result.group_id,
+          name: fieldValue.value.trim(),
+          role: 'ADMIN',
+        })
       } else {
-        await joinGroup({ inviteLink: fieldValue.value.trim() })
+        await joinGroup(fieldValue.value)
 
+        // Тягнемо реальну назву щойно приєднаної групи з беку
+        const groups = await fetchMyGroups()
         const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-        storedUser.role = 'MEMBER'
-        localStorage.setItem('currentUser', JSON.stringify(storedUser))
+        const joinedGroup =
+          groups.find((g) => g.id !== storedUser.groupId) || groups[groups.length - 1]
+
+        if (joinedGroup) {
+          setActiveGroup(joinedGroup) // role='MEMBER' прийде з беку у groupResponse
+        }
       }
 
       router.push('/feed')
@@ -228,26 +237,25 @@
       const status = err.response?.status
       const message = err.response?.data?.message
 
-      // Вже є учасником — отримуємо роль і йдемо на feed
-      if (status === 400 && message === 'Ви вже є учасником цієї групи') {
+      if (status === 400 && message === 'You are already a member of this group') {
+        // Якщо юзер уже учасник — теж оновлюємо стан і йдемо на feed
+        const groups = await fetchMyGroups()
         const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-        storedUser.role = 'MEMBER'
-        localStorage.setItem('currentUser', JSON.stringify(storedUser))
+        const existingGroup = groups.find((g) => g.id !== storedUser.groupId) || groups[0]
+        if (existingGroup) setActiveGroup(existingGroup)
         router.push('/feed')
         return
       }
 
-      if (status === 409) {
-        serverError.value = 'A group with this name already exists'
-      } else if (status === 410) {
+      if (status === 409) serverError.value = 'A group with this name already exists'
+      else if (status === 410)
         serverError.value = 'This invite link has expired. Ask Admin to generate a new one.'
-      } else if (status === 400) {
-        serverError.value = message || 'Invalid invite link'
-      } else if (status === 404) {
+      else if (status === 400) serverError.value = message || 'Invalid invite link'
+      else if (status === 404)
         serverError.value = 'Invite link not found. Check the link and try again.'
-      } else {
-        serverError.value = message || 'Something went wrong. Please try again.'
-      }
+      else serverError.value = message || 'Something went wrong. Please try again.'
+    } finally {
+      isLoading.value = false
     }
   }
 </script>

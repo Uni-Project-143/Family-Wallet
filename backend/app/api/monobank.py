@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, Depends, status, HTTPException, Request
 from app.services.monobank_service import MonobankService
 from datetime import datetime
@@ -42,9 +44,14 @@ async def connect_monobank_card(
         raise HTTPException(status_code=409,
                             detail="This account is already connected to the system.")
 
-    # 2. Реєструємо Webhook у Монобанку
-
-    webhook_url = "https://overblown-whoopee-labored.ngrok-free.dev/api/v1/monobank/webhook"
+    # 2. Реєструємо Webhook у Монобанку.
+    # URL береться з env MONOBANK_WEBHOOK_URL (для прода — публічний https-домен бекенду).
+    webhook_url = os.getenv("MONOBANK_WEBHOOK_URL")
+    if not webhook_url:
+        raise HTTPException(
+            status_code=500,
+            detail="MONOBANK_WEBHOOK_URL is not configured on the server."
+        )
 
     async with httpx.AsyncClient() as client:
         wh_response = await client.post(

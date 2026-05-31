@@ -16,6 +16,7 @@ ENV/
 # Frontend production env містить ЛИШЕ публічні URL (без секретів) —
 # дозволяємо комітити, щоб Cloudflare Pages підхопив значення при білді.
 !.env.production
+firebase-adminsdk.json
 
 # Python байт-код
 __pycache__/

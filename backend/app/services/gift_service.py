@@ -13,7 +13,8 @@ class GiftService:
         try:
             while True:
                 try:
-                    now = datetime.now(timezone.utc)
+                    # 1. Робимо поточний час "наївним", відрізаючи таймзону
+                    now = datetime.now(timezone.utc).replace(tzinfo=None)
 
                     # Шукаємо всі активні подарунки
                     active_gifts = await GiftEvent.find(
@@ -23,8 +24,11 @@ class GiftService:
                     for gift in active_gifts:
                         gift_id_str = str(gift.id)
 
+                        # 2. Робимо час з бази також "наївним" перед будь-якими порівняннями
+                        unlock_date_naive = gift.unlock_date.replace(tzinfo=None)
+
                         # 1. РОЗКРИТТЯ ПОДАРУНКА (PROJ-64 BE-01)
-                        if gift.unlock_date <= now:
+                        if unlock_date_naive <= now:
                             gift.status = GiftStatus.REVEALED
                             await gift.save()
                             print(f"[CRON] Подарунок {gift.name} успішно розкрито!")
@@ -39,9 +43,8 @@ class GiftService:
                             continue  # Ідемо до наступного подарунка
 
                         # 2. НАГАДУВАННЯ ЗА 24 ГОДИНИ (BE-01)
-                        time_until_unlock = gift.unlock_date - now
-                        if timedelta(hours=23, minutes=58) <= time_until_unlock <= timedelta(
-                            hours=24, minutes=2):
+                        time_until_unlock = unlock_date_naive - now
+                        if timedelta(hours=23, minutes=58) <= time_until_unlock <= timedelta(hours=24, minutes=2):
                             await GiftService._notify_group_except_target(
                                 gift, "REMINDER_24H", f"{gift_id_str}_remind_24h"
                             )
@@ -49,7 +52,7 @@ class GiftService:
                         # 3. НАГАДУВАННЯ В ДЕНЬ РОЗКРИТТЯ (BE-02)
                         # Якщо до розкриття менше 10 годин і це той самий день
                         if timedelta(hours=0) < time_until_unlock <= timedelta(hours=10):
-                            if now.date() == gift.unlock_date.date():
+                            if now.date() == unlock_date_naive.date():
                                 await GiftService._notify_group_except_target(
                                     gift, "REMINDER_DAY_OF", f"{gift_id_str}_remind_day_of"
                                 )

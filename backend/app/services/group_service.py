@@ -186,6 +186,9 @@ class GroupService:
                 users_data.append({
                     "id": str(user.id),
                     "name": display_name,
+                    "email": getattr(user, 'email', None),
+                    "role": getattr(m, 'role', "MEMBER"),
+                    "joined_at": getattr(m, 'created_at', None),
                     "avatar": getattr(user, 'avatar_url', None)
                 })
 

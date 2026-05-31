@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from datetime import datetime, timezone
 from beanie import PydanticObjectId
 from decimal import Decimal
+from pydantic import BaseModel
 
 from app.api.auth import get_current_user
 from app.models.user import User
@@ -235,3 +236,69 @@ async def get_group_gifts(group_id: str, current_user: User = Depends(get_curren
         })
 
     return response_data
+
+
+class ContributeRequest(BaseModel):
+    amount: float
+    card_id: str
+
+
+@router.post("/{gift_id}/contribute", status_code=status.HTTP_200_OK)
+async def contribute_to_gift(
+    gift_id: str,
+    request: ContributeRequest,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        gift_oid = PydanticObjectId(gift_id)
+        card_oid = PydanticObjectId(request.card_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Невалідний формат ID")
+
+    gift = await GiftEvent.get(gift_oid)
+    if not gift:
+        raise HTTPException(status_code=404, detail="Подарунок не знайдено")
+
+    # Валідація з контракту
+    if gift.status != GiftStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="Збір вже закрито")
+
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    if now_utc >= gift.unlock_date.replace(tzinfo=None):
+        raise HTTPException(status_code=400, detail="Час збору вже минув")
+
+    if str(current_user.id) == gift.target_user_id:
+        raise HTTPException(status_code=400, detail="Ви не можете донатити на свій же сюрприз")
+
+    if request.amount <= 0 or request.amount > 100000:
+        raise HTTPException(status_code=400, detail="Невалідна сума внеску")
+
+    membership = await GroupMembership.find_one({
+        "user_id": PydanticObjectId(str(current_user.id)),
+        "group_id": PydanticObjectId(gift.group_id)
+    })
+    if not membership:
+        raise HTTPException(status_code=403, detail="Ви не у цій групі")
+
+    card = await BankCard.get(card_oid)
+    if not card or card.user_id != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Картка вам не належить")
+
+    # Створюємо транзакцію (amount з мінусом, бо це витрата)
+    tx = Transaction(
+        card_id=request.card_id,
+        amount=Decimal(str(-request.amount)),
+        group_id=gift.group_id,
+        category_id="gift_contribution",  # або інша дефолтна категорія
+        description=f"Внесок до Secret Gift: {gift.name}",
+        is_secret_gift=True,
+        target_user_id=gift.target_user_id,
+        gift_id=str(gift.id)
+    )
+    await tx.insert()
+
+    # Рахуємо нову суму для респонсу
+    gift_txs = await Transaction.find(Transaction.gift_id == str(gift.id)).to_list()
+    new_collected = sum(abs(t.amount) for t in gift_txs)
+
+    return {"success": True, "new_collected_amount": float(new_collected)}

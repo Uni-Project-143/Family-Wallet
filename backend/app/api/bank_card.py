@@ -1,3 +1,4 @@
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from beanie import PydanticObjectId
@@ -5,6 +6,7 @@ from app.api.auth import get_current_user
 from app.models.user import User
 from app.models.bank_card import BankCard
 from app.models.group_membership import GroupMembership
+from app.repositories.bank_card_repository import BankCardRepository
 from app.schemas.bank_card import BankCardResponse
 
 bank_card_router = APIRouter(prefix="/api/v1/bank-cards", tags=["Bank Cards"])
@@ -38,6 +40,10 @@ async def get_cards_by_group(
     # 2. Отримання ВСІХ карток групи
     cards = await BankCard.find({"group_id": group_id}).to_list()
 
+    # 2.1 Підрахунок дельти віртуальних транзакцій для effective_balance (UC-2)
+    card_ids = [str(c.id) for c in cards]
+    deltas = await BankCardRepository.get_virtual_deltas_by_card_ids(card_ids)
+
     # 3. Мапінг даних у безпечну схему із завантаженням імені власника (JOIN)
     response_cards = []
     for card in cards:
@@ -49,6 +55,9 @@ async def get_cards_by_group(
             except Exception:
                 pass
 
+        delta = deltas.get(str(card.id), Decimal("0"))
+        effective_balance = card.balance + delta
+
         # Формуємо відповідь, додаючи ім'я для фронтенду
         response_cards.append(
             BankCardResponse(
@@ -58,6 +67,7 @@ async def get_cards_by_group(
                 account_id=card.account_id,
                 masked_pan=card.masked_pan,
                 balance=card.balance,
+                effective_balance=effective_balance,
                 status=card.status,
                 transaction_ids=[str(tid) for tid in card.transaction_ids],
                 owner_full_name=owner.full_name if owner else "Невідомий власник"  # <--- НАША ЗМІНА

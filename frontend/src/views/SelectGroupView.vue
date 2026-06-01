@@ -281,4 +281,35 @@
   .link-cta:hover {
     color: #9b7a25;
   }
+
+  @media (max-width: 560px) {
+    .auth-card,
+    .login-card,
+    .register-card,
+    .select-group-card {
+      max-width: 100%;
+      width: calc(100% - 32px);
+      padding: 28px 22px;
+    }
+    .auth-title,
+    .form-title {
+      font-size: 24px;
+    }
+    /* Стандартні input fields fall back на 100% width */
+    .i-field {
+      font-size: 16px; /* 16px+ не зум-ом на iOS */
+    }
+  }
+
+  @media (max-width: 480px) {
+    .group-option {
+      padding: 14px 16px;
+      gap: 12px;
+    }
+    .group-option__avatar {
+      width: 44px;
+      height: 44px;
+      font-size: 18px;
+    }
+  }
 </style>

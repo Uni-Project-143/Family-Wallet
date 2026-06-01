@@ -88,6 +88,12 @@ const routes = [
     component: () => import('../views/SelectGroupView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/gift-events/:id',
+    name: 'GiftEventDetails',
+    component: () => import('../views/GiftEventDetailsView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

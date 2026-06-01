@@ -299,4 +299,36 @@
     opacity: 0;
     transform: scale(0.96) translateY(8px);
   }
+
+  @media (max-width: 560px) {
+    .modal-overlay {
+      padding: 0;
+      align-items: flex-end;
+    }
+    .modal-card {
+      max-width: 100%;
+      width: 100%;
+      border-radius: 20px 20px 0 0;
+      padding: 24px 20px 28px;
+      max-height: 92vh;
+      overflow-y: auto;
+      border-top: 3px solid #b8973a;
+    }
+    .modal-title {
+      font-size: 20px;
+    }
+    .modal-close {
+      top: 10px;
+      right: 12px;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .details-row {
+      padding: 10px 12px;
+    }
+    .details-row__value--accent {
+      font-size: 18px;
+    }
+  }
 </style>

@@ -62,7 +62,7 @@
               </thead>
               <tbody>
                 <tr v-for="member in groupMembers" :key="member.id">
-                  <td>
+                  <td data-label="Member">
                     <div class="member-cell">
                       <div class="avatar avatar--sm" :class="`avatar--${member.avatarVariant}`">
                         {{ member.initials }}
@@ -70,8 +70,8 @@
                       <span class="member-cell__name">{{ member.name }}</span>
                     </div>
                   </td>
-                  <td class="td-email">{{ member.email }}</td>
-                  <td>
+                  <td data-label="Email" class="td-email">{{ member.email }}</td>
+                  <td data-label="Role">
                     <span
                       class="badge"
                       :class="member.role === 'ADMIN' ? 'badge--admin' : 'badge--member'"
@@ -79,8 +79,8 @@
                       {{ member.role }}
                     </span>
                   </td>
-                  <td class="td-date">{{ member.joinedAt }}</td>
-                  <td>
+                  <td data-label="Joined" class="td-date">{{ member.joinedAt }}</td>
+                  <td data-label="Actions">
                     <!-- Admin не може сам себе видалити -->
                     <button
                       v-if="isAdmin && !member.isCurrentUser"
@@ -513,8 +513,8 @@
     })
   }
 
-  function mapMemberFromApi(apiMember, currentUserEmail) {
-    const fullName = apiMember.full_name || apiMember.email || 'User'
+  function mapMemberFromApi(apiMember, currentUserId) {
+    const fullName = apiMember.name || 'User'
     const initials = fullName
       .split(' ')
       .map((w) => w[0])
@@ -526,14 +526,14 @@
     const variantIdx = (initials.charCodeAt(0) || 0) % variants.length
 
     return {
-      id: apiMember.user_id || apiMember.id,
+      id: apiMember.id,
       name: fullName,
       initials,
-      role: apiMember.role,
+      role: apiMember.role || 'MEMBER',
       avatarVariant: variants[variantIdx],
-      email: apiMember.email,
-      joinedAt: formatJoinedDate(apiMember.joined_at),
-      isCurrentUser: apiMember.email === storedUser.email,
+      email: apiMember.email || '—',
+      joinedAt: apiMember.joined_at ? formatJoinedDate(apiMember.joined_at) : '—',
+      isCurrentUser: apiMember.id === currentUserId,
     }
   }
 
@@ -545,7 +545,7 @@
     try {
       const data = await fetchGroupMembers(storedUser.groupId)
       const members = Array.isArray(data) ? data : data.members || []
-      groupMembers.value = members.map((m) => mapMemberFromApi(m, storedUser.email))
+      groupMembers.value = members.map((m) => mapMemberFromApi(m, currentUser.value?.id))
     } catch (err) {
       showToast('Failed to load group members', 'error')
     } finally {
@@ -1623,6 +1623,170 @@
     }
     100% {
       background-position: -200% 0;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .navbar {
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      height: auto;
+      padding: 10px 14px;
+      gap: 8px 10px;
+    }
+    .navbar__left {
+      grid-row: 1;
+      grid-column: 1;
+    }
+    .navbar__right {
+      grid-row: 1;
+      grid-column: 2;
+      gap: 6px;
+    }
+    .navbar__center {
+      grid-row: 2;
+      grid-column: 1 / -1;
+      justify-self: center;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .navbar__center::-webkit-scrollbar {
+      display: none;
+    }
+    .navbar__logo {
+      font-size: 15px;
+    }
+    .navbar__tab {
+      padding: 6px 14px;
+      font-size: 12px;
+    }
+    .navbar__user-name {
+      display: none;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .navbar {
+      padding: 8px 12px;
+    }
+    .navbar__tab {
+      padding: 5px 12px;
+      font-size: 11px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .settings-layout {
+      flex-direction: column;
+      height: auto;
+    }
+    .settings-nav {
+      width: 100%;
+      display: flex;
+      overflow-x: auto;
+      padding: 8px 12px;
+      border-right: none;
+      border-bottom: 1px solid #eae8e4;
+      -webkit-overflow-scrolling: touch;
+      flex-shrink: 0;
+    }
+    .settings-nav::-webkit-scrollbar {
+      display: none;
+    }
+    .settings-nav__item {
+      flex-shrink: 0;
+      border-left: none;
+      border-bottom: 3px solid transparent;
+      padding: 10px 16px;
+      white-space: nowrap;
+      width: auto;
+    }
+    .settings-nav__item--active {
+      border-left-color: transparent;
+      border-bottom-color: #b8973a;
+    }
+    .settings-main {
+      padding: 24px 16px;
+    }
+
+    /* Members table — стає cards-stack */
+    .members-table-wrap {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+    }
+    .members-table thead {
+      display: none;
+    }
+    .members-table,
+    .members-table tbody,
+    .members-table tr,
+    .members-table td {
+      display: block;
+      width: 100%;
+    }
+    .members-table tr {
+      background: #ffffff;
+      border: 1px solid #eae8e4;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      padding: 12px;
+    }
+    .members-table td {
+      padding: 6px 0;
+      border-bottom: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .members-table td::before {
+      content: attr(data-label);
+      font-size: 10px;
+      font-weight: 700;
+      color: #b0ada7;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
+    /* Invite section */
+    .invite-section {
+      padding: 20px 16px;
+    }
+    .invite-link-box {
+      flex-direction: column;
+    }
+    .invite-link-box__url {
+      border-right: none;
+      border-bottom: 1px solid #f2e9c8;
+      font-size: 11px;
+      padding: 10px 12px;
+    }
+    .btn-copy {
+      width: 100%;
+      padding: 12px;
+      justify-content: center;
+    }
+    .invite-direct__row {
+      flex-direction: column;
+    }
+
+    /* Cards list */
+    .card-item {
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .card-item__actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .settings-section__title {
+      font-size: 20px;
+    }
+    .settings-main {
+      padding: 20px 12px;
     }
   }
 </style>

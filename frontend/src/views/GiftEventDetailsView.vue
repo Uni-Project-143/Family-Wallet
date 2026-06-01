@@ -149,7 +149,10 @@
                 {{ getInitials(donor.name) }}
               </div>
               <span class="donor-row__name">{{ donor.name }}</span>
-              <span class="donor-row__amount">{{ formatAmount(donor.amount) }} UAH</span>
+              <!-- Backend наразі не повертає суму по кожному донору -->
+              <span v-if="donor.amount" class="donor-row__amount">
+                {{ formatAmount(donor.amount) }} UAH
+              </span>
             </div>
           </div>
         </div>
@@ -172,10 +175,12 @@
   import { useRoute, useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
   import { fetchGiftEventDetails, generateGiftInviteLink } from '../services/giftEventService'
+  import { useGiftEvents } from '../composables/useGiftEvents'
 
   const route = useRoute()
   const router = useRouter()
   const { currentUser } = useAuth()
+  const { trackGift } = useGiftEvents()
 
   const fullName = computed(() => currentUser.value?.fullName || '')
   const initials = computed(() => {
@@ -221,6 +226,12 @@
     try {
       const data = await fetchGiftEventDetails(giftId.value)
       gift.value = data
+
+      // Подія успішно відкрилась → відстежуємо її, щоб вона показалась у стрічці
+      // (актуально для донорів, які перейшли за invite-лінком).
+      if (currentUser.value?.groupId) {
+        trackGift(currentUser.value.groupId, giftId.value)
+      }
 
       // wow-екран → запускаємо конфеті після рендеру
       if (isWowMode.value) {
@@ -319,7 +330,7 @@
   async function generateLink() {
     isGeneratingLink.value = true
     try {
-      const data = await generateGiftInviteLink(giftId.value)
+      const data = await generateGiftInviteLink(giftId.value, currentUser.value?.groupId)
       inviteUrl.value = data.invite_url
       showToast('Link generated', 'success')
     } catch (err) {

@@ -402,7 +402,7 @@
   import ConnectCardReminderModal from '../components/ConnectCardReminderModal.vue'
   import { scheduleLater, dismissForever, getScheduledTime } from '../utils/cardReminder'
   import CardDetailsModal from '../components/CardDetailsModal.vue'
-  import { fetchGroupGiftEvents } from '../services/giftEventService'
+  import { useGiftEvents } from '../composables/useGiftEvents'
 
   const router = useRouter()
   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
@@ -531,15 +531,17 @@
     }
   }
 
-  // Реальні події групи (замість мок activeGiftEvents)
+  // Реальні події групи (замість мок activeGiftEvents).
+  // Дані тягнемо з GET /gift/{id}/details по відстежуваних id (див. useGiftEvents),
+  // бо бекенд не має ендпоінта "список подій групи".
+  const { loadTrackedGiftEvents } = useGiftEvents()
   const realGiftEvents = ref([])
 
   async function loadGiftEvents() {
     if (!currentUser.value?.groupId) return
     try {
-      realGiftEvents.value = await fetchGroupGiftEvents(currentUser.value.groupId)
-    } catch (err) {
-      // Endpoint поки відсутній — буде 404, не критично
+      realGiftEvents.value = await loadTrackedGiftEvents(currentUser.value.groupId)
+    } catch {
       realGiftEvents.value = []
     }
   }
@@ -596,17 +598,24 @@
     { name: 'Other', pct: 10, color: '#8A7AAA' },
   ])
 
-  const activeGiftEvents = ref([
-    {
-      id: 1,
-      name: "Sofia's Birthday",
-      targetUser: 'Sofia K.',
-      unlockDate: 'Apr 15, 2025',
-      collected: 1200,
-      goal: 2000,
-      progressPct: 60,
-    },
-  ])
+  // Реальні активні події групи для правого блоку (заміна мок-заглушки Sofia's Birthday).
+  const activeGiftEvents = computed(() =>
+    realGiftEvents.value
+      .filter((g) => g.status === 'ACTIVE' || g.status === 'REVEALED')
+      .map((g) => {
+        const collected = Number(g.collected_amount) || 0
+        const goal = Number(g.goal_amount) || 0
+        return {
+          id: g.id,
+          name: g.name,
+          targetUser: g.target_user_name,
+          unlockDate: formatPinnedDate(g.unlock_date),
+          collected: formatAmount(collected),
+          goal: formatAmount(goal),
+          progressPct: goal ? Math.min(100, Math.round((collected / goal) * 100)) : 0,
+        }
+      }),
+  )
 
   const notifications = ref([
     {

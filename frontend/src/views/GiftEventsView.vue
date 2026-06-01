@@ -364,9 +364,11 @@
   import { useAuth } from '../composables/useAuth'
   import { fetchGroupMembers } from '../services/authService'
   import { createGiftEvent, generateGiftInviteLink } from '../services/giftEventService'
+  import { useGiftEvents } from '../composables/useGiftEvents'
 
   const router = useRouter()
   const { currentUser, isAdmin } = useAuth()
+  const { trackGift } = useGiftEvents()
 
   const fullName = computed(() => currentUser.value?.fullName || '')
   const initials = computed(() => {
@@ -588,9 +590,12 @@
 
       createdGiftId.value = created.gift_id || created.id
 
+      // Зберігаємо подію локально, щоб вона зʼявилась у стрічці (правий блок + pinned)
+      trackGift(currentUser.value.groupId, createdGiftId.value)
+
       // Автоматично генеруємо invite link (PROJ-57)
       try {
-        const linkData = await generateGiftInviteLink(createdGiftId.value)
+        const linkData = await generateGiftInviteLink(createdGiftId.value, currentUser.value.groupId)
         inviteUrl.value = linkData.invite_url
       } catch (linkErr) {
         inviteError.value =
@@ -620,7 +625,7 @@
     if (!createdGiftId.value) return
     inviteError.value = ''
     try {
-      const linkData = await generateGiftInviteLink(createdGiftId.value)
+      const linkData = await generateGiftInviteLink(createdGiftId.value, currentUser.value.groupId)
       inviteUrl.value = linkData.invite_url
     } catch (err) {
       inviteError.value = err.response?.data?.message || 'Failed to generate link.'

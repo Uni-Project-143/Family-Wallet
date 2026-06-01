@@ -15,6 +15,14 @@
             {{ transaction.category_name || 'Other' }}
           </div>
 
+          <span
+            v-if="transaction.is_virtual"
+            class="tx-card__virtual-badge"
+            title="Внутрішній переказ"
+          >
+            ↔ Переказ
+          </span>
+
           <div v-if="transaction.description" class="tx-card__desc">
             {{ transaction.description }}
           </div>
@@ -365,6 +373,19 @@
     font-weight: 700;
     letter-spacing: 0.6px;
     text-transform: uppercase;
+    vertical-align: middle;
+  }
+
+  .tx-card__virtual-badge {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 0.75rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background-color: rgba(99, 102, 241, 0.1);
+    color: #4f46e5;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-weight: 500;
     vertical-align: middle;
   }
 </style>

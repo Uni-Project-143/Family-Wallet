@@ -134,6 +134,13 @@
             <button class="connect-card-btn" @click="isConnectCardOpen = true">
               + Connect Card
             </button>
+            <button
+              class="transfer-btn"
+              :disabled="!hasOwnActiveCards"
+              @click="isTransferModalOpen = true"
+            >
+              ↗ Переказ
+            </button>
           </template>
         </section>
 
@@ -380,6 +387,15 @@
     :card="selectedCardForDetails"
     @close="closeCardDetails"
   />
+  <TransferModal
+    :is-open="isTransferModalOpen"
+    :user-cards="userOwnedActiveCards"
+    :group-cards="connectedCards"
+    :categories="[]"
+    @close="isTransferModalOpen = false"
+    @success="handleTransferSuccess"
+    @toast="showToast($event.message, $event.type)"
+  />
 </template>
 
 <script setup>
@@ -402,6 +418,7 @@
   import ConnectCardReminderModal from '../components/ConnectCardReminderModal.vue'
   import { scheduleLater, dismissForever, getScheduledTime } from '../utils/cardReminder'
   import CardDetailsModal from '../components/CardDetailsModal.vue'
+  import TransferModal from '../components/TransferModal.vue'
   import { fetchGroupGiftEvents } from '../services/giftEventService'
 
   const router = useRouter()
@@ -477,6 +494,23 @@
   const hasOwnCard = computed(() =>
     connectedCards.value.some((c) => c.user_id === currentUser.value?.id),
   )
+
+  // ─── Transfer between cards (UC-16) ───
+  const isTransferModalOpen = ref(false)
+
+  const userOwnedActiveCards = computed(() =>
+    connectedCards.value.filter(
+      (c) => String(c.user_id) === String(currentUser.value?.id) && c.status === 'ACTIVE',
+    ),
+  )
+  const hasOwnActiveCards = computed(() => userOwnedActiveCards.value.length > 0)
+
+  async function handleTransferSuccess(_result) {
+    isTransferModalOpen.value = false
+    // Re-fetch cards (to pick up new effective_balance) and feed without page reload
+    await loadCards()
+    await loadFirstPage()
+  }
 
   const groups = ref([
     { id: 1, name: storedUser.groupName || 'Family' },
@@ -1057,6 +1091,33 @@
     border-color: #b8973a;
     color: #9b7a25;
     background: #fbf7ec;
+  }
+
+  .transfer-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 36px;
+    border: 1.5px solid #d6d3ce;
+    border-radius: 8px;
+    background: #fff;
+    color: #6b6860;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    cursor: pointer;
+    transition: all 0.18s;
+    margin-top: 6px;
+  }
+  .transfer-btn:hover:not(:disabled) {
+    border-color: #b8973a;
+    color: #9b7a25;
+    background: #fbf7ec;
+  }
+  .transfer-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   /* ── Feed main ── */

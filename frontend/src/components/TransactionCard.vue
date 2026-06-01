@@ -28,22 +28,91 @@
         </div>
       </div>
 
-      <div v-if="transaction.reactions?.length" class="tx-card__reactions">
-        <button v-for="r in transaction.reactions" :key="r.emoji" class="reaction-pill">
+      <div class="tx-card__reactions">
+        <button
+          v-for="r in displayReactions"
+          :key="r.emoji"
+          class="reaction-pill"
+          :class="{ 'reaction-pill--mine': r.mine }"
+          @click="onToggle(r.emoji)"
+        >
           {{ r.emoji }} {{ r.count }}
         </button>
+
+        <!-- Кнопка-пікер реакцій (Telegram-style) -->
+        <div class="reaction-picker">
+          <button
+            class="reaction-add"
+            :class="{ 'reaction-add--open': isPickerOpen }"
+            aria-label="Додати реакцію"
+            @click="togglePicker"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3" />
+              <path
+                d="M5.8 9.4C6.2 10.2 7 10.8 8 10.8C9 10.8 9.8 10.2 10.2 9.4"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"
+              />
+              <circle cx="6" cy="6.4" r="0.9" fill="currentColor" />
+              <circle cx="10" cy="6.4" r="0.9" fill="currentColor" />
+            </svg>
+          </button>
+
+          <Transition name="picker">
+            <div v-if="isPickerOpen" class="reaction-menu" role="menu">
+              <button
+                v-for="emoji in REACTION_EMOJIS"
+                :key="emoji"
+                class="reaction-menu__item"
+                :class="{ 'reaction-menu__item--active': myReaction === emoji }"
+                :aria-label="`Реакція ${emoji}`"
+                @click="onPick(emoji)"
+              >
+                {{ emoji }}
+              </button>
+            </div>
+          </Transition>
+        </div>
       </div>
     </div>
+
+    <!-- Прозорий бекдроп: клік поза пікером закриває його -->
+    <div v-if="isPickerOpen" class="reaction-backdrop" @click="closePicker" />
   </div>
 </template>
 
 <script setup>
-  import { computed } from 'vue'
+  import { computed, ref } from 'vue'
   import UserAvatar from './UserAvatar.vue'
+  import { useReactions, useDisplayReactions, REACTION_EMOJIS } from '../composables/useReactions'
 
   const props = defineProps({
     transaction: { type: Object, required: true },
   })
+
+  // ─── Емодзі-реакції (Telegram-style) ───
+  const { getMyReaction, toggleReaction } = useReactions()
+  const displayReactions = useDisplayReactions(() => props.transaction)
+  const myReaction = computed(() => getMyReaction(props.transaction.id))
+
+  const isPickerOpen = ref(false)
+
+  function togglePicker() {
+    isPickerOpen.value = !isPickerOpen.value
+  }
+  function closePicker() {
+    isPickerOpen.value = false
+  }
+  function onPick(emoji) {
+    toggleReaction(props.transaction.id, emoji)
+    closePicker()
+  }
+  function onToggle(emoji) {
+    // Клік по наявній реакції-пілюлі також ставить/знімає її
+    toggleReaction(props.transaction.id, emoji)
+  }
 
   const authorDisplayName = computed(() => {
     return props.transaction.display_name || 'Невідомий учасник'
@@ -83,6 +152,7 @@
 
 <style scoped>
   .tx-card {
+    position: relative;
     display: flex;
     gap: 14px;
     padding: 16px 18px;
@@ -166,6 +236,7 @@
 
   .tx-card__reactions {
     display: flex;
+    align-items: center;
     gap: 6px;
     margin-top: 10px;
     flex-wrap: wrap;
@@ -188,6 +259,99 @@
   .reaction-pill:hover {
     background: #fbf7ec;
     border-color: #f2e9c8;
+  }
+
+  /* Реакція, яку поставив поточний користувач */
+  .reaction-pill--mine {
+    background: #fbf7ec;
+    border-color: #dfc876;
+    color: #9b7a25;
+    font-weight: 600;
+  }
+
+  /* ── Пікер реакцій ── */
+  .reaction-picker {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .reaction-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 26px;
+    border-radius: 9999px;
+    border: 1px dashed #d6d3ce;
+    color: #b0ada7;
+    background: none;
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+  .reaction-add:hover,
+  .reaction-add--open {
+    color: #9b7a25;
+    border-color: #dfc876;
+    background: #fbf7ec;
+  }
+
+  .reaction-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    z-index: 30;
+    display: flex;
+    gap: 2px;
+    padding: 6px;
+    background: #fff;
+    border: 1px solid #eae8e4;
+    border-radius: 9999px;
+    box-shadow: 0 8px 24px rgba(13, 12, 10, 0.16);
+  }
+
+  .reaction-menu__item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: none;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      transform 0.12s ease,
+      background 0.12s ease;
+  }
+  .reaction-menu__item:hover {
+    background: #f4f1e9;
+    transform: scale(1.25);
+  }
+  .reaction-menu__item--active {
+    background: #fbf7ec;
+    box-shadow: inset 0 0 0 1.5px #dfc876;
+  }
+
+  /* Прозорий бекдроп для закриття по кліку поза пікером */
+  .reaction-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+  }
+
+  .picker-enter-active,
+  .picker-leave-active {
+    transition:
+      opacity 0.15s ease,
+      transform 0.15s ease;
+    transform-origin: bottom left;
+  }
+  .picker-enter-from,
+  .picker-leave-to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.92);
   }
   .tx-card__gift-badge {
     display: inline-block;

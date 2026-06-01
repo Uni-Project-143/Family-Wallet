@@ -68,22 +68,24 @@
       <aside class="sidebar">
         <section class="sidebar__section">
           <div class="sidebar__section-title">Group Members</div>
-          <div v-for="member in groupMembers" :key="member.id" class="member-row">
-            <div class="member-row__left">
-              <div class="avatar avatar--sm" :class="`avatar--${member.avatarVariant}`">
-                {{ member.initials }}
+          <div class="sidebar__scroll sidebar__scroll--members">
+            <div v-for="member in groupMembers" :key="member.id" class="member-row">
+              <div class="member-row__left">
+                <div class="avatar avatar--sm" :class="`avatar--${member.avatarVariant}`">
+                  {{ member.initials }}
+                </div>
+                <span class="member-row__name">{{ member.name }}</span>
+                <span v-if="member.isCurrentUser" class="member-row__you">(you)</span>
+                <span v-if="member.role === 'ADMIN'" class="badge badge--admin">Admin</span>
               </div>
-              <span class="member-row__name">{{ member.name }}</span>
-              <span v-if="member.isCurrentUser" class="member-row__you">(you)</span>
-              <span v-if="member.role === 'ADMIN'" class="badge badge--admin">Admin</span>
+              <button
+                v-if="!member.isCurrentUser"
+                class="money-btn"
+                @click="openMoneyRequestModal(member)"
+              >
+                $
+              </button>
             </div>
-            <button
-              v-if="!member.isCurrentUser"
-              class="money-btn"
-              @click="openMoneyRequestModal(member)"
-            >
-              $
-            </button>
           </div>
           <!-- + Invite member — тільки Admin (US 1.3)        !!!!!!!!!!!!!!!!!!!!!!!! -->
           <button v-if="isAdmin" class="invite-btn" @click="isInviteModalOpen = true">
@@ -113,19 +115,21 @@
           </template>
 
           <template v-else>
-            <div v-for="card in connectedCards" :key="card.id" class="card-widget">
-              <div class="card-widget__header">
-                <span class="card-widget__bank">Monobank</span>
-                <span
-                  class="card-widget__dot"
-                  :class="{ 'card-widget__dot--inactive': card.status === 'INACTIVE' }"
-                ></span>
+            <div class="sidebar__scroll sidebar__scroll--cards">
+              <div v-for="card in connectedCards" :key="card.id" class="card-widget">
+                <div class="card-widget__header">
+                  <span class="card-widget__bank">Monobank</span>
+                  <span
+                    class="card-widget__dot"
+                    :class="{ 'card-widget__dot--inactive': card.status === 'INACTIVE' }"
+                  ></span>
+                </div>
+                <div class="card-widget__pan">{{ card.masked_pan }}</div>
+                <div v-if="cardOwnerName(card)" class="card-widget__owner">
+                  {{ cardOwnerName(card) }}
+                </div>
+                <button class="card-widget__details" @click="openCardDetails(card)">Details</button>
               </div>
-              <div class="card-widget__pan">{{ card.masked_pan }}</div>
-              <div v-if="cardOwnerName(card)" class="card-widget__owner">
-                {{ cardOwnerName(card) }}
-              </div>
-              <button class="card-widget__details" @click="openCardDetails(card)">Details</button>
             </div>
             <button class="connect-card-btn" @click="isConnectCardOpen = true">
               + Connect Card
@@ -886,6 +890,40 @@
     flex: 1;
     height: 1px;
     background: #eae8e4;
+  }
+
+  /* Прокручувані списки в sidebar:
+     показуємо ~4-5 елементів, решта — за прокруткою. */
+  .sidebar__scroll {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* тонкий скролбар у стилі теми (Firefox) */
+    scrollbar-width: thin;
+    scrollbar-color: #dfc876 transparent;
+    /* місце під скролбар, щоб контент не "стрибав" */
+    padding-right: 4px;
+  }
+  /* ~5 рядків учасників (рядок ≈ 46px) */
+  .sidebar__scroll--members {
+    max-height: 232px;
+  }
+  /* ~2.5 картки, щоб було видно що список прокручується */
+  .sidebar__scroll--cards {
+    max-height: 270px;
+  }
+  /* Кастомний скролбар (WebKit) */
+  .sidebar__scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  .sidebar__scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .sidebar__scroll::-webkit-scrollbar-thumb {
+    background: #e7dcb4;
+    border-radius: 9999px;
+  }
+  .sidebar__scroll:hover::-webkit-scrollbar-thumb {
+    background: #dfc876;
   }
 
   .member-row {

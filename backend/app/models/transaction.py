@@ -20,7 +20,7 @@ class Transaction(Document):
     target_user_id: Optional[str] = Field(default=None,
                                           description="ID того, кому призначений подарунок")
     gift_id: Optional[str] = Field(default=None,
-                                   description="ID конкретної події Secret Gift")  # <--- ДОДАЙ ЦЕ
+                                   description="ID конкретної події Secret Gift")
     mono_id: Optional[str] = None
     mcc: Optional[int] = None
     is_virtual: bool = Field(default=False, description="Внутрішня фейкова транзакція")

@@ -4,7 +4,7 @@ from app.api.auth import get_current_user
 from app.core.limiter import limiter
 from app.models.user import User
 from app.models.bank_card import BankCard
-from app.models.group_membership import GroupMembership # Додали імпорт
+from app.models.group_membership import GroupMembership
 from app.schemas.transaction import (
     TransactionFilterParams,
     TransactionPaginatedResponse,
@@ -15,7 +15,6 @@ from app.services.transaction_service import TransactionService
 
 router = APIRouter()
 
-# ЗМІНЕНО: Тепер приймаємо group_id у шляху
 @router.get("/group/{group_id}", response_model=TransactionPaginatedResponse, status_code=status.HTTP_200_OK)
 async def get_group_transactions(
     group_id: str,

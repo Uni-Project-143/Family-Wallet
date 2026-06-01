@@ -399,7 +399,7 @@
 </template>
 
 <script setup>
-  import { ref, computed, onMounted } from 'vue'
+  import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
   import { useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
   import { useFeedTransactions } from '../composables/useFeedTransactions'
@@ -414,7 +414,6 @@
   import EmptyFeed from '../components/EmptyFeed.vue'
   import ConnectionIndicator from '../components/ConnectionIndicator.vue'
 
-  import { watch, onUnmounted } from 'vue' // дописати watch і onUnmounted до існуючого імпорту з 'vue'
   import ConnectCardReminderModal from '../components/ConnectCardReminderModal.vue'
   import { scheduleLater, dismissForever, getScheduledTime } from '../utils/cardReminder'
   import CardDetailsModal from '../components/CardDetailsModal.vue'
@@ -755,27 +754,10 @@
     if (reminderTimer) clearTimeout(reminderTimer)
   })
 
-  function goToConnectCard() {
-    isConnectCardOpen.value = true // одразу відкриваємо модалку
-  }
-
   function cardOwnerName(card) {
     return card.owner_full_name || null
   }
 
-  // /**
-  //  * Після успішного підключення оновлюємо локальний список і кеш.
-  //  */
-  // function handleCardConnected(card) {
-  //   const cardData = {
-  //     id: card.id,
-  //     bankName: 'Monobank',
-  //     masked_pan: card.masked_pan,
-  //     status: card.status,
-  //   }
-  //   connectedCards.value.push(cardData)
-  //   addCardToStorage(storedUser.groupId, cardData)
-  // }
 </script>
 
 <style scoped>

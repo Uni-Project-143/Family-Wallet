@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List
 from datetime import date, datetime
 from decimal import Decimal
@@ -45,10 +45,12 @@ class TransactionResponse(BaseModel):
     card_id: str
     amount: Decimal
     currency: str
-    category_id: str
-    description: Optional[str]
+    category_id: Optional[str] = None
+    description: Optional[str] = None
     timestamp: datetime
-    reactions: List[dict]
+    reactions: List[dict] = []
+    is_virtual: bool = False
+    transfer_id: Optional[str] = None
 
 
 class TransactionPaginatedResponse(BaseModel):
@@ -57,3 +59,26 @@ class TransactionPaginatedResponse(BaseModel):
     page: int
     size: int
     pages: int
+
+
+class TransferRequest(BaseModel):
+    from_card_id: str
+    to_card_id: str
+    amount: Decimal = Field(..., gt=0, decimal_places=2, max_digits=14)
+    description: Optional[str] = Field(None, max_length=500)
+    category_id: Optional[str] = None
+
+    @model_validator(mode="after")
+    def reject_same_card(self) -> "TransferRequest":
+        if self.from_card_id == self.to_card_id:
+            raise ValueError("from_card_id must differ from to_card_id")
+        return self
+
+
+class TransferResponse(BaseModel):
+    transfer_id: str
+    debit_transaction_id: str
+    credit_transaction_id: str
+    amount: Decimal
+    from_effective_balance: Decimal
+    to_effective_balance: Decimal

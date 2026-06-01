@@ -51,7 +51,7 @@ export async function disconnectMonobankCard(cardId) {
  * Доступно будь-якому учаснику групи.
  *
  * @param {string} groupId
- * @returns {Promise<Array<{id, user_id, group_id, account_id, masked_pan, balance, status, transaction_ids}>>}
+ * @returns {Promise<Array<{id, user_id, group_id, account_id, masked_pan, balance, effective_balance, status, transaction_ids, owner_full_name}>>}
  */
 export async function fetchGroupCards(groupId) {
   const response = await apiClient.get(`/api/v1/bank-cards/group/${groupId}`)

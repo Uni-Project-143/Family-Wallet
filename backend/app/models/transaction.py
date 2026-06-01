@@ -11,7 +11,7 @@ class Transaction(Document):
     card_id: str
     amount: Decimal
     currency: str = "UAH"
-    category_id: str
+    category_id: Optional[str] = None
     description: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     reactions: List[dict] = []
@@ -23,6 +23,11 @@ class Transaction(Document):
                                    description="ID конкретної події Secret Gift")  # <--- ДОДАЙ ЦЕ
     mono_id: Optional[str] = None
     mcc: Optional[int] = None
+    is_virtual: bool = Field(default=False, description="Внутрішня фейкова транзакція")
+    transfer_id: Optional[str] = Field(
+        default=None,
+        description="ID парної транзакції для переказу між картками сім'ї",
+    )
 
     # ----------------
 
@@ -39,5 +44,9 @@ class Transaction(Document):
         indexes = [
             IndexModel([("group_id", pymongo.ASCENDING), ("timestamp", pymongo.DESCENDING)]),
             # UNIQUE індекс для захисту від дублікатів (sparse=True дозволяє мати null для старих транзакцій)
-            IndexModel([("mono_id", pymongo.ASCENDING)], unique=True, sparse=True)
+            IndexModel([("mono_id", pymongo.ASCENDING)], unique=True, sparse=True),
+            # Перформанс агрегацій effective_balance (NFR-04): фільтр карт + is_virtual
+            IndexModel([("card_id", pymongo.ASCENDING), ("is_virtual", pymongo.ASCENDING)]),
+            # Кореляція парних ніг переказу у стрічці (UC-3-A2) та діагностиці UC-14
+            IndexModel([("transfer_id", pymongo.ASCENDING)], sparse=True),
         ]

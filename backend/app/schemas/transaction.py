@@ -45,10 +45,12 @@ class TransactionResponse(BaseModel):
     card_id: str
     amount: Decimal
     currency: str
-    category_id: str
-    description: Optional[str]
+    category_id: Optional[str] = None
+    description: Optional[str] = None
     timestamp: datetime
-    reactions: List[dict]
+    reactions: List[dict] = []
+    is_virtual: bool = False
+    transfer_id: Optional[str] = None
 
 
 class TransactionPaginatedResponse(BaseModel):

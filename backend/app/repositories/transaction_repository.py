@@ -62,7 +62,9 @@ class TransactionRepository:
                 "category_id": doc.category_id,
                 "description": doc.description,
                 "timestamp": doc.timestamp,
-                "reactions": doc.reactions
+                "reactions": doc.reactions,
+                "is_virtual": getattr(doc, "is_virtual", False),
+                "transfer_id": getattr(doc, "transfer_id", None),
             })
 
         return transactions, total_count

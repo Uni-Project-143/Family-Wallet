@@ -1,6 +1,11 @@
+import logging
+
 from app.models.transaction import Transaction
 from app.schemas.transaction import TransactionFilterParams, TransactionType
+from app.config.database import db_client
 from datetime import datetime, time
+
+logger = logging.getLogger(__name__)
 
 
 class TransactionRepository:
@@ -62,7 +67,39 @@ class TransactionRepository:
                 "category_id": doc.category_id,
                 "description": doc.description,
                 "timestamp": doc.timestamp,
-                "reactions": doc.reactions
+                "reactions": doc.reactions,
+                "is_virtual": doc.is_virtual,
+                "transfer_id": doc.transfer_id,
             })
 
         return transactions, total_count
+
+    @staticmethod
+    async def create_paired_virtual_transactions(
+        debit: Transaction,
+        credit: Transaction,
+    ) -> tuple[str, str]:
+        """
+        Inserts the two paired virtual transactions atomically using a MongoDB
+        transaction (requires replica set). Returns (debit_id, credit_id).
+        On any failure, rolls back so the database has zero documents with the
+        attempted transfer_id. If the rollback itself fails, logs critical context.
+        """
+        async with await db_client.start_session() as session:
+            async with session.start_transaction():
+                try:
+                    await debit.insert(session=session)
+                    await credit.insert(session=session)
+                except Exception as exc:
+                    logger.critical(
+                        "TRANSFER_ROLLBACK_FAILED",
+                        extra={
+                            "transfer_id": debit.transfer_id,
+                            "debit_card_id": debit.card_id,
+                            "credit_card_id": credit.card_id,
+                            "amount": str(debit.amount),
+                            "error": str(exc),
+                        },
+                    )
+                    raise
+        return str(debit.id), str(credit.id)

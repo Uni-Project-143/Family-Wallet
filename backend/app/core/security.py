@@ -7,8 +7,10 @@ import os
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Секретний ключ для JWT (в ідеалі має братися з os.getenv("JWT_SECRET"))
+# Секретний ключ для JWT. У проді МАЄ бути заданий через env JWT_SECRET.
 SECRET_KEY = os.getenv("JWT_SECRET", "super-secret-key-for-development-only")
+if os.getenv("ENV", "development").lower() == "production" and SECRET_KEY == "super-secret-key-for-development-only":
+    raise RuntimeError("JWT_SECRET must be set in production environment.")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 48
 

@@ -13,6 +13,9 @@ ENV/
 .env
 .env.*
 !.env.example
+# Frontend production env містить ЛИШЕ публічні URL (без секретів) —
+# дозволяємо комітити, щоб Cloudflare Pages підхопив значення при білді.
+!.env.production
 
 # Python байт-код
 __pycache__/

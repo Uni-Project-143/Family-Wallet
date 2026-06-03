@@ -161,10 +161,10 @@ async def generate_gift_invite(gift_id: str, current_user: User = Depends(get_cu
 
     # Перевіряємо, чи є вже активний лінк, щоб не плодити дублікати
     now_utc = datetime.now(timezone.utc)
-    existing_invite = await GiftInvite.find_one(
-        GiftInvite.gift_id == str(gift.id),
-        GiftInvite.expires_at > now_utc
-    )
+    existing_invite = await GiftInvite.find_one({
+        "gift_id": str(gift.id),
+        "expires_at": {"$gt": now_utc}
+    })
 
     if existing_invite:
         token = existing_invite.token
@@ -179,11 +179,68 @@ async def generate_gift_invite(gift_id: str, current_user: User = Depends(get_cu
         await new_invite.insert()
 
     # Формуємо URL (у реальному проєкті домен береться з ENV конфігів)
-    invite_url = f"https://твій-домен.com/gift/join/{token}"
+    invite_url = f"https://family-wallet.com/join/{token}"
 
     return {
         "invite_url": invite_url,
         "token": token
+    }
+
+
+@router.post("/join/{token}", status_code=status.HTTP_200_OK)
+async def join_gift_by_invite(token: str, current_user: User = Depends(get_current_user)):
+    """
+    Ендпоінт для переходу за запрошенням на Secret Gift.
+    Валідує токен, перевіряє права доступу та ізолює іменинника.
+    """
+    # 1. Шукаємо активний токен в базі
+    now_utc = datetime.now(timezone.utc)
+    invite = await GiftInvite.find_one({
+        "token": token,
+        "expires_at": {"$gt": now_utc}
+    })
+
+    if not invite:
+        raise HTTPException(
+            status_code=404,
+            detail="Запрошення не знайдено або його термін дії минув"
+        )
+
+    # 2. Шукаємо сам подарунок
+    try:
+        gift_oid = PydanticObjectId(invite.gift_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Пошкоджений ID подарунка в токені")
+
+    gift = await GiftEvent.get(gift_oid)
+    if not gift or gift.status == GiftStatus.CANCELLED:
+        raise HTTPException(status_code=404, detail="Подарунок не знайдено або збір скасовано")
+
+    # 3. PROJ-58: Ізоляція іменинника (TARGET USER)
+    if str(current_user.id) == gift.target_user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Сюрприз! Ви не можете підглядати за власним подарунком 🎁"
+        )
+
+    # 4. Перевірка: чи є юзер учасником сім'ї/групи
+    membership = await GroupMembership.find_one({
+        "user_id": PydanticObjectId(str(current_user.id)),
+        "group_id": PydanticObjectId(gift.group_id)
+    })
+
+    if not membership:
+        raise HTTPException(
+            status_code=403,
+            detail="Тільки учасники цієї групи можуть долучитися до подарунка"
+        )
+
+    # 5. Усе супер! Повертаємо дані фронтенду для редиректу
+    return {
+        "message": "Успішно звадільовано",
+        "gift_id": str(gift.id),
+        "group_id": gift.group_id,
+        "gift_name": gift.name
     }
 
 # ==========================================
@@ -202,10 +259,10 @@ async def get_group_gifts(group_id: str, current_user: User = Depends(get_curren
         raise HTTPException(status_code=403, detail="Ви не є учасником цієї групи")
 
     # Шукаємо всі активні подарунки групи
-    active_gifts = await GiftEvent.find(
-        GiftEvent.group_id == group_id,
-        GiftEvent.status == GiftStatus.ACTIVE
-    ).to_list()
+    active_gifts = await GiftEvent.find({
+        "group_id": group_id,  # Або спробуй group_oid, якщо в базі це ObjectId
+        "status": GiftStatus.ACTIVE
+    }).to_list()
 
     now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     response_data = []

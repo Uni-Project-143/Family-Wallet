@@ -6,6 +6,7 @@ from beanie import init_beanie
 from app.models.category import Category
 from app.models.gift_event import GiftEvent
 from app.models.notification import NotificationLog
+from app.models.password_reset import PasswordResetToken
 # Імпортуємо моделі
 from app.models.user import User
 from app.models.invite import InviteToken
@@ -14,6 +15,8 @@ from app.models.group_membership import GroupMembership
 from app.models.blacklisted_token import BlacklistedToken
 from app.models.bank_card import BankCard
 from app.models.transaction import Transaction
+from app.models.gift_invite import GiftInvite
+from app.models.notification import NotificationLog
 
 load_dotenv()
 
@@ -40,5 +43,5 @@ async def init_db():
     """Функція підключає моделі Beanie до MongoDB при старті сервера."""
     await init_beanie(
         database=db_client[DB_NAME],
-        document_models=[User, Group, GroupMembership, InviteToken, BlacklistedToken, BankCard, Transaction, Category, GiftEvent, NotificationLog]
+        document_models=[User, Group, GroupMembership, InviteToken, BlacklistedToken, BankCard, Transaction, Category, GiftEvent, NotificationLog, GiftInvite, PasswordResetToken]
     )

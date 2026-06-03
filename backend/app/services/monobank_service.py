@@ -5,6 +5,7 @@ from app.core.encryption import EncryptionService
 from app.models.bank_card import BankCard
 from app.repositories.bank_card_repository import BankCardRepository
 from app.models.group_membership import GroupMembership
+import os
 
 class MonobankService:
 
@@ -48,20 +49,23 @@ class MonobankService:
                 detail="This account is already connected to the system."
             )
 
-        # 4. BE-03: Шифрування токена
-        encrypted_token = EncryptionService.encrypt(personal_token)
+            # 4. BE-03: Шифрування токена
+            encrypted_token = EncryptionService.encrypt(personal_token)
 
-        # 5. BE-02: Реєстрація webhook у Monobank
-        # ВАЖЛИВО: Твій сервер має бути доступний з інтернету (ngrok/vps),
-        # щоб Монобанк міг слати сюди вебхуки.
-        # Поки що ставимо заглушку або твій реальний URL, якщо він є.
-        # Наприклад: "webhook_url = "https://overblown-whoopee-labored.ngrok-free.dev/api/v1/monobank/webhook"
-        webhook_url = "https://overblown-whoopee-labored.ngrok-free.dev/api/v1/monobank/webhook"
+            # 5. BE-02: Реєстрація webhook у Monobank
+            webhook_url = os.getenv("MONOBANK_WEBHOOK_URL")
 
-        # РОЗКОМЕНТУЙ цю лінію, коли матимеш публічну адресу (ngrok), інакше Монобанк відхилить запит
-        await MonobankClient.register_webhook(personal_token, webhook_url)
+            # Захист, якщо ми забули додати змінну в .env
+            if not webhook_url:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="MONOBANK_WEBHOOK_URL is not configured on the server."
+                )
 
-        # 6. Збереження в базу (DB-01)
+            # Реєструємо вебхук у Монобанку
+            await MonobankClient.register_webhook(personal_token, webhook_url)
+
+            # 6. Збереження в базу (DB-01)
         new_card = BankCard(
             user_id=user_id,
             group_id=group_id,

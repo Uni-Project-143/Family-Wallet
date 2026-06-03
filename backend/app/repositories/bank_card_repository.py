@@ -47,13 +47,24 @@ class BankCardRepository:
             {"$group": {"_id": "$card_id", "delta": {"$sum": "$amount"}}},
         ]
 
-        cursor = Transaction.get_motor_collection().aggregate(pipeline)
+        # 1. Звертаємось до колекції напряму (як просила перша помилка)
+        collection = Transaction.get_pymongo_collection()
+
+        # 2. Робимо синхронний виклик aggregate (щоб уникнути багу Motor 3.4+)
+        cursor = collection.aggregate(pipeline)
+
+        # 3. Витягуємо всі результати в звичайний список (тут вже потрібен await)
+        docs = await cursor.to_list(length=None)
+
         result: dict[str, Decimal] = {}
-        async for doc in cursor:
+
+        # 4. Використовуємо звичайний for (бо docs - це вже простий список, а не асинхронний генератор)
+        for doc in docs:
             raw_delta = doc["delta"]
             if isinstance(raw_delta, Decimal128):
                 delta = raw_delta.to_decimal()
             else:
                 delta = Decimal(str(raw_delta))
             result[doc["_id"]] = delta
+
         return result

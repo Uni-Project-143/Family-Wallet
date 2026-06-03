@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 from bson.decimal128 import Decimal128
-from pymongo import IndexModel
+from pymongo import IndexModel, ASCENDING
 import pymongo
 
 class Transaction(Document):
@@ -43,10 +43,14 @@ class Transaction(Document):
         name = "transactions"
         indexes = [
             IndexModel([("group_id", pymongo.ASCENDING), ("timestamp", pymongo.DESCENDING)]),
-            # UNIQUE індекс для захисту від дублікатів (sparse=True дозволяє мати null для старих транзакцій)
-            IndexModel([("mono_id", pymongo.ASCENDING)], unique=True, sparse=True),
-            # Перформанс агрегацій effective_balance (NFR-04): фільтр карт + is_virtual
+
+            # ---> ВИПРАВЛЕНИЙ ІНДЕКС <---
+            IndexModel(
+                [("mono_id", pymongo.ASCENDING)],
+                unique=True,
+                partialFilterExpression={"mono_id": {"$type": "string"}}
+            ),
+
             IndexModel([("card_id", pymongo.ASCENDING), ("is_virtual", pymongo.ASCENDING)]),
-            # Кореляція парних ніг переказу у стрічці (UC-3-A2) та діагностиці UC-14
-            IndexModel([("transfer_id", pymongo.ASCENDING)], sparse=True),
+            IndexModel([("transfer_id", pymongo.ASCENDING)], sparse=True)
         ]

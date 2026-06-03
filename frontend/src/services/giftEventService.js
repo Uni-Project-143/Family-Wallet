@@ -22,56 +22,41 @@ export async function fetchGiftEventDetails(giftId) {
 }
 
 /**
- * Invite-лінк для запрошення родини до збору (PROJ-57).
- *
- * ⚠️ Backend НЕ має gift-специфічного ендпоінта POST /gift/{id}/invite.
- * Тому використовуємо реальний ГРУПОВИЙ invite — GET /api/v1/group/{group_id}/invite,
- * який повертає валідний токенізований лінк ({invite_link, token, expires_at}).
- * Лінк запрошує користувача до групи (де й відбувається збір).
- *
- * Якщо груповий invite недоступний (напр. організатор не ADMIN → 403),
- * повертаємо локальний fallback-URL, щоб UX копіювання не ламався.
+ * POST /api/v1/gift/{id}/invite — генерує invite-лінк для запрошення донорів (PROJ-57).
+ * Тільки організатор (інакше 403). Повторний виклик повертає той самий активний token.
  *
  * @param {string} giftId
- * @param {string} [groupId]
- * @returns {Promise<{invite_url: string, token: string, expires_at: string|null}>}
+ * @returns {Promise<{invite_url: string, token: string}>}
  */
-export async function generateGiftInviteLink(giftId, groupId) {
-  if (groupId) {
-    try {
-      const response = await apiClient.get(`/api/v1/group/${groupId}/invite`)
-      const data = response.data
-      return {
-        invite_url: data.invite_link,
-        token: data.token,
-        expires_at: data.expires_at ?? null,
-      }
-    } catch {
-      // Падаємо у fallback нижче (403 для не-ADMIN, 404, мережа тощо)
-    }
-  }
-  return {
-    invite_url: `${window.location.origin}/gift/join/${giftId}`,
-    token: giftId,
-    expires_at: null,
-  }
+export async function generateGiftInviteLink(giftId) {
+  const response = await apiClient.post(`/api/v1/gift/${giftId}/invite`)
+  return response.data
 }
 
 /**
- * Завантажує деталі кількох подій за їх id (паралельно, fault-tolerant).
+ * GET /api/v1/gift/group/{group_id} — список активних подій групи.
+ * Бек виключає події, де я target і unlock_date ще не настав (PROJ-58 ізоляція).
  *
- * ⚠️ Backend не має ендпоінта "список подій групи" (GET /gift/group/{id} відсутній).
- * Тому фронт сам тримає список id створених/відкритих подій (див. useGiftEvents)
- * і дотягує деталі через GET /gift/{id}/details.
- *
- * Події, що повертають помилку (403 ізоляція target / 404 cancelled), тихо
- * відкидаються — це зберігає таємність сюрпризу (PROJ-58).
- *
- * @param {string[]} ids
- * @returns {Promise<object[]>}
+ * @param {string} groupId
+ * @returns {Promise<Array<{id, name, target_user_id, target_user_name, unlock_date, goal_amount, collected_amount, status}>>}
  */
-export async function fetchGiftEventsByIds(ids = []) {
-  if (!ids.length) return []
-  const results = await Promise.allSettled(ids.map((id) => fetchGiftEventDetails(id)))
-  return results.filter((r) => r.status === 'fulfilled').map((r) => r.value)
+export async function fetchGroupGiftEvents(groupId) {
+  const response = await apiClient.get(`/api/v1/gift/group/${groupId}`)
+  return response.data
+}
+
+/**
+ * POST /api/v1/gift/{id}/contribute — внесок до збору.
+ * Створює secret-транзакцію (−amount) з картки користувача й оновлює зібрану суму.
+ *
+ * Валідації беку: збір ACTIVE і ще не минув, не target, 0 < amount ≤ 100000,
+ * картка належить користувачу, користувач — у групі.
+ *
+ * @param {string} giftId
+ * @param {{amount: number, card_id: string}} payload
+ * @returns {Promise<{success: boolean, new_collected_amount: number}>}
+ */
+export async function contributeToGift(giftId, payload) {
+  const response = await apiClient.post(`/api/v1/gift/${giftId}/contribute`, payload)
+  return response.data
 }

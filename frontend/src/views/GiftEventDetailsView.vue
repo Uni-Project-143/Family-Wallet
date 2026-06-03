@@ -140,6 +140,40 @@
           </button>
         </div>
 
+        <!-- Внесок до збору (contribute) -->
+        <div v-if="canContribute" class="contribute-section">
+          <div class="contribute-section__label">MAKE A CONTRIBUTION</div>
+
+          <div v-if="isLoadingCards" class="contribute-hint">Loading your cards…</div>
+
+          <div v-else-if="!myCards.length" class="contribute-hint">
+            Connect a bank card on the Feed page to contribute.
+          </div>
+
+          <template v-else>
+            <div class="contribute-row">
+              <input
+                v-model.number="contributeAmount"
+                type="number"
+                class="contribute-input"
+                placeholder="Amount"
+                min="1"
+                max="100000"
+                step="50"
+              />
+              <select v-model="selectedCardId" class="contribute-select">
+                <option v-for="card in myCards" :key="card.id" :value="card.id">
+                  {{ card.masked_pan }}
+                </option>
+              </select>
+            </div>
+            <button class="btn-gold contribute-btn" :disabled="isContributing" @click="submitContribution">
+              {{ isContributing ? 'Sending…' : 'Contribute' }}
+            </button>
+            <p class="contribute-note">Your contribution stays hidden from the recipient until unlock.</p>
+          </template>
+        </div>
+
         <!-- Donors list -->
         <div v-if="gift.donors?.length" class="donors-section">
           <div class="donors-section__title">Contributors</div>
@@ -174,13 +208,16 @@
   import { ref, computed, onMounted, nextTick } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
-  import { fetchGiftEventDetails, generateGiftInviteLink } from '../services/giftEventService'
-  import { useGiftEvents } from '../composables/useGiftEvents'
+  import {
+    fetchGiftEventDetails,
+    generateGiftInviteLink,
+    contributeToGift,
+  } from '../services/giftEventService'
+  import { fetchGroupCards } from '../services/cardService'
 
   const route = useRoute()
   const router = useRouter()
   const { currentUser } = useAuth()
-  const { trackGift } = useGiftEvents()
 
   const fullName = computed(() => currentUser.value?.fullName || '')
   const initials = computed(() => {
@@ -227,16 +264,15 @@
       const data = await fetchGiftEventDetails(giftId.value)
       gift.value = data
 
-      // Подія успішно відкрилась → відстежуємо її, щоб вона показалась у стрічці
-      // (актуально для донорів, які перейшли за invite-лінком).
-      if (currentUser.value?.groupId) {
-        trackGift(currentUser.value.groupId, giftId.value)
-      }
-
       // wow-екран → запускаємо конфеті після рендеру
       if (isWowMode.value) {
         await nextTick()
         triggerConfetti()
+      }
+
+      // Якщо можна донатити — підвантажуємо власні картки для форми внеску
+      if (canContribute.value) {
+        loadMyCards()
       }
     } catch (err) {
       const status = err.response?.status
@@ -330,7 +366,7 @@
   async function generateLink() {
     isGeneratingLink.value = true
     try {
-      const data = await generateGiftInviteLink(giftId.value, currentUser.value?.groupId)
+      const data = await generateGiftInviteLink(giftId.value)
       inviteUrl.value = data.invite_url
       showToast('Link generated', 'success')
     } catch (err) {
@@ -352,6 +388,69 @@
       }, 2500)
     } catch {
       showToast('Failed to copy. Please copy manually.', 'error')
+    }
+  }
+
+  // ─── Внесок до збору (contribute) ───
+  // Дозволено всім учасникам групи, крім іменинника, поки збір ACTIVE і не минув.
+  const canContribute = computed(
+    () => !isTarget.value && gift.value?.status === 'ACTIVE' && !isUnlocked.value,
+  )
+
+  const myCards = ref([])
+  const isLoadingCards = ref(false)
+  const contributeAmount = ref(null)
+  const selectedCardId = ref('')
+  const isContributing = ref(false)
+
+  async function loadMyCards() {
+    const groupId = currentUser.value?.groupId
+    if (!groupId) return
+    isLoadingCards.value = true
+    try {
+      const cards = await fetchGroupCards(groupId)
+      myCards.value = cards.filter(
+        (c) => c.user_id === currentUser.value?.id && c.status === 'ACTIVE',
+      )
+      if (myCards.value.length) selectedCardId.value = myCards.value[0].id
+    } catch {
+      myCards.value = []
+    } finally {
+      isLoadingCards.value = false
+    }
+  }
+
+  async function submitContribution() {
+    const amount = Number(contributeAmount.value)
+    if (!amount || amount <= 0) {
+      showToast('Enter a valid amount', 'error')
+      return
+    }
+    if (amount > 100000) {
+      showToast('Maximum is 100 000 UAH', 'error')
+      return
+    }
+    if (!selectedCardId.value) {
+      showToast('Select a card', 'error')
+      return
+    }
+
+    isContributing.value = true
+    try {
+      const res = await contributeToGift(giftId.value, {
+        amount,
+        card_id: selectedCardId.value,
+      })
+      // Оновлюємо деталі, щоб одразу побачити нову суму + себе у списку донорів
+      if (gift.value) gift.value.collected_amount = res.new_collected_amount
+      await loadDetails()
+      contributeAmount.value = null
+      showToast('Thank you for your contribution!', 'success')
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.response?.data?.message
+      showToast(msg || 'Contribution failed. Try again.', 'error')
+    } finally {
+      isContributing.value = false
     }
   }
 
@@ -787,6 +886,70 @@
   }
   .btn-copy--copied {
     color: #2a6b2a;
+  }
+
+  /* Contribute */
+  .contribute-section {
+    margin-bottom: 28px;
+    padding: 18px;
+    background: #faf8f3;
+    border: 1px solid #f2e9c8;
+    border-radius: 12px;
+  }
+  .contribute-section__label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #6b6860;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .contribute-hint {
+    font-size: 13px;
+    color: #b0ada7;
+  }
+  .contribute-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .contribute-input,
+  .contribute-select {
+    height: 44px;
+    border: 1.5px solid #eae8e4;
+    border-radius: 8px;
+    background: #fff;
+    padding: 0 14px;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 14px;
+    color: #0d0c0a;
+    outline: none;
+    transition:
+      border-color 0.18s,
+      box-shadow 0.18s;
+  }
+  .contribute-input {
+    flex: 1;
+    min-width: 0;
+  }
+  .contribute-select {
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .contribute-input:focus,
+  .contribute-select:focus {
+    border-color: #b8973a;
+    box-shadow: 0 0 0 3px rgba(184, 151, 58, 0.15);
+  }
+  .contribute-btn {
+    width: 100%;
+    height: 46px;
+  }
+  .contribute-note {
+    font-size: 11px;
+    color: #b0ada7;
+    margin: 10px 0 0;
+    font-style: italic;
   }
 
   /* Donors */

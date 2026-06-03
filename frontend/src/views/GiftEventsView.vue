@@ -326,9 +326,7 @@
 
               <div v-else-if="inviteError" class="invite-section">
                 <p class="error-text">Couldn't generate invite link. {{ inviteError }}</p>
-                <button class="btn-secondary" style="margin-top: 8px" @click="retryInvite">
-                  Retry
-                </button>
+                <button class="btn-retry" @click="retryInvite">Retry</button>
               </div>
 
               <div class="success-actions">
@@ -364,11 +362,9 @@
   import { useAuth } from '../composables/useAuth'
   import { fetchGroupMembers } from '../services/authService'
   import { createGiftEvent, generateGiftInviteLink } from '../services/giftEventService'
-  import { useGiftEvents } from '../composables/useGiftEvents'
 
   const router = useRouter()
   const { currentUser, isAdmin } = useAuth()
-  const { trackGift } = useGiftEvents()
 
   const fullName = computed(() => currentUser.value?.fullName || '')
   const initials = computed(() => {
@@ -590,16 +586,15 @@
 
       createdGiftId.value = created.gift_id || created.id
 
-      // Зберігаємо подію локально, щоб вона зʼявилась у стрічці (правий блок + pinned)
-      trackGift(currentUser.value.groupId, createdGiftId.value)
-
       // Автоматично генеруємо invite link (PROJ-57)
       try {
-        const linkData = await generateGiftInviteLink(createdGiftId.value, currentUser.value.groupId)
+        const linkData = await generateGiftInviteLink(createdGiftId.value)
         inviteUrl.value = linkData.invite_url
       } catch (linkErr) {
         inviteError.value =
-          linkErr.response?.data?.message || 'You can generate it later from the event page.'
+          linkErr.response?.data?.detail ||
+          linkErr.response?.data?.message ||
+          'You can generate it later from the event page.'
       }
 
       currentStep.value = 3
@@ -625,10 +620,11 @@
     if (!createdGiftId.value) return
     inviteError.value = ''
     try {
-      const linkData = await generateGiftInviteLink(createdGiftId.value, currentUser.value.groupId)
+      const linkData = await generateGiftInviteLink(createdGiftId.value)
       inviteUrl.value = linkData.invite_url
     } catch (err) {
-      inviteError.value = err.response?.data?.message || 'Failed to generate link.'
+      inviteError.value =
+        err.response?.data?.detail || err.response?.data?.message || 'Failed to generate link.'
     }
   }
 
@@ -1304,6 +1300,26 @@
   .success-actions {
     display: flex;
     gap: 12px;
+  }
+
+  /* Retry-кнопка в блоці помилки invite */
+  .btn-retry {
+    margin-top: 10px;
+    height: 40px;
+    padding: 0 22px;
+    background: #fff;
+    color: #9b7a25;
+    border: 1.5px solid #dfc876;
+    border-radius: 8px;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+  .btn-retry:hover {
+    background: #fbf7ec;
+    border-color: #b8973a;
   }
 
   .spinner {

@@ -134,13 +134,6 @@
             <button class="connect-card-btn" @click="isConnectCardOpen = true">
               + Connect Card
             </button>
-            <button
-              class="transfer-btn"
-              :disabled="!hasOwnActiveCards"
-              @click="isTransferModalOpen = true"
-            >
-              ↗ Переказ
-            </button>
           </template>
         </section>
 
@@ -419,7 +412,6 @@
   import CardDetailsModal from '../components/CardDetailsModal.vue'
   import TransferModal from '../components/TransferModal.vue'
   import { fetchGroupGiftEvents } from '../services/giftEventService'
-  import { useGiftEvents } from '../composables/useGiftEvents'
 
   const router = useRouter()
   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
@@ -503,7 +495,6 @@
       (c) => String(c.user_id) === String(currentUser.value?.id) && c.status === 'ACTIVE',
     ),
   )
-  const hasOwnActiveCards = computed(() => userOwnedActiveCards.value.length > 0)
 
   async function handleTransferSuccess(_result) {
     isTransferModalOpen.value = false
@@ -512,10 +503,7 @@
     await loadFirstPage()
   }
 
-  const groups = ref([
-    { id: 1, name: storedUser.groupName || 'Family' },
-    { id: 2, name: 'Neighborhood' },
-  ])
+  const groups = ref([{ id: 1, name: storedUser.groupName || 'Family' }])
 
   // Для ролі. Замість const isAdmin = ref(true)
   // const isAdmin = computed(() => storedUser.role === 'ADMIN')
@@ -565,16 +553,15 @@
     }
   }
 
-  // Реальні події групи (замість мок activeGiftEvents).
-  // Дані тягнемо з GET /gift/{id}/details по відстежуваних id (див. useGiftEvents),
-  // бо бекенд не має ендпоінта "список подій групи".
-  const { loadTrackedGiftEvents } = useGiftEvents()
+  // Реальні активні події групи (замість мок activeGiftEvents).
+  // GET /api/v1/gift/group/{group_id} — бек віддає лише ACTIVE і приховує
+  // події, де поточний користувач є target до unlock_date (PROJ-58).
   const realGiftEvents = ref([])
 
   async function loadGiftEvents() {
     if (!currentUser.value?.groupId) return
     try {
-      realGiftEvents.value = await loadTrackedGiftEvents(currentUser.value.groupId)
+      realGiftEvents.value = await fetchGroupGiftEvents(currentUser.value.groupId)
     } catch {
       realGiftEvents.value = []
     }

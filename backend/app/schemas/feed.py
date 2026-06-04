@@ -17,6 +17,7 @@ class FeedTransactionItem(BaseModel):
     author_id: Optional[str] = None  # Для фільтрації по автору (filter chips)
     category_name: Optional[str] = None  # Для відображення назви категорії
     category_emoji: Optional[str] = None  # Для іконки категорії
+    category_code: Optional[str] = None  # slug категорії (groceries/fast_food/...) для мапінгу на фронті
     is_secret_gift: bool = False  # Для приховування подарунків
 
 

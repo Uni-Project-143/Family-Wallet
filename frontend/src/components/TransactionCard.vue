@@ -11,15 +11,9 @@
           </div>
 
           <div class="tx-card__category" :style="categoryBadgeStyle">
-            <span v-if="transaction.category_emoji" class="tx-card__category-emoji">{{
-              transaction.category_emoji
-            }}</span>
-            <span
-              v-else
-              class="tx-card__category-dot"
-              :style="{ background: categoryColor }"
-            ></span>
-            {{ transaction.category_name || 'Other' }}
+            <span v-if="category.emoji" class="tx-card__category-emoji">{{ category.emoji }}</span>
+            <span v-else class="tx-card__category-dot" :style="{ background: category.color }"></span>
+            {{ category.label }}
           </div>
 
           <span
@@ -103,15 +97,15 @@
   import UserAvatar from './UserAvatar.vue'
   import { useReactions, useDisplayReactions, REACTION_EMOJIS } from '../composables/useReactions'
   import { parseServerDate } from '../utils/datetime'
-  import { getCategoryColor, getCategoryBadgeStyle } from '../utils/categoryColors'
+  import { resolveCategory, badgeStyleFromColor } from '../utils/categoryColors'
 
   const props = defineProps({
     transaction: { type: Object, required: true },
   })
 
-  // ─── Колір категорії (стабільний за назвою, спільний з донат-діаграмою) ───
-  const categoryColor = computed(() => getCategoryColor(props.transaction.category_name))
-  const categoryBadgeStyle = computed(() => getCategoryBadgeStyle(props.transaction.category_name))
+  // ─── Категорія (slug із беку → fallback на назву), спільна логіка з донатом ───
+  const category = computed(() => resolveCategory(props.transaction))
+  const categoryBadgeStyle = computed(() => badgeStyleFromColor(category.value.color))
 
   // ─── Емодзі-реакції (Telegram-style) ───
   const { getMyReaction, toggleReaction } = useReactions()

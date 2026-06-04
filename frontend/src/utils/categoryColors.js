@@ -103,16 +103,76 @@ export function hexToRgba(hex, alpha = 1) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
-/**
- * Готовий набір стилів для бейджа категорії: колір тексту, м'який фон і рамка
- * в одному тоні. Використовується через :style у TransactionCard.
- * @param {string} name
- */
-export function getCategoryBadgeStyle(name) {
-  const color = getCategoryColor(name)
+/** Набір стилів бейджа (фон/рамка/текст) із готового hex-кольору. */
+export function badgeStyleFromColor(color) {
   return {
     color,
     background: hexToRgba(color, 0.12),
     borderColor: hexToRgba(color, 0.32),
+  }
+}
+
+/**
+ * Готовий набір стилів для бейджа категорії за НАЗВОЮ.
+ * @param {string} name
+ */
+export function getCategoryBadgeStyle(name) {
+  return badgeStyleFromColor(getCategoryColor(name))
+}
+
+/**
+ * Словник slug-категорій від бекенду (контракт із бекендером).
+ * Бек віддає код категорії (groceries / fast_food / pharmacy / ...),
+ * а фронт мапить його у людську назву, емодзі та колір.
+ *
+ * ⚠️ Працює лише якщо стрічка /api/v1/feed РЕАЛЬНО віддає цей код
+ * (поле category_code / category_slug / category_id). Зараз feed віддає
+ * вже резолвлену category_name="Інше", тож слаг сюди не доходить — це
+ * фіксується на боці беку (1 рядок: прокинути tx.category_id у відповідь).
+ */
+export const CATEGORY_BY_SLUG = {
+  groceries: { label: 'Продукти', emoji: '🛒', color: '#C4862A' },
+  fast_food: { label: 'Кафе та ресторани', emoji: '🍔', color: '#C4613A' },
+  pharmacy: { label: 'Аптека', emoji: '💊', color: '#5A8A6A' },
+  entertainment: { label: 'Розваги', emoji: '🎬', color: '#8A7AAA' },
+  transport: { label: 'Транспорт', emoji: '🚗', color: '#4A6FA5' },
+  gifts: { label: 'Подарунки', emoji: '🎁', color: '#C2557A' },
+  gift_contribution: { label: 'Подарунок', emoji: '🎁', color: '#C2557A' },
+  transfer: { label: 'Перекази', emoji: '💸', color: '#3E8E8E' },
+  other: { label: 'Інше', emoji: '💰', color: NEUTRAL_COLOR },
+}
+
+/**
+ * Єдина точка визначення відображення категорії для транзакції.
+ * Повертає { label, emoji, color }.
+ *
+ * Пріоритет:
+ *  1. slug-код від беку (category_code / category_slug / category_id),
+ *     якщо він є у словнику CATEGORY_BY_SLUG;
+ *  2. інакше — резолв за назвою category_name (поточна поведінка стрічки).
+ *
+ * Завдяки цьому, щойно бек почне віддавати slug, категорії одразу стануть
+ * правильними — без додаткових змін на фронті.
+ *
+ * @param {object} tx — елемент стрічки
+ */
+export function resolveCategory(tx) {
+  if (!tx) return { ...CATEGORY_BY_SLUG.other }
+
+  const slug = (tx.category_code ?? tx.category_slug ?? tx.category_id ?? '')
+    .toString()
+    .trim()
+    .toLowerCase()
+
+  if (slug && CATEGORY_BY_SLUG[slug]) {
+    return CATEGORY_BY_SLUG[slug]
+  }
+
+  // Fallback: резолв за назвою (як зараз віддає feed).
+  const name = tx.category_name || 'Інше'
+  return {
+    label: name,
+    emoji: tx.category_emoji || '💰',
+    color: getCategoryColor(name),
   }
 }

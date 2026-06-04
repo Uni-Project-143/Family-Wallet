@@ -130,6 +130,9 @@ async def get_unified_feed(
             author_id=str(owner.id) if owner else None,
             category_name=category.name if category else "Інше",
             category_emoji=category.icon if category else "💰",
+            # slug категорії (groceries/fast_food/...) — фронт мапить його у назву/колір.
+            # Якщо category_id порожній/"None" — віддаємо "other" (дефолт на фронті).
+            category_code=tx.category_id if (tx.category_id and tx.category_id != "None") else "other",
             is_secret_gift=tx.is_secret_gift
         ))
 

@@ -338,7 +338,7 @@
   import TransferModal from '../components/TransferModal.vue'
   import { fetchGroupGiftEvents } from '../services/giftEventService'
   import { parseServerDate } from '../utils/datetime'
-  import { getCategoryColor } from '../utils/categoryColors'
+  import { resolveCategory } from '../utils/categoryColors'
   import strings from '../locales/en'
 
   const router = useRouter()
@@ -526,30 +526,32 @@
   const DONUT_CIRCUMFERENCE = 351.86 // 2π·56 (r=56)
 
   // Розбивка витрат за категоріями з завантажених транзакцій (тільки витрати — від'ємні суми).
-  // Колір кожного сегмента береться з getCategoryColor(name) — той самий, що й у бейджі
-  // транзакції, тож діаграма і список завжди узгоджені за кольором.
+  // Категорія визначається через resolveCategory(tx) — той самий резолвер, що й у бейджі
+  // транзакції (slug із беку → fallback на назву), тож діаграма й список завжди узгоджені.
   const categoryBreakdown = computed(() => {
-    const totals = new Map()
+    const totals = new Map() // label → { value, color }
     for (const tx of transactions.value) {
       const amt = Number(tx.amount)
       if (!amt || amt >= 0) continue // лише витрати
-      const name = tx.category_name || 'Інше'
-      totals.set(name, (totals.get(name) || 0) + Math.abs(amt))
+      const { label, color } = resolveCategory(tx)
+      const prev = totals.get(label) || { value: 0, color }
+      prev.value += Math.abs(amt)
+      totals.set(label, prev)
     }
-    const grand = [...totals.values()].reduce((s, v) => s + v, 0)
+    const grand = [...totals.values()].reduce((s, v) => s + v.value, 0)
     if (!grand) return []
 
     let offset = 0
     return [...totals.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, value]) => {
+      .sort((a, b) => b[1].value - a[1].value)
+      .map(([name, { value, color }]) => {
         const fraction = value / grand
         const dash = fraction * DONUT_CIRCUMFERENCE
         const seg = {
           name,
           value,
           pct: Math.round(fraction * 100),
-          color: getCategoryColor(name),
+          color,
           dasharray: `${dash.toFixed(2)} ${DONUT_CIRCUMFERENCE.toFixed(2)}`,
           offset: -Number(offset.toFixed(2)),
         }

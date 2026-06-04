@@ -16,6 +16,20 @@ from app.models.bank_card import BankCard
 from app.core.websockets import ws_manager
 from app.models.category import Category
 
+
+def get_category_id_by_mcc(mcc: int) -> str:
+    """Перекладає код Монобанку у нашу текстову категорію для фронтенду"""
+    mcc_mapping = {
+        5411: "groceries",     # Супермаркети (Сільпо, АТБ)
+        5814: "fast_food",     # Фастфуд, кафе
+        5912: "pharmacy",      # Аптеки
+        7999: "entertainment", # Розваги
+        5541: "transport",     # АЗС
+        4121: "transport",     # Таксі
+    }
+    return mcc_mapping.get(mcc, "other") # Якщо код невідомий, буде "other"
+
+
 router = APIRouter(prefix="/api/v1/monobank", tags=["Monobank Integration"])
 
 
@@ -125,9 +139,7 @@ async def handle_monobank_webhook(payload: MonobankWebhookRequest):
     amount_in_uah = Decimal(str(mono_tx.amount / 100))
     tx_time = datetime.fromtimestamp(mono_tx.time)
 
-    category = await Category.find_one({"mcc_list": mono_tx.mcc})
-
-    resolved_category_id = str(category.id) if category else "None"
+    resolved_category_id = get_category_id_by_mcc(mono_tx.mcc)
 
     # 4. Збереження транзакції (DB-01)
     new_transaction = Transaction(
@@ -135,7 +147,7 @@ async def handle_monobank_webhook(payload: MonobankWebhookRequest):
         group_id=card.group_id,
         amount=amount_in_uah,
         currency="UAH",
-        category_id=resolved_category_id,  # Змінимо на мапінг MCC в наступному кроці
+        category_id=resolved_category_id,
         description=mono_tx.description,
         timestamp=tx_time,
         mono_id=mono_tx.id,

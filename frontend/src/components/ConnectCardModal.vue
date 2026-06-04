@@ -443,7 +443,7 @@
     } else if (status === 422) {
       serverError.value = detail?.[0]?.msg || 'Please check the form fields'
     } else {
-      serverError.value = message || 'Something went wrong. Please try again.'
+      serverError.value = err.userMessage || 'Something went wrong. Please try again.'
     }
   }
 

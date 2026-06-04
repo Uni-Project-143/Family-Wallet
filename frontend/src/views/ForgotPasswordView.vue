@@ -110,8 +110,8 @@
     try {
       await requestPasswordReset({ email: email.value.trim().toLowerCase() })
       isEmailSent.value = true
-    } catch {
-      serverError.value = 'Something went wrong. Please try again'
+    } catch (err) {
+      serverError.value = err.userMessage || 'Something went wrong. Please try again'
     } finally {
       isLoading.value = false
     }

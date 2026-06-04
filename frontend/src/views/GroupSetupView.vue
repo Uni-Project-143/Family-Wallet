@@ -235,7 +235,8 @@
       router.push('/feed')
     } catch (err) {
       const status = err.response?.status
-      const message = err.response?.data?.message
+      // Бекенд (FastAPI) повертає текст у `detail`, не в `message`
+      const message = err.response?.data?.detail || err.response?.data?.message
 
       if (status === 400 && message === 'You are already a member of this group') {
         // Якщо юзер уже учасник — теж оновлюємо стан і йдемо на feed
@@ -253,7 +254,7 @@
       else if (status === 400) serverError.value = message || 'Invalid invite link'
       else if (status === 404)
         serverError.value = 'Invite link not found. Check the link and try again.'
-      else serverError.value = message || 'Something went wrong. Please try again.'
+      else serverError.value = err.userMessage || 'Something went wrong. Please try again.'
     } finally {
       isLoading.value = false
     }

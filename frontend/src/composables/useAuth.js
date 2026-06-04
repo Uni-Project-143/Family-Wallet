@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { loginUser, registerUser, fetchMyGroups, logoutUser } from '../services/authService'
 import { scheduleAfterRegistration } from '../utils/cardReminder'
+import { usePushNotifications } from './usePushNotifications'
 
 const STORAGE_TOKEN_KEY = 'accessToken'
 const STORAGE_USER_KEY = 'currentUser'
@@ -43,6 +44,7 @@ function setActiveGroup(group) {
 
 export function useAuth() {
   const router = useRouter()
+  const { initPush } = usePushNotifications()
 
   const isAuthenticated = computed(
     () => !!currentUser.value && !!localStorage.getItem(STORAGE_TOKEN_KEY),
@@ -65,19 +67,16 @@ export function useAuth() {
       }
 
       persistAuthSession(data.access_token, userInfo)
-      persistAuthSession(data.access_token, userInfo)
+      initPush() // реєстрація push (дозвіл + FCM-токен → backend)
       scheduleAfterRegistration() // запланувати reminder через 5 хв
 
       router.push('/group-setup')
     } catch (err) {
-      const status = err.response?.status
-      if (status === 409) {
-        authError.value = 'User with this email already exists'
-      } else if (status === 422) {
-        authError.value = err.response?.data?.detail?.[0]?.msg || 'Check the fields'
-      } else {
-        authError.value = 'Something went wrong. Please try again'
-      }
+      // 409 — окремий зрозумілий текст; решта — централізоване повідомлення
+      authError.value =
+        err.response?.status === 409
+          ? 'User with this email already exists'
+          : err.userMessage || 'Something went wrong. Please try again'
     } finally {
       isLoading.value = false
     }
@@ -110,6 +109,9 @@ export function useAuth() {
         groupName: null,
       }
       persistAuthSession(data.access_token, userInfo)
+
+      // Реєструємо push-сповіщення (дозвіл + FCM-токен → backend). Fire-and-forget.
+      initPush()
 
       // Крок 4: маршрутизація залежно від кількості груп
       if (!Array.isArray(groups) || groups.length === 0) {

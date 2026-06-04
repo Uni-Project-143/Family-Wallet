@@ -3,8 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Family Wallet</title>
-    <!-- Додай ці рядки -->
+    <title>Family Wallet — Shared Family Budget</title>
+    <meta
+      name="description"
+      content="Family Wallet — shared family budgeting: a unified Monobank transaction feed, connected cards, and Secret Gift collective gifting with surprise isolation."
+    />
+    <meta name="theme-color" content="#0d0c0a" />
     <style>
       *,
       *::before,
@@ -16,7 +20,9 @@
       body {
         margin: 0;
         padding: 0;
-        overflow: hidden;
+        /* overflow-x: hidden прибирає випадковий горизонтальний скрол,
+           але дозволяє вертикальний — інакше на мобільному контент обрізається */
+        overflow-x: hidden;
       }
       #app {
         margin: 0;

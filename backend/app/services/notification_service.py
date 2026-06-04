@@ -49,8 +49,11 @@ class NotificationService:
 
         # 3. Бойова відправка Email через SendGrid
         email = getattr(user, 'email', None)
+        print(f"[NOTIFY] {notif_type}: одержувач user={user_id}, email={email}")
         if email:
             await NotificationService._send_email_sendgrid(email, subject, body)
+        else:
+            print(f"[NOTIFY] ⚠️ У користувача {user_id} немає email — лист не надіслано.")
 
         # 4. Бойова відправка Push через FCM
         # Передбачаємо, що фронтенд передає і ми зберігаємо fcm_token у моделі User

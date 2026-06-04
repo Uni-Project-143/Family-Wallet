@@ -1,25 +1,6 @@
 <template>
   <div class="page">
-    <header class="navbar">
-      <div class="navbar__left">
-        <span class="navbar__logo">Family <span class="navbar__logo--accent">Wallet</span></span>
-      </div>
-      <nav class="navbar__center">
-        <router-link to="/feed" class="navbar__tab" active-class="navbar__tab--active"
-          >Feed</router-link
-        >
-        <router-link to="/gift-events" class="navbar__tab" active-class="navbar__tab--active"
-          >Gift Events</router-link
-        >
-        <router-link to="/settings" class="navbar__tab" active-class="navbar__tab--active"
-          >Settings</router-link
-        >
-      </nav>
-      <div class="navbar__right">
-        <div class="avatar avatar--sm avatar--gold">{{ initials }}</div>
-        <span class="navbar__user-name">{{ fullName }}</span>
-      </div>
-    </header>
+    <NavBar />
 
     <main class="main">
       <!-- Loading -->
@@ -140,6 +121,40 @@
           </button>
         </div>
 
+        <!-- Внесок до збору (contribute) -->
+        <div v-if="canContribute" class="contribute-section">
+          <div class="contribute-section__label">MAKE A CONTRIBUTION</div>
+
+          <div v-if="isLoadingCards" class="contribute-hint">Loading your cards…</div>
+
+          <div v-else-if="!myCards.length" class="contribute-hint">
+            Connect a bank card on the Feed page to contribute.
+          </div>
+
+          <template v-else>
+            <div class="contribute-row">
+              <input
+                v-model.number="contributeAmount"
+                type="number"
+                class="contribute-input"
+                placeholder="Amount"
+                min="1"
+                max="100000"
+                step="50"
+              />
+              <select v-model="selectedCardId" class="contribute-select">
+                <option v-for="card in myCards" :key="card.id" :value="card.id">
+                  {{ card.masked_pan }}
+                </option>
+              </select>
+            </div>
+            <button class="btn-gold contribute-btn" :disabled="isContributing" @click="submitContribution">
+              {{ isContributing ? 'Sending…' : 'Contribute' }}
+            </button>
+            <p class="contribute-note">Your contribution stays hidden from the recipient until unlock.</p>
+          </template>
+        </div>
+
         <!-- Donors list -->
         <div v-if="gift.donors?.length" class="donors-section">
           <div class="donors-section__title">Contributors</div>
@@ -149,7 +164,10 @@
                 {{ getInitials(donor.name) }}
               </div>
               <span class="donor-row__name">{{ donor.name }}</span>
-              <span class="donor-row__amount">{{ formatAmount(donor.amount) }} UAH</span>
+              <!-- Backend наразі не повертає суму по кожному донору -->
+              <span v-if="donor.amount" class="donor-row__amount">
+                {{ formatAmount(donor.amount) }} UAH
+              </span>
             </div>
           </div>
         </div>
@@ -171,23 +189,18 @@
   import { ref, computed, onMounted, nextTick } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
-  import { fetchGiftEventDetails, generateGiftInviteLink } from '../services/giftEventService'
+  import {
+    fetchGiftEventDetails,
+    generateGiftInviteLink,
+    contributeToGift,
+  } from '../services/giftEventService'
+  import { fetchGroupCards } from '../services/cardService'
+  import { parseServerDate } from '../utils/datetime'
+  import NavBar from '../components/NavBar.vue'
 
   const route = useRoute()
   const router = useRouter()
   const { currentUser } = useAuth()
-
-  const fullName = computed(() => currentUser.value?.fullName || '')
-  const initials = computed(() => {
-    const name = fullName.value
-    if (!name) return '?'
-    return name
-      .split(' ')
-      .map((w) => w[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  })
 
   const giftId = computed(() => route.params.id)
 
@@ -201,8 +214,9 @@
   const isTarget = computed(() => currentUser.value?.id === gift.value?.target_user_id)
   const isOrganizer = computed(() => currentUser.value?.id === gift.value?.organizer_id)
   const isUnlocked = computed(() => {
-    if (!gift.value?.unlock_date) return false
-    return new Date(gift.value.unlock_date).getTime() <= Date.now()
+    const d = parseServerDate(gift.value?.unlock_date)
+    if (!d) return false
+    return d.getTime() <= Date.now()
   })
   const isWowMode = computed(
     () => isTarget.value && (gift.value?.status === 'REVEALED' || isUnlocked.value),
@@ -227,6 +241,11 @@
         await nextTick()
         triggerConfetti()
       }
+
+      // Якщо можна донатити — підвантажуємо власні картки для форми внеску
+      if (canContribute.value) {
+        loadMyCards()
+      }
     } catch (err) {
       const status = err.response?.status
       if (status === 403) {
@@ -238,7 +257,7 @@
         error.value = "This event doesn't exist or has been cancelled."
       } else {
         errorTitle.value = 'Could not load event'
-        error.value = err.response?.data?.message || 'Please try again later.'
+        error.value = err.userMessage || 'Please try again later.'
       }
     } finally {
       isLoading.value = false
@@ -283,8 +302,8 @@
   }
 
   function formatDate(isoString) {
-    if (!isoString) return ''
-    const d = new Date(isoString)
+    const d = parseServerDate(isoString)
+    if (!d) return ''
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'long',
@@ -323,8 +342,7 @@
       inviteUrl.value = data.invite_url
       showToast('Link generated', 'success')
     } catch (err) {
-      const message = err.response?.data?.message || 'Failed to generate link.'
-      showToast(message, 'error')
+      showToast(err.userMessage || 'Failed to generate link.', 'error')
     } finally {
       isGeneratingLink.value = false
     }
@@ -341,6 +359,68 @@
       }, 2500)
     } catch {
       showToast('Failed to copy. Please copy manually.', 'error')
+    }
+  }
+
+  // ─── Внесок до збору (contribute) ───
+  // Дозволено всім учасникам групи, крім іменинника, поки збір ACTIVE і не минув.
+  const canContribute = computed(
+    () => !isTarget.value && gift.value?.status === 'ACTIVE' && !isUnlocked.value,
+  )
+
+  const myCards = ref([])
+  const isLoadingCards = ref(false)
+  const contributeAmount = ref(null)
+  const selectedCardId = ref('')
+  const isContributing = ref(false)
+
+  async function loadMyCards() {
+    const groupId = currentUser.value?.groupId
+    if (!groupId) return
+    isLoadingCards.value = true
+    try {
+      const cards = await fetchGroupCards(groupId)
+      myCards.value = cards.filter(
+        (c) => c.user_id === currentUser.value?.id && c.status === 'ACTIVE',
+      )
+      if (myCards.value.length) selectedCardId.value = myCards.value[0].id
+    } catch {
+      myCards.value = []
+    } finally {
+      isLoadingCards.value = false
+    }
+  }
+
+  async function submitContribution() {
+    const amount = Number(contributeAmount.value)
+    if (!amount || amount <= 0) {
+      showToast('Enter a valid amount', 'error')
+      return
+    }
+    if (amount > 100000) {
+      showToast('Maximum is 100 000 UAH', 'error')
+      return
+    }
+    if (!selectedCardId.value) {
+      showToast('Select a card', 'error')
+      return
+    }
+
+    isContributing.value = true
+    try {
+      const res = await contributeToGift(giftId.value, {
+        amount,
+        card_id: selectedCardId.value,
+      })
+      // Оновлюємо деталі, щоб одразу побачити нову суму + себе у списку донорів
+      if (gift.value) gift.value.collected_amount = res.new_collected_amount
+      await loadDetails()
+      contributeAmount.value = null
+      showToast('Thank you for your contribution!', 'success')
+    } catch (err) {
+      showToast(err.userMessage || 'Contribution failed. Try again.', 'error')
+    } finally {
+      isContributing.value = false
     }
   }
 
@@ -363,75 +443,6 @@
     display: flex;
     flex-direction: column;
     background: #faf8f3;
-  }
-
-  /* Navbar */
-  .navbar {
-    height: 60px;
-    background: #0d0c0a;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    padding: 0 28px;
-    flex-shrink: 0;
-    border-bottom: 1px solid rgba(184, 151, 58, 0.18);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .navbar__left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .navbar__logo {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: 18px;
-    font-weight: 600;
-    color: #fff;
-  }
-  .navbar__logo--accent {
-    color: #b8973a;
-  }
-  .navbar__center {
-    display: flex;
-    gap: 2px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 4px;
-    justify-self: center;
-  }
-  .navbar__tab {
-    padding: 7px 20px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.5);
-    text-decoration: none;
-    transition: all 0.18s;
-    white-space: nowrap;
-    border: 1px solid transparent;
-  }
-  .navbar__tab:hover {
-    color: rgba(255, 255, 255, 0.85);
-  }
-  .navbar__tab--active {
-    background: rgba(184, 151, 58, 0.18);
-    color: #ead9a0;
-    font-weight: 600;
-    border-color: rgba(184, 151, 58, 0.25);
-  }
-  .navbar__right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    justify-self: end;
-  }
-  .navbar__user-name {
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.85);
   }
 
   .avatar {
@@ -778,6 +789,70 @@
     color: #2a6b2a;
   }
 
+  /* Contribute */
+  .contribute-section {
+    margin-bottom: 28px;
+    padding: 18px;
+    background: #faf8f3;
+    border: 1px solid #f2e9c8;
+    border-radius: 12px;
+  }
+  .contribute-section__label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #6b6860;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .contribute-hint {
+    font-size: 13px;
+    color: #b0ada7;
+  }
+  .contribute-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .contribute-input,
+  .contribute-select {
+    height: 44px;
+    border: 1.5px solid #eae8e4;
+    border-radius: 8px;
+    background: #fff;
+    padding: 0 14px;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 14px;
+    color: #0d0c0a;
+    outline: none;
+    transition:
+      border-color 0.18s,
+      box-shadow 0.18s;
+  }
+  .contribute-input {
+    flex: 1;
+    min-width: 0;
+  }
+  .contribute-select {
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .contribute-input:focus,
+  .contribute-select:focus {
+    border-color: #b8973a;
+    box-shadow: 0 0 0 3px rgba(184, 151, 58, 0.15);
+  }
+  .contribute-btn {
+    width: 100%;
+    height: 46px;
+  }
+  .contribute-note {
+    font-size: 11px;
+    color: #b0ada7;
+    margin: 10px 0 0;
+    font-style: italic;
+  }
+
   /* Donors */
   .donors-section {
     margin-top: 24px;
@@ -902,55 +977,6 @@
   .toast-leave-to {
     opacity: 0;
     transform: translateY(12px);
-  }
-
-  @media (max-width: 768px) {
-    .navbar {
-      grid-template-columns: 1fr auto;
-      grid-template-rows: auto auto;
-      height: auto;
-      padding: 10px 14px;
-      gap: 8px 10px;
-    }
-    .navbar__left {
-      grid-row: 1;
-      grid-column: 1;
-    }
-    .navbar__right {
-      grid-row: 1;
-      grid-column: 2;
-      gap: 6px;
-    }
-    .navbar__center {
-      grid-row: 2;
-      grid-column: 1 / -1;
-      justify-self: stretch;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .navbar__center::-webkit-scrollbar {
-      display: none;
-    }
-    .navbar__logo {
-      font-size: 15px;
-    }
-    .navbar__tab {
-      padding: 6px 14px;
-      font-size: 12px;
-    }
-    .navbar__user-name {
-      display: none;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .navbar {
-      padding: 8px 12px;
-    }
-    .navbar__tab {
-      padding: 5px 12px;
-      font-size: 11px;
-    }
   }
 
   @media (max-width: 768px) {

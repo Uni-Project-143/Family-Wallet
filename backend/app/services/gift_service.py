@@ -13,7 +13,8 @@ class GiftService:
         try:
             while True:
                 try:
-                    # 1. Робимо поточний час "наївним", відрізаючи таймзону
+                    # 1. Поточний час як НАЇВНИЙ UTC (без таймзони) для коректного
+                    #    порівняння з датами, які MongoDB повертає теж наївними (UTC).
                     now = datetime.now(timezone.utc).replace(tzinfo=None)
 
                     # Шукаємо всі активні подарунки
@@ -21,17 +22,25 @@ class GiftService:
                         GiftEvent.status == GiftStatus.ACTIVE
                     ).to_list()
 
+                    if active_gifts:
+                        print(f"[CRON] now(UTC)={now:%Y-%m-%d %H:%M:%S} | активних подій: {len(active_gifts)}")
+
                     for gift in active_gifts:
                         gift_id_str = str(gift.id)
 
-                        # 2. Робимо час з бази також "наївним" перед будь-якими порівняннями
+                        # 2. Дату з бази також робимо наївною (UTC) перед порівняннями
                         unlock_date_naive = gift.unlock_date.replace(tzinfo=None)
+                        seconds_left = (unlock_date_naive - now).total_seconds()
+                        print(
+                            f"[CRON]   '{gift.name}' unlock(UTC)={unlock_date_naive:%Y-%m-%d %H:%M:%S} "
+                            f"| залишилось {int(seconds_left)} с"
+                        )
 
                         # 1. РОЗКРИТТЯ ПОДАРУНКА (PROJ-64 BE-01)
                         if unlock_date_naive <= now:
                             gift.status = GiftStatus.REVEALED
                             await gift.save()
-                            print(f"[CRON] Подарунок {gift.name} успішно розкрито!")
+                            print(f"[CRON] 🎁 Подарунок '{gift.name}' РОЗКРИТО (unlock минув)!")
 
                             # Надсилаємо імениннику
                             await NotificationService.send_notification(
@@ -60,7 +69,8 @@ class GiftService:
                 except Exception as e:
                     print(f"[CRON ERROR] Помилка виконання: {e}")
 
-                await asyncio.sleep(60)
+                # Перевіряємо кожні 30 с → розкриття спрацьовує ≤30 с після unlock_date
+                await asyncio.sleep(30)
 
         except asyncio.CancelledError:
             print("[CRON] Роботу фонової задачі коректно завершено.")

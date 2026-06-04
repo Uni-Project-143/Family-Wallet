@@ -10,8 +10,15 @@
             <span v-if="transaction.is_secret_gift" class="tx-card__gift-badge">Gift</span>
           </div>
 
-          <div class="tx-card__category">
-            <span v-if="transaction.category_emoji">{{ transaction.category_emoji }}</span>
+          <div class="tx-card__category" :style="categoryBadgeStyle">
+            <span v-if="transaction.category_emoji" class="tx-card__category-emoji">{{
+              transaction.category_emoji
+            }}</span>
+            <span
+              v-else
+              class="tx-card__category-dot"
+              :style="{ background: categoryColor }"
+            ></span>
             {{ transaction.category_name || 'Other' }}
           </div>
 
@@ -95,10 +102,16 @@
   import { computed, ref } from 'vue'
   import UserAvatar from './UserAvatar.vue'
   import { useReactions, useDisplayReactions, REACTION_EMOJIS } from '../composables/useReactions'
+  import { parseServerDate } from '../utils/datetime'
+  import { getCategoryColor, getCategoryBadgeStyle } from '../utils/categoryColors'
 
   const props = defineProps({
     transaction: { type: Object, required: true },
   })
+
+  // ─── Колір категорії (стабільний за назвою, спільний з донат-діаграмою) ───
+  const categoryColor = computed(() => getCategoryColor(props.transaction.category_name))
+  const categoryBadgeStyle = computed(() => getCategoryBadgeStyle(props.transaction.category_name))
 
   // ─── Емодзі-реакції (Telegram-style) ───
   const { getMyReaction, toggleReaction } = useReactions()
@@ -139,8 +152,8 @@
    * Відносний час: "2 хв тому", "3 год тому", "вчора", "12 кві".
    */
   const relativeTime = computed(() => {
-    if (!props.transaction.timestamp) return ''
-    const txDate = new Date(props.transaction.timestamp)
+    const txDate = parseServerDate(props.transaction.timestamp)
+    if (!txDate) return ''
     const diffMs = Date.now() - txDate.getTime()
     const minutes = Math.floor(diffMs / 60000)
 
@@ -202,12 +215,25 @@
     gap: 5px;
     padding: 2px 10px;
     border-radius: 9999px;
+    /* Кольори (фон/рамка/текст) задаються інлайн через :style — getCategoryBadgeStyle().
+       Тут лише запасні значення, якщо стиль не передано. */
     background: #fbf7ec;
     border: 1px solid #f2e9c8;
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 600;
     color: #9b7a25;
     margin-bottom: 4px;
+  }
+
+  .tx-card__category-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .tx-card__category-emoji {
+    line-height: 1;
   }
 
   .tx-card__desc {
@@ -376,16 +402,19 @@
     vertical-align: middle;
   }
 
+  /* Visual Check: бейдж переказу був у «чужому» індиго (#4f46e5) після мерджу —
+     приведено до золото-кремової теми застосунку. */
   .tx-card__virtual-badge {
     display: inline-block;
     margin-left: 6px;
     font-size: 0.75rem;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background-color: rgba(99, 102, 241, 0.1);
-    color: #4f46e5;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    background-color: rgba(184, 151, 58, 0.12);
+    color: #9b7a25;
+    border: 1px solid rgba(184, 151, 58, 0.28);
     font-family: 'DM Sans', system-ui, sans-serif;
-    font-weight: 500;
+    font-weight: 600;
     vertical-align: middle;
   }
 </style>

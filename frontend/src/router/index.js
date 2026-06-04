@@ -94,6 +94,12 @@ const routes = [
     component: () => import('../views/GiftEventDetailsView.vue'),
     meta: { requiresAuth: true },
   },
+  // Catch-all 404 — публічна, без redirect-guard'ів
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('../views/NotFoundView.vue'),
+  },
 ]
 
 const router = createRouter({

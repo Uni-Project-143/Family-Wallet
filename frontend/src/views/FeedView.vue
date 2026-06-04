@@ -1,9 +1,8 @@
 <template>
   <div class="feed-page">
     <!-- ═══ NAVBAR ═══ -->
-    <header class="navbar">
-      <div class="navbar__left">
-        <span class="navbar__logo">Family <span class="navbar__logo--accent">Wallet</span></span>
+    <NavBar :show-logout="true">
+      <template #left>
         <div class="navbar__groups">
           <button
             v-for="group in groups"
@@ -14,53 +13,12 @@
           >
             {{ group.name }}
           </button>
-          <!-- СТАЛО -->
           <button class="navbar__group-tab navbar__group-tab--add" @click="goToGroupSetup">
             + New group
           </button>
         </div>
-      </div>
-
-      <!-- Центр: три вкладки -->
-      <nav class="navbar__center">
-        <router-link to="/feed" class="navbar__tab" active-class="navbar__tab--active"
-          >Feed</router-link
-        >
-        <router-link to="/gift-events" class="navbar__tab" active-class="navbar__tab--active"
-          >Gift Events</router-link
-        >
-        <router-link to="/settings" class="navbar__tab" active-class="navbar__tab--active"
-          >Settings</router-link
-        >
-      </nav>
-
-      <!-- Права: аватар + ім'я + badge -->
-      <div class="navbar__right">
-        <div class="avatar avatar--sm avatar--gold">{{ currentUserInitials }}</div>
-        <span class="navbar__user-name">{{ currentUserName }}</span>
-        <span v-if="isAdmin" class="badge badge--admin">Admin</span>
-        <span v-else class="badge badge--member">Member</span>
-
-        <!-- ↓ нова кнопка -->
-        <button class="logout-btn" :disabled="isLoading" @click="handleLogout" aria-label="Logout">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M6 14H3.5C2.67 14 2 13.33 2 12.5V3.5C2 2.67 2.67 2 3.5 2H6"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-            />
-            <path
-              d="M11 11L14 8L11 5M14 8H6"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </button>
-      </div>
-    </header>
+      </template>
+    </NavBar>
 
     <!-- ═══ BODY ═══ -->
     <div class="feed-layout">
@@ -68,7 +26,17 @@
       <aside class="sidebar">
         <section class="sidebar__section">
           <div class="sidebar__section-title">Group Members</div>
-          <div class="sidebar__scroll sidebar__scroll--members">
+
+          <!-- Loading -->
+          <div v-if="isLoadingMembers && !groupMembers.length" class="sidebar__loading">
+            <div class="sidebar__skeleton-row" v-for="n in 3" :key="n"></div>
+          </div>
+          <!-- Empty -->
+          <div v-else-if="!groupMembers.length" class="sidebar__empty">
+            {{ strings.empty.members }}
+          </div>
+          <!-- List -->
+          <div v-else class="sidebar__scroll sidebar__scroll--members">
             <div v-for="member in groupMembers" :key="member.id" class="member-row">
               <div class="member-row__left">
                 <div class="avatar avatar--sm" :class="`avatar--${member.avatarVariant}`">
@@ -115,7 +83,10 @@
           </template>
 
           <template v-else>
-            <div class="sidebar__scroll sidebar__scroll--cards">
+            <div v-if="!connectedCards.length" class="sidebar__empty">
+              {{ strings.empty.cards }}
+            </div>
+            <div v-else class="sidebar__scroll sidebar__scroll--cards">
               <div v-for="card in connectedCards" :key="card.id" class="card-widget">
                 <div class="card-widget__header">
                   <span class="card-widget__bank">Monobank</span>
@@ -133,13 +104,6 @@
             </div>
             <button class="connect-card-btn" @click="isConnectCardOpen = true">
               + Connect Card
-            </button>
-            <button
-              class="transfer-btn"
-              :disabled="!hasOwnActiveCards"
-              @click="isTransferModalOpen = true"
-            >
-              ↗ Переказ
             </button>
           </template>
         </section>
@@ -211,7 +175,7 @@
 
         <!-- Картки є, але транзакцій 0 -->
         <div v-else-if="transactions.length === 0" class="feed-empty">
-          <p>No transactions yet. Awaiting the first transaction from Monobank.</p>
+          <p>{{ strings.empty.transactions }}</p>
         </div>
 
         <!-- Список (FE-01) -->
@@ -222,7 +186,7 @@
 
           <div ref="sentinelRef" class="tx-sentinel" aria-hidden="true" />
 
-          <div v-if="isLoadingMore" class="tx-loading-more">Loading more...</div>
+          <div v-if="isLoadingMore" class="tx-loading-more">{{ strings.loading.more }}</div>
         </template>
       </main>
 
@@ -230,62 +194,21 @@
       <aside class="right-panel">
         <section class="right-panel__section">
           <div class="right-panel__title">Spending by Category</div>
-          <div class="donut-wrap">
+
+          <div v-if="categoryBreakdown.length" class="donut-wrap">
             <svg width="152" height="152" viewBox="0 0 160 160">
               <circle cx="80" cy="80" r="56" fill="none" stroke="#F0EFED" stroke-width="26" />
               <circle
+                v-for="seg in categoryBreakdown"
+                :key="seg.name"
                 cx="80"
                 cy="80"
                 r="56"
                 fill="none"
-                stroke="#C4862A"
+                :stroke="seg.color"
                 stroke-width="26"
-                stroke-dasharray="123.2 351.9"
-                stroke-dashoffset="0"
-                transform="rotate(-90 80 80)"
-              />
-              <circle
-                cx="80"
-                cy="80"
-                r="56"
-                fill="none"
-                stroke="#4A6FA5"
-                stroke-width="26"
-                stroke-dasharray="88.0 351.9"
-                stroke-dashoffset="-123.2"
-                transform="rotate(-90 80 80)"
-              />
-              <circle
-                cx="80"
-                cy="80"
-                r="56"
-                fill="none"
-                stroke="#5A8A6A"
-                stroke-width="26"
-                stroke-dasharray="52.8 351.9"
-                stroke-dashoffset="-211.2"
-                transform="rotate(-90 80 80)"
-              />
-              <circle
-                cx="80"
-                cy="80"
-                r="56"
-                fill="none"
-                stroke="#C4613A"
-                stroke-width="26"
-                stroke-dasharray="52.8 351.9"
-                stroke-dashoffset="-264.0"
-                transform="rotate(-90 80 80)"
-              />
-              <circle
-                cx="80"
-                cy="80"
-                r="56"
-                fill="none"
-                stroke="#8A7AAA"
-                stroke-width="26"
-                stroke-dasharray="35.2 351.9"
-                stroke-dashoffset="-316.8"
+                :stroke-dasharray="seg.dasharray"
+                :stroke-dashoffset="seg.offset"
                 transform="rotate(-90 80 80)"
               />
               <text
@@ -307,7 +230,7 @@
                 font-family="Cormorant Garamond,serif"
                 font-weight="600"
               >
-                2 412
+                {{ formatAmount(categoryTotal) }}
               </text>
               <text
                 x="80"
@@ -329,6 +252,8 @@
               <div class="donut-legend__note">Categories from Monobank MCC codes</div>
             </div>
           </div>
+
+          <div v-else class="right-panel__empty">{{ strings.empty.spending }}</div>
         </section>
 
         <section v-if="activeGiftEvents.length" class="right-panel__section">
@@ -351,15 +276,7 @@
 
         <section class="right-panel__section">
           <div class="right-panel__title">Notifications</div>
-          <div
-            v-for="n in notifications"
-            :key="n.id"
-            class="notif-item"
-            :class="{ 'notif-item--unread': n.isUnread }"
-          >
-            <div class="notif-item__title">{{ n.title }}</div>
-            <div class="notif-item__sub">{{ n.subtitle }}</div>
-          </div>
+          <div class="right-panel__empty">{{ strings.empty.notifications }}</div>
         </section>
       </aside>
     </div>
@@ -413,12 +330,16 @@
   import FeedSkeleton from '../components/FeedSkeleton.vue'
   import EmptyFeed from '../components/EmptyFeed.vue'
   import ConnectionIndicator from '../components/ConnectionIndicator.vue'
+  import NavBar from '../components/NavBar.vue'
 
   import ConnectCardReminderModal from '../components/ConnectCardReminderModal.vue'
   import { scheduleLater, dismissForever, getScheduledTime } from '../utils/cardReminder'
   import CardDetailsModal from '../components/CardDetailsModal.vue'
   import TransferModal from '../components/TransferModal.vue'
   import { fetchGroupGiftEvents } from '../services/giftEventService'
+  import { parseServerDate } from '../utils/datetime'
+  import { getCategoryColor } from '../utils/categoryColors'
+  import strings from '../locales/en'
 
   const router = useRouter()
   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
@@ -472,24 +393,6 @@
 
   const isInviteModalOpen = ref(false)
 
-  const { isLoading, logout } = useAuth()
-
-  async function handleLogout() {
-    await logout()
-  }
-
-  const currentUserName = computed(() => currentUser.value?.fullName || '')
-  const currentUserInitials = computed(() => {
-    const name = currentUser.value?.fullName || '?'
-    if (!name) return '?'
-    return name
-      .split(' ')
-      .map((w) => w[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  })
-
   const hasOwnCard = computed(() =>
     connectedCards.value.some((c) => c.user_id === currentUser.value?.id),
   )
@@ -502,7 +405,6 @@
       (c) => String(c.user_id) === String(currentUser.value?.id) && c.status === 'ACTIVE',
     ),
   )
-  const hasOwnActiveCards = computed(() => userOwnedActiveCards.value.length > 0)
 
   async function handleTransferSuccess(_result) {
     isTransferModalOpen.value = false
@@ -511,10 +413,7 @@
     await loadFirstPage()
   }
 
-  const groups = ref([
-    { id: 1, name: storedUser.groupName || 'Family' },
-    { id: 2, name: 'Neighborhood' },
-  ])
+  const groups = ref([{ id: 1, name: storedUser.groupName || 'Family' }])
 
   // Для ролі. Замість const isAdmin = ref(true)
   // const isAdmin = computed(() => storedUser.role === 'ADMIN')
@@ -558,21 +457,22 @@
       const members = Array.isArray(data) ? data : data.members || []
       groupMembers.value = members.map((m) => mapMemberFromApi(m, currentUser.value?.id))
     } catch (err) {
-      showToast('Failed to load group members', 'error')
+      showToast(err.userMessage || 'Failed to load group members', 'error')
     } finally {
       isLoadingMembers.value = false
     }
   }
 
-  // Реальні події групи (замість мок activeGiftEvents)
+  // Реальні активні події групи (замість мок activeGiftEvents).
+  // GET /api/v1/gift/group/{group_id} — бек віддає лише ACTIVE і приховує
+  // події, де поточний користувач є target до unlock_date (PROJ-58).
   const realGiftEvents = ref([])
 
   async function loadGiftEvents() {
     if (!currentUser.value?.groupId) return
     try {
       realGiftEvents.value = await fetchGroupGiftEvents(currentUser.value.groupId)
-    } catch (err) {
-      // Endpoint поки відсутній — буде 404, не критично
+    } catch {
       realGiftEvents.value = []
     }
   }
@@ -583,8 +483,9 @@
   })
 
   function formatPinnedDate(iso) {
-    if (!iso) return ''
-    return new Date(iso).toLocaleDateString('en-US', {
+    const d = parseServerDate(iso)
+    if (!d) return ''
+    return d.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
     })
@@ -621,40 +522,64 @@
     return transactions.value.filter((tx) => tx.author_id === activeFilter.value)
   })
 
-  const categoryBreakdown = ref([
-    { name: 'Food & Groceries', pct: 35, color: '#C4862A' },
-    { name: 'Transport', pct: 25, color: '#4A6FA5' },
-    { name: 'Pharmacy', pct: 15, color: '#5A8A6A' },
-    { name: 'Cafe & Restaurant', pct: 15, color: '#C4613A' },
-    { name: 'Other', pct: 10, color: '#8A7AAA' },
-  ])
+  // ─── Spending by Category (реальні дані зі стрічки, без моків) ───
+  const DONUT_CIRCUMFERENCE = 351.86 // 2π·56 (r=56)
 
-  const activeGiftEvents = ref([
-    {
-      id: 1,
-      name: "Sofia's Birthday",
-      targetUser: 'Sofia K.',
-      unlockDate: 'Apr 15, 2025',
-      collected: 1200,
-      goal: 2000,
-      progressPct: 60,
-    },
-  ])
+  // Розбивка витрат за категоріями з завантажених транзакцій (тільки витрати — від'ємні суми).
+  // Колір кожного сегмента береться з getCategoryColor(name) — той самий, що й у бейджі
+  // транзакції, тож діаграма і список завжди узгоджені за кольором.
+  const categoryBreakdown = computed(() => {
+    const totals = new Map()
+    for (const tx of transactions.value) {
+      const amt = Number(tx.amount)
+      if (!amt || amt >= 0) continue // лише витрати
+      const name = tx.category_name || 'Інше'
+      totals.set(name, (totals.get(name) || 0) + Math.abs(amt))
+    }
+    const grand = [...totals.values()].reduce((s, v) => s + v, 0)
+    if (!grand) return []
 
-  const notifications = ref([
-    {
-      id: 1,
-      title: 'Gift unlock in 24h 🎁',
-      subtitle: "Sofia's Birthday — Apr 15",
-      isUnread: true,
-    },
-    {
-      id: 2,
-      title: 'Mykola reacted 🔥 to your expense',
-      subtitle: 'Today at 11:08',
-      isUnread: false,
-    },
-  ])
+    let offset = 0
+    return [...totals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value]) => {
+        const fraction = value / grand
+        const dash = fraction * DONUT_CIRCUMFERENCE
+        const seg = {
+          name,
+          value,
+          pct: Math.round(fraction * 100),
+          color: getCategoryColor(name),
+          dasharray: `${dash.toFixed(2)} ${DONUT_CIRCUMFERENCE.toFixed(2)}`,
+          offset: -Number(offset.toFixed(2)),
+        }
+        offset += dash
+        return seg
+      })
+  })
+
+  const categoryTotal = computed(() =>
+    categoryBreakdown.value.reduce((s, c) => s + c.value, 0),
+  )
+
+  // Реальні активні події групи для правого блоку (заміна мок-заглушки Sofia's Birthday).
+  const activeGiftEvents = computed(() =>
+    realGiftEvents.value
+      .filter((g) => g.status === 'ACTIVE' || g.status === 'REVEALED')
+      .map((g) => {
+        const collected = Number(g.collected_amount) || 0
+        const goal = Number(g.goal_amount) || 0
+        return {
+          id: g.id,
+          name: g.name,
+          targetUser: g.target_user_name,
+          unlockDate: formatPinnedDate(g.unlock_date),
+          collected: formatAmount(collected),
+          goal: formatAmount(goal),
+          progressPct: goal ? Math.min(100, Math.round((collected / goal) * 100)) : 0,
+        }
+      }),
+  )
 
   const toast = ref({ isVisible: false, message: '', type: 'success' })
 
@@ -757,7 +682,6 @@
   function cardOwnerName(card) {
     return card.owner_full_name || null
   }
-
 </script>
 
 <style scoped>
@@ -768,36 +692,7 @@
     background: #faf8f3;
   }
 
-  /* ── Navbar ── */
-  .navbar {
-    height: 60px;
-    background: #0d0c0a;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    padding: 0 28px;
-    flex-shrink: 0;
-    border-bottom: 1px solid rgba(184, 151, 58, 0.18);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-
-  .navbar__left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .navbar__logo {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: 18px;
-    font-weight: 600;
-    color: #fff;
-    white-space: nowrap;
-  }
-  .navbar__logo--accent {
-    color: #b8973a;
-  }
+  /* ── Navbar: перемикач груп (передається у NavBar через слот #left) ── */
   .navbar__groups {
     display: flex;
     gap: 3px;
@@ -821,51 +716,6 @@
   }
   .navbar__group-tab--add {
     color: rgba(184, 151, 58, 0.6);
-  }
-
-  /* Центровані таби */
-  .navbar__center {
-    display: flex;
-    gap: 2px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 4px;
-    justify-self: center;
-  }
-
-  .navbar__tab {
-    padding: 7px 20px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.5);
-    text-decoration: none;
-    transition: all 0.18s;
-    white-space: nowrap;
-    border: 1px solid transparent;
-  }
-
-  .navbar__tab:hover {
-    color: rgba(255, 255, 255, 0.85);
-  }
-  .navbar__tab--active {
-    background: rgba(184, 151, 58, 0.18);
-    color: #ead9a0;
-    font-weight: 600;
-    border-color: rgba(184, 151, 58, 0.25);
-  }
-
-  .navbar__right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    justify-self: end;
-  }
-  .navbar__user-name {
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.85);
   }
 
   /* ── Layout ── */
@@ -940,6 +790,29 @@
   }
   .sidebar__scroll:hover::-webkit-scrollbar-thumb {
     background: #dfc876;
+  }
+
+  /* Порожні / завантажувальні стани в sidebar */
+  .sidebar__empty {
+    padding: 14px 10px;
+    border: 1px dashed #e2ddd2;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #b0ada7;
+    text-align: center;
+  }
+  .sidebar__loading {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .sidebar__skeleton-row {
+    height: 34px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #ede9de 25%, #f4f1e9 50%, #ede9de 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease infinite;
   }
 
   .member-row {
@@ -1137,18 +1010,26 @@
     font-size: 12px;
     font-weight: 500;
     color: #6b6860;
-    border: none;
+    border: 1px solid transparent;
     background: none;
     font-family: 'DM Sans', system-ui, sans-serif;
     cursor: pointer;
     transition: all 0.18s;
   }
-  .feed-filter-chip:hover {
+  /* Неактивний чіп: підсвічуємо золотим тоном на hover (а не сірим),
+     щоб перехід до активного стану читався як єдина золота гама. */
+  .feed-filter-chip:hover:not(.feed-filter-chip--active) {
     background: #fbf7ec;
+    border-color: #f2e9c8;
+    color: #9b7a25;
   }
+  /* Активний чіп: золотий градієнт як у .btn-gold/бейджів — гармонійно з темою. */
   .feed-filter-chip--active {
-    background: #0d0c0a;
+    background: linear-gradient(135deg, #b8973a, #c9a84c);
     color: #fff;
+    font-weight: 600;
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(184, 151, 58, 0.25);
   }
 
   .live-badge {
@@ -1366,6 +1247,16 @@
     color: #b0ada7;
     margin-bottom: 12px;
   }
+  .right-panel__empty {
+    padding: 16px 14px;
+    background: #faf8f3;
+    border: 1px dashed #e2ddd2;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #b0ada7;
+    text-align: center;
+  }
   .donut-wrap {
     display: flex;
     flex-direction: column;
@@ -1573,31 +1464,6 @@
     opacity: 0;
     transform: translateY(-12px);
   }
-  .logout-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.04);
-    color: rgba(255, 255, 255, 0.6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.18s;
-    margin-left: 4px;
-  }
-
-  .logout-btn:hover:not(:disabled) {
-    background: rgba(196, 64, 42, 0.18);
-    border-color: rgba(196, 64, 42, 0.4);
-    color: #ff8a72;
-  }
-
-  .logout-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
   .tx-sentinel {
     height: 1px;
     width: 100%;
@@ -1635,54 +1501,6 @@
     background: #fbf7ec;
     border-color: #b8973a;
     color: #9b7a25;
-  }
-
-  @media (max-width: 768px) {
-    .navbar {
-      grid-template-columns: 1fr auto;
-      grid-template-rows: auto auto;
-      height: auto;
-      padding: 10px 14px;
-      gap: 8px 10px;
-    }
-    .navbar__left {
-      grid-row: 1;
-      grid-column: 1;
-    }
-    .navbar__right {
-      grid-row: 1;
-      grid-column: 2;
-      gap: 6px;
-    }
-    .navbar__center {
-      grid-row: 2;
-      grid-column: 1 / -1;
-      justify-self: center;
-      -webkit-overflow-scrolling: touch;
-    }
-    .navbar__center::-webkit-scrollbar {
-      display: none;
-    }
-    .navbar__logo {
-      font-size: 15px;
-    }
-    .navbar__tab {
-      padding: 6px 14px;
-      font-size: 12px;
-    }
-    .navbar__user-name {
-      display: none;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .navbar {
-      padding: 8px 12px;
-    }
-    .navbar__tab {
-      padding: 5px 12px;
-      font-size: 11px;
-    }
   }
 
   @media (max-width: 768px) {

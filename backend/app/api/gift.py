@@ -258,20 +258,21 @@ async def get_group_gifts(group_id: str, current_user: User = Depends(get_curren
     if not membership:
         raise HTTPException(status_code=403, detail="Ви не є учасником цієї групи")
 
-    # Шукаємо всі активні подарунки групи
-    active_gifts = await GiftEvent.find({
+    # Шукаємо ACTIVE та REVEALED подарунки групи.
+    # REVEALED включаємо, щоб після розкриття іменинник мав точку входу
+    # до своєї події (→ WOW-екран). CANCELLED не показуємо.
+    gifts = await GiftEvent.find({
         "group_id": group_id,  # Або спробуй group_oid, якщо в базі це ObjectId
-        "status": GiftStatus.ACTIVE
+        "status": {"$in": [GiftStatus.ACTIVE.value, GiftStatus.REVEALED.value]}
     }).to_list()
 
-    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     response_data = []
 
-    for gift in active_gifts:
-        # Логіка ізоляції Target User (виключаємо, якщо час ще не настав)
-        gift_unlock_naive = gift.unlock_date.replace(tzinfo=None)
-        if gift.target_user_id == str(current_user.id) and now_utc < gift_unlock_naive:
-            continue # Пропускаємо цей подарунок для іменинника
+    for gift in gifts:
+        # Ізоляція Target User (PROJ-58): іменинник НЕ бачить свою подію,
+        # поки вона ACTIVE (не розкрита). Після REVEALED — бачить (це і є сюрприз).
+        if gift.status == GiftStatus.ACTIVE and gift.target_user_id == str(current_user.id):
+            continue  # Пропускаємо нерозкриту подію для іменинника
 
         # Дістаємо ім'я іменинника (для UX)
         target_user = await User.get(PydanticObjectId(gift.target_user_id))

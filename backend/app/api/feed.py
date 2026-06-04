@@ -6,7 +6,7 @@ from app.models.transaction import Transaction
 from app.models.bank_card import BankCard
 from app.models.group_membership import GroupMembership
 from app.models.category import Category
-from app.models.gift_event import GiftEvent
+from app.models.gift_event import GiftEvent, GiftStatus
 from app.schemas.feed import FeedResponse, FeedTransactionItem
 from beanie import PydanticObjectId
 import urllib.parse
@@ -41,25 +41,29 @@ async def get_unified_feed(
         raise HTTPException(status_code=403, detail="Ви не є учасником цієї групи")
 
     # 4. Фільтр Secret Gift (PROJ-58: Ізоляція Target User)
-    now = datetime.now(timezone.utc)
-
-    # Крок А: Шукаємо подарунки, де юзер є іменинником, але час ще НЕ настав
+    # Ховаємо транзакції від іменинника, ПОКИ його подія НЕ розкрита (status == ACTIVE).
+    # Прив'язка до статусу, а не до unlock_date, робить ізоляцію стійкою до таймзон
+    # і до затримки cron: щойно cron переведе подію в REVEALED — іменинник побачить внески.
     locked_gifts = await GiftEvent.find(
         GiftEvent.target_user_id == str(current_user.id),
-        GiftEvent.unlock_date > now
+        GiftEvent.status == GiftStatus.ACTIVE
     ).to_list()
 
-        # Витягуємо їхні ID у список
+    # Витягуємо їхні ID у список
     locked_gift_ids = [str(g.id) for g in locked_gifts]
 
-        # Крок Б: Формуємо запит.
+    # Формуємо запит.
     query = {
         "group_id": clean_group_id,
-         "$nor": [
+        "$nor": [
             # 1. Захист для старих транзакцій (без прив'язки до події)
             {"is_secret_gift": True, "target_user_id": str(current_user.id), "gift_id": None},
-            # 2. Нове правило (BE-02): Приховуємо транзакції, якщо вони належать до заблокованих подій
-            {"gift_id": {"$in": locked_gift_ids}}
+            # 2. Приховуємо транзакції нерозкритих подій, де юзер — іменинник
+            {"gift_id": {"$in": locked_gift_ids}},
+            # 3. Підстраховка: будь-яка секретна транзакція, що таргетить юзера,
+            #    поки в нього є нерозкрита подія (на випадок розбіжності gift_id)
+            {"is_secret_gift": True, "target_user_id": str(current_user.id),
+             "gift_id": {"$in": locked_gift_ids}},
         ]
     }
 

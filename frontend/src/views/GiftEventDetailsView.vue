@@ -1,25 +1,6 @@
 <template>
   <div class="page">
-    <header class="navbar">
-      <div class="navbar__left">
-        <span class="navbar__logo">Family <span class="navbar__logo--accent">Wallet</span></span>
-      </div>
-      <nav class="navbar__center">
-        <router-link to="/feed" class="navbar__tab" active-class="navbar__tab--active"
-          >Feed</router-link
-        >
-        <router-link to="/gift-events" class="navbar__tab" active-class="navbar__tab--active"
-          >Gift Events</router-link
-        >
-        <router-link to="/settings" class="navbar__tab" active-class="navbar__tab--active"
-          >Settings</router-link
-        >
-      </nav>
-      <div class="navbar__right">
-        <div class="avatar avatar--sm avatar--gold">{{ initials }}</div>
-        <span class="navbar__user-name">{{ fullName }}</span>
-      </div>
-    </header>
+    <NavBar />
 
     <main class="main">
       <!-- Loading -->
@@ -214,22 +195,12 @@
     contributeToGift,
   } from '../services/giftEventService'
   import { fetchGroupCards } from '../services/cardService'
+  import { parseServerDate } from '../utils/datetime'
+  import NavBar from '../components/NavBar.vue'
 
   const route = useRoute()
   const router = useRouter()
   const { currentUser } = useAuth()
-
-  const fullName = computed(() => currentUser.value?.fullName || '')
-  const initials = computed(() => {
-    const name = fullName.value
-    if (!name) return '?'
-    return name
-      .split(' ')
-      .map((w) => w[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  })
 
   const giftId = computed(() => route.params.id)
 
@@ -243,8 +214,9 @@
   const isTarget = computed(() => currentUser.value?.id === gift.value?.target_user_id)
   const isOrganizer = computed(() => currentUser.value?.id === gift.value?.organizer_id)
   const isUnlocked = computed(() => {
-    if (!gift.value?.unlock_date) return false
-    return new Date(gift.value.unlock_date).getTime() <= Date.now()
+    const d = parseServerDate(gift.value?.unlock_date)
+    if (!d) return false
+    return d.getTime() <= Date.now()
   })
   const isWowMode = computed(
     () => isTarget.value && (gift.value?.status === 'REVEALED' || isUnlocked.value),
@@ -285,7 +257,7 @@
         error.value = "This event doesn't exist or has been cancelled."
       } else {
         errorTitle.value = 'Could not load event'
-        error.value = err.response?.data?.message || 'Please try again later.'
+        error.value = err.userMessage || 'Please try again later.'
       }
     } finally {
       isLoading.value = false
@@ -330,8 +302,8 @@
   }
 
   function formatDate(isoString) {
-    if (!isoString) return ''
-    const d = new Date(isoString)
+    const d = parseServerDate(isoString)
+    if (!d) return ''
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'long',
@@ -370,8 +342,7 @@
       inviteUrl.value = data.invite_url
       showToast('Link generated', 'success')
     } catch (err) {
-      const message = err.response?.data?.message || 'Failed to generate link.'
-      showToast(message, 'error')
+      showToast(err.userMessage || 'Failed to generate link.', 'error')
     } finally {
       isGeneratingLink.value = false
     }
@@ -447,8 +418,7 @@
       contributeAmount.value = null
       showToast('Thank you for your contribution!', 'success')
     } catch (err) {
-      const msg = err.response?.data?.detail || err.response?.data?.message
-      showToast(msg || 'Contribution failed. Try again.', 'error')
+      showToast(err.userMessage || 'Contribution failed. Try again.', 'error')
     } finally {
       isContributing.value = false
     }
@@ -473,75 +443,6 @@
     display: flex;
     flex-direction: column;
     background: #faf8f3;
-  }
-
-  /* Navbar */
-  .navbar {
-    height: 60px;
-    background: #0d0c0a;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    padding: 0 28px;
-    flex-shrink: 0;
-    border-bottom: 1px solid rgba(184, 151, 58, 0.18);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .navbar__left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .navbar__logo {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: 18px;
-    font-weight: 600;
-    color: #fff;
-  }
-  .navbar__logo--accent {
-    color: #b8973a;
-  }
-  .navbar__center {
-    display: flex;
-    gap: 2px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 4px;
-    justify-self: center;
-  }
-  .navbar__tab {
-    padding: 7px 20px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.5);
-    text-decoration: none;
-    transition: all 0.18s;
-    white-space: nowrap;
-    border: 1px solid transparent;
-  }
-  .navbar__tab:hover {
-    color: rgba(255, 255, 255, 0.85);
-  }
-  .navbar__tab--active {
-    background: rgba(184, 151, 58, 0.18);
-    color: #ead9a0;
-    font-weight: 600;
-    border-color: rgba(184, 151, 58, 0.25);
-  }
-  .navbar__right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    justify-self: end;
-  }
-  .navbar__user-name {
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.85);
   }
 
   .avatar {
@@ -1076,55 +977,6 @@
   .toast-leave-to {
     opacity: 0;
     transform: translateY(12px);
-  }
-
-  @media (max-width: 768px) {
-    .navbar {
-      grid-template-columns: 1fr auto;
-      grid-template-rows: auto auto;
-      height: auto;
-      padding: 10px 14px;
-      gap: 8px 10px;
-    }
-    .navbar__left {
-      grid-row: 1;
-      grid-column: 1;
-    }
-    .navbar__right {
-      grid-row: 1;
-      grid-column: 2;
-      gap: 6px;
-    }
-    .navbar__center {
-      grid-row: 2;
-      grid-column: 1 / -1;
-      justify-self: stretch;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .navbar__center::-webkit-scrollbar {
-      display: none;
-    }
-    .navbar__logo {
-      font-size: 15px;
-    }
-    .navbar__tab {
-      padding: 6px 14px;
-      font-size: 12px;
-    }
-    .navbar__user-name {
-      display: none;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .navbar {
-      padding: 8px 12px;
-    }
-    .navbar__tab {
-      padding: 5px 12px;
-      font-size: 11px;
-    }
   }
 
   @media (max-width: 768px) {

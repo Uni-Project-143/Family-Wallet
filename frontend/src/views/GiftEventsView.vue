@@ -1,29 +1,6 @@
 <template>
   <div class="page">
-    <!-- Той самий navbar що на Feed/Settings -->
-    <header class="navbar">
-      <div class="navbar__left">
-        <span class="navbar__logo">Family <span class="navbar__logo--accent">Wallet</span></span>
-      </div>
-      <nav class="navbar__center">
-        <router-link to="/feed" class="navbar__tab" active-class="navbar__tab--active"
-          >Feed</router-link
-        >
-        <router-link to="/gift-events" class="navbar__tab" active-class="navbar__tab--active"
-          >Gift Events</router-link
-        >
-        <router-link to="/settings" class="navbar__tab" active-class="navbar__tab--active"
-          >Settings</router-link
-        >
-      </nav>
-      <div class="navbar__right">
-        <div class="avatar avatar--sm avatar--gold">{{ initials }}</div>
-        <span class="navbar__user-name">{{ fullName }}</span>
-        <span class="badge" :class="isAdmin ? 'badge--admin' : 'badge--member'">
-          {{ isAdmin ? 'Admin' : 'Member' }}
-        </span>
-      </div>
-    </header>
+    <NavBar />
 
     <main class="main">
       <div class="header-row">
@@ -357,26 +334,15 @@
 </template>
 
 <script setup>
-  import { ref, computed, onMounted } from 'vue'
+  import { ref, computed, onMounted, watch } from 'vue'
   import { useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
   import { fetchGroupMembers } from '../services/authService'
   import { createGiftEvent, generateGiftInviteLink } from '../services/giftEventService'
+  import NavBar from '../components/NavBar.vue'
 
   const router = useRouter()
-  const { currentUser, isAdmin } = useAuth()
-
-  const fullName = computed(() => currentUser.value?.fullName || '')
-  const initials = computed(() => {
-    const name = fullName.value
-    if (!name) return '?'
-    return name
-      .split(' ')
-      .map((w) => w[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  })
+  const { currentUser } = useAuth()
 
   // ─── Group members з API ───
   const groupMembers = ref([])
@@ -460,14 +426,44 @@
     goalAmount: '',
   })
 
+  // ─── Динамічна валідація «на льоту» ───
+  // Щойно поле вже показало помилку — перевіряємо його наживо, поки користувач виправляє.
+  watch(
+    () => form.value.name,
+    () => {
+      if (errors.value.name) validate('name')
+    },
+  )
+  watch(
+    () => form.value.unlockDate,
+    () => {
+      if (errors.value.unlockDate) validate('unlockDate')
+    },
+  )
+  watch(
+    () => form.value.goalAmount,
+    () => {
+      if (errors.value.goalAmount) validate('goalAmount')
+    },
+  )
+  // Вибір отримувача одразу прибирає помилку
+  watch(
+    () => form.value.targetUserId,
+    (v) => {
+      if (v) errors.value.targetUserId = ''
+    },
+  )
+
   /**
    * Мінімум для datetime-local — завтра 00:00 у локальній timezone.
    * datetime-local не приймає UTC ISO — потрібен local string "YYYY-MM-DDTHH:mm".
    */
   const minDateTime = computed(() => {
     const d = new Date()
-    d.setDate(d.getDate() + 1)
-    d.setHours(0, 0, 0, 0)
+    // ⚠️ ТИМЧАСОВО ДЛЯ ТЕСТУВАННЯ: дозволяємо сьогодні (min = поточний момент).
+    // Для продакшну повернути мінімум "завтра" (PROJ-56), розкоментувавши 2 рядки:
+    // d.setDate(d.getDate() + 1)
+    // d.setHours(0, 0, 0, 0)
     return formatLocalDateTime(d)
   })
 
@@ -591,26 +587,14 @@
         const linkData = await generateGiftInviteLink(createdGiftId.value)
         inviteUrl.value = linkData.invite_url
       } catch (linkErr) {
-        inviteError.value =
-          linkErr.response?.data?.detail ||
-          linkErr.response?.data?.message ||
-          'You can generate it later from the event page.'
+        inviteError.value = linkErr.userMessage || 'You can generate it later from the event page.'
       }
 
       currentStep.value = 3
     } catch (err) {
-      const status = err.response?.status
-      const message = err.response?.data?.message
-
-      if (status === 400) {
-        serverError.value = message || 'Invalid event data. Please check the fields.'
-      } else if (status === 422) {
-        serverError.value = message || 'Validation error. Date must be in the future.'
-      } else if (status === 403) {
-        serverError.value = "You don't have permission to create events in this group."
-      } else {
-        serverError.value = message || 'Something went wrong. Please try again.'
-      }
+      // Показуємо конкретну причину з бекенду (self як target, минула дата тощо),
+      // або осмислений фолбек за статусом.
+      serverError.value = err.userMessage || 'Something went wrong. Please try again.'
     } finally {
       isSubmitting.value = false
     }
@@ -623,8 +607,7 @@
       const linkData = await generateGiftInviteLink(createdGiftId.value)
       inviteUrl.value = linkData.invite_url
     } catch (err) {
-      inviteError.value =
-        err.response?.data?.detail || err.response?.data?.message || 'Failed to generate link.'
+      inviteError.value = err.userMessage || 'Failed to generate link.'
     }
   }
 
@@ -671,75 +654,6 @@
     display: flex;
     flex-direction: column;
     background: #faf8f3;
-  }
-
-  /* ── Navbar (повторюється з FeedView) ── */
-  .navbar {
-    height: 60px;
-    background: #0d0c0a;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    padding: 0 28px;
-    flex-shrink: 0;
-    border-bottom: 1px solid rgba(184, 151, 58, 0.18);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .navbar__left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .navbar__logo {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: 18px;
-    font-weight: 600;
-    color: #fff;
-  }
-  .navbar__logo--accent {
-    color: #b8973a;
-  }
-  .navbar__center {
-    display: flex;
-    gap: 2px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 4px;
-    justify-self: center;
-  }
-  .navbar__tab {
-    padding: 7px 20px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.5);
-    text-decoration: none;
-    transition: all 0.18s;
-    white-space: nowrap;
-    border: 1px solid transparent;
-  }
-  .navbar__tab:hover {
-    color: rgba(255, 255, 255, 0.85);
-  }
-  .navbar__tab--active {
-    background: rgba(184, 151, 58, 0.18);
-    color: #ead9a0;
-    font-weight: 600;
-    border-color: rgba(184, 151, 58, 0.25);
-  }
-  .navbar__right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    justify-self: end;
-  }
-  .navbar__user-name {
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.85);
   }
 
   .avatar {
@@ -1392,55 +1306,6 @@
   .modal-leave-to {
     opacity: 0;
     transform: scale(0.94) translateY(12px);
-  }
-
-  @media (max-width: 768px) {
-    .navbar {
-      grid-template-columns: 1fr auto;
-      grid-template-rows: auto auto;
-      height: auto;
-      padding: 10px 14px;
-      gap: 8px 10px;
-    }
-    .navbar__left {
-      grid-row: 1;
-      grid-column: 1;
-    }
-    .navbar__right {
-      grid-row: 1;
-      grid-column: 2;
-      gap: 6px;
-    }
-    .navbar__center {
-      grid-row: 2;
-      grid-column: 1 / -1;
-      justify-self: center;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .navbar__center::-webkit-scrollbar {
-      display: none;
-    }
-    .navbar__logo {
-      font-size: 15px;
-    }
-    .navbar__tab {
-      padding: 6px 14px;
-      font-size: 12px;
-    }
-    .navbar__user-name {
-      display: none;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .navbar {
-      padding: 8px 12px;
-    }
-    .navbar__tab {
-      padding: 5px 12px;
-      font-size: 11px;
-    }
   }
 
   @media (max-width: 480px) {

@@ -1,28 +1,6 @@
 <template>
   <div class="settings-page">
-    <!-- ═══ NAVBAR (той самий що на Feed) ═══ -->
-    <header class="navbar">
-      <div class="navbar__left">
-        <span class="navbar__logo">Family <span class="navbar__logo--accent">Wallet</span></span>
-      </div>
-      <nav class="navbar__center">
-        <router-link to="/feed" class="navbar__tab" active-class="navbar__tab--active"
-          >Feed</router-link
-        >
-        <router-link to="/gift-events" class="navbar__tab" active-class="navbar__tab--active"
-          >Gift Events</router-link
-        >
-        <router-link to="/settings" class="navbar__tab" active-class="navbar__tab--active"
-          >Settings</router-link
-        >
-      </nav>
-      <div class="navbar__right">
-        <div class="avatar avatar--sm avatar--gold">{{ currentUserInitials }}</div>
-        <span class="navbar__user-name">{{ currentUserName }}</span>
-        <span v-if="isAdmin" class="badge badge--admin">Admin</span>
-        <span v-else class="badge badge--member">Member</span>
-      </div>
-    </header>
+    <NavBar />
 
     <!-- ═══ BODY ═══ -->
     <div class="settings-layout">
@@ -356,11 +334,9 @@
                   {{ card.status }}
                 </span>
                 <button class="btn-details" @click="openCardDetails(card)">Details</button>
-                <button
-                  v-if="card.user_id === currentUser?.id"
-                  class="btn-remove"
-                  @click="askDisconnect(card)"
-                >
+                <!-- Видалити можна ВИКЛЮЧНО власну картку (порівняння через String,
+                     бо user_id/ id можуть бути різного типу після серіалізації). -->
+                <button v-if="isOwnCard(card)" class="btn-remove" @click="askDisconnect(card)">
                   Disconnect
                 </button>
               </div>
@@ -465,6 +441,7 @@
 
   import ConnectCardModal from '../components/ConnectCardModal.vue'
   import ConfirmDialog from '../components/ConfirmDialog.vue'
+  import NavBar from '../components/NavBar.vue'
   import { useRoute } from 'vue-router'
   import { usePersistentState } from '../composables/usePersistentState'
   import CardDetailsModal from '../components/CardDetailsModal.vue'
@@ -482,17 +459,6 @@
 
   // Реальна роль з localStorage через useAuth
   const { currentUser, isAdmin } = useAuth()
-
-  const currentUserName = computed(() => currentUser.value?.fullName || 'User')
-  const currentUserInitials = computed(() => {
-    const name = currentUser.value?.fullName || 'U'
-    return name
-      .split(' ')
-      .map((w) => w[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  })
 
   const navItems = [
     { key: 'members', icon: '👥', label: 'Group Members' },
@@ -616,7 +582,7 @@
       if (status === 403) {
         showToast('Only Admin can generate invite links (Rule-02)', 'error')
       } else {
-        showToast('Error generating invite link. Try again.', 'error')
+        showToast(err.userMessage || 'Error generating invite link. Try again.', 'error')
       }
     } finally {
       isGeneratingLink.value = false
@@ -683,6 +649,14 @@
   const isDisconnecting = ref(false)
 
   /**
+   * Чи належить картка поточному користувачу.
+   * Порівнюємо через String — user_id з беку та currentUser.id можуть мати різні типи.
+   */
+  function isOwnCard(card) {
+    return String(card.user_id) === String(currentUser.value?.id)
+  }
+
+  /**
    * Завантажує всі картки групи з беку.
    * GET /api/v1/bank-cards/group/{group_id}
    * Доступно будь-якому учаснику групи (бек повертає всі картки крім encrypted_token).
@@ -739,7 +713,7 @@
       cardToDisconnect.value = null
     } catch (err) {
       const status = err.response?.status
-      const message = err.response?.data?.message
+      const message = err.response?.data?.detail || err.response?.data?.message
 
       if (status === 403) {
         showToast(message || 'You can only disconnect your own cards', 'error')
@@ -750,7 +724,7 @@
         isConfirmOpen.value = false
         cardToDisconnect.value = null
       } else {
-        showToast(message || 'Failed to disconnect card', 'error')
+        showToast(err.userMessage || 'Failed to disconnect card', 'error')
       }
     } finally {
       isDisconnecting.value = false
@@ -819,75 +793,6 @@
     display: flex;
     flex-direction: column;
     background: #faf8f3;
-  }
-
-  /* ── Navbar (той самий стиль що в FeedView) ── */
-  .navbar {
-    height: 60px;
-    background: #0d0c0a;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    padding: 0 28px;
-    flex-shrink: 0;
-    border-bottom: 1px solid rgba(184, 151, 58, 0.18);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .navbar__left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .navbar__logo {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: 18px;
-    font-weight: 600;
-    color: #fff;
-  }
-  .navbar__logo--accent {
-    color: #b8973a;
-  }
-  .navbar__center {
-    display: flex;
-    gap: 2px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 4px;
-    justify-self: center;
-  }
-  .navbar__tab {
-    padding: 7px 20px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.5);
-    text-decoration: none;
-    transition: all 0.18s;
-    white-space: nowrap;
-    border: 1px solid transparent;
-  }
-  .navbar__tab:hover {
-    color: rgba(255, 255, 255, 0.85);
-  }
-  .navbar__tab--active {
-    background: rgba(184, 151, 58, 0.18);
-    color: #ead9a0;
-    font-weight: 600;
-    border-color: rgba(184, 151, 58, 0.25);
-  }
-  .navbar__right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    justify-self: end;
-  }
-  .navbar__user-name {
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.85);
   }
 
   /* ── Layout ── */
@@ -1623,55 +1528,6 @@
     }
     100% {
       background-position: -200% 0;
-    }
-  }
-
-  @media (max-width: 768px) {
-    .navbar {
-      grid-template-columns: 1fr auto;
-      grid-template-rows: auto auto;
-      height: auto;
-      padding: 10px 14px;
-      gap: 8px 10px;
-    }
-    .navbar__left {
-      grid-row: 1;
-      grid-column: 1;
-    }
-    .navbar__right {
-      grid-row: 1;
-      grid-column: 2;
-      gap: 6px;
-    }
-    .navbar__center {
-      grid-row: 2;
-      grid-column: 1 / -1;
-      justify-self: center;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .navbar__center::-webkit-scrollbar {
-      display: none;
-    }
-    .navbar__logo {
-      font-size: 15px;
-    }
-    .navbar__tab {
-      padding: 6px 14px;
-      font-size: 12px;
-    }
-    .navbar__user-name {
-      display: none;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .navbar {
-      padding: 8px 12px;
-    }
-    .navbar__tab {
-      padding: 5px 12px;
-      font-size: 11px;
     }
   }
 

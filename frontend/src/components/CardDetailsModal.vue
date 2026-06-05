@@ -39,9 +39,9 @@
               </div>
 
               <div v-if="isOwnCard" class="details-row">
-                <span class="details-row__label">Effective balance</span>
+                <span class="details-row__label">Balance</span>
                 <span class="details-row__value details-row__value--accent">
-                  {{ formatBalance(card.effective_balance ?? card.balance) }}
+                  {{ formatBalance(card.virtual_balance ?? card.effective_balance ?? card.balance) }}
                   <span class="details-row__currency">UAH</span>
                 </span>
               </div>

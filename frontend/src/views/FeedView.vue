@@ -281,6 +281,13 @@
     @success="handleTransferSuccess"
     @toast="showToast($event.message, $event.type)"
   />
+  <MoneyRequestModal
+    :is-open="isMoneyRequestOpen"
+    :sender-name="currentUser?.fullName || 'You'"
+    :recipient="moneyRequestRecipient"
+    @close="isMoneyRequestOpen = false"
+    @toast="showToast($event.message, $event.type)"
+  />
 </template>
 
 <script setup>
@@ -304,6 +311,7 @@
   import { scheduleLater, dismissForever, getScheduledTime } from '../utils/cardReminder'
   import CardDetailsModal from '../components/CardDetailsModal.vue'
   import TransferModal from '../components/TransferModal.vue'
+  import MoneyRequestModal from '../components/MoneyRequestModal.vue'
   import { fetchGroupGiftEvents } from '../services/giftEventService'
   import { parseServerDate } from '../utils/datetime'
   import { resolveCategory } from '../utils/categoryColors'
@@ -586,8 +594,13 @@
     }, 4000)
   }
 
+  // ─── Money Request (кнопка "$" біля учасника) ───
+  const isMoneyRequestOpen = ref(false)
+  const moneyRequestRecipient = ref(null)
+
   function openMoneyRequestModal(member) {
-    showToast(`Opening request to ${member.name}`, 'info')
+    moneyRequestRecipient.value = member
+    isMoneyRequestOpen.value = true
   }
 
   /**

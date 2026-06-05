@@ -12,6 +12,7 @@ from app.schemas.transaction import (
     TransferResponse,
 )
 from app.services.transaction_service import TransactionService
+from app.schemas.transaction import ReactionRequest
 
 router = APIRouter()
 
@@ -77,3 +78,20 @@ async def create_transfer(
         payload=payload,
         current_user_id=str(current_user.id),
     )
+
+@router.post("/{transaction_id}/react", status_code=status.HTTP_200_OK)
+async def react_to_transaction(
+    transaction_id: str,
+    payload: ReactionRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Додає або оновлює емодзі-реакцію користувача на транзакцію.
+    Автоматично розсилає оновлення по WebSocket всім учасникам групи.
+    """
+    result = await TransactionService.react_to_transaction(
+        transaction_id=transaction_id,
+        user_id=str(current_user.id),
+        emoji=payload.emoji
+    )
+    return result

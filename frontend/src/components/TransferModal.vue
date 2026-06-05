@@ -37,7 +37,8 @@
                   >
                     <option :value="''" disabled>Виберіть картку</option>
                     <option v-for="card in userCards" :key="card.id" :value="card.id">
-                      {{ card.masked_pan }} — {{ formatBalance(card.effective_balance) }} UAH
+                      {{ card.masked_pan }} —
+                      {{ formatBalance(card.virtual_balance ?? card.effective_balance) }} UAH
                     </option>
                   </select>
                 </div>
@@ -300,8 +301,11 @@
       errors.amount = 'Сума має бути більше 0'
       return false
     }
-    if (fromCard.value && fromCard.value.effective_balance != null) {
-      const balance = parseFloat(fromCard.value.effective_balance)
+    // Достатність коштів перевіряємо по актуальному (virtual) балансу,
+    // з фолбеком на effective_balance, який зараз віддає API карток.
+    const fromBalance = fromCard.value?.virtual_balance ?? fromCard.value?.effective_balance
+    if (fromBalance != null) {
+      const balance = parseFloat(fromBalance)
       if (!Number.isNaN(balance) && num > balance) {
         errors.amount = 'Недостатньо коштів на картці-відправнику'
         return false

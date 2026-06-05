@@ -158,8 +158,10 @@ async def handle_monobank_webhook(payload: MonobankWebhookRequest):
 
     await new_transaction.insert()
 
-    # 5. Оновлення балансу картки
-    new_raw_balance = Decimal(str(mono_tx.amount / 100))
+    # 5. Оновлення балансу картки.
+    # Новий реальний баланс рахунку приходить у mono_tx.balance (копійки),
+    # а mono_tx.amount — це сума самої операції (НЕ підсумковий баланс).
+    new_raw_balance = Decimal(str(mono_tx.balance / 100))
 
     balance_diff = new_raw_balance - card.balance
 

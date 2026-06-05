@@ -68,6 +68,7 @@ async def get_cards_by_group(
                 masked_pan=card.masked_pan,
                 balance=card.balance,
                 effective_balance=effective_balance,
+                virtual_balance=card.virtual_balance,
                 status=card.status,
                 transaction_ids=[str(tid) for tid in card.transaction_ids],
                 owner_full_name=owner.full_name if owner else "Невідомий власник"  # <--- НАША ЗМІНА

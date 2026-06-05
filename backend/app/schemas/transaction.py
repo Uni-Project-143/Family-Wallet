@@ -3,6 +3,12 @@ from typing import Optional, List
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
+from typing import Literal
+
+AllowedEmoji = Literal["👍", "❤️", "😂", "🔥", "😮"]
+
+class ReactionRequest(BaseModel):
+    emoji: AllowedEmoji = Field(..., description="Емодзі-реакція")
 
 
 class TransactionType(str, Enum):

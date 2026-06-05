@@ -132,38 +132,6 @@
             </button>
           </div>
         </div>
-        <!-- Pinned Secret Gift banner -->
-        <div
-          v-if="pinnedGift"
-          class="pinned-gift"
-          @click="$router.push(`/gift-events/${pinnedGift.id}`)"
-        >
-          <div class="pinned-gift__icon">
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-              <rect x="3" y="8" width="16" height="11" rx="1.5" fill="#b8973a" />
-              <rect x="3" y="8" width="16" height="2" fill="#9b7a25" />
-              <path
-                d="M11 5V19M7 5C7 3 9 2 11 5C13 2 15 3 15 5"
-                stroke="#dfc876"
-                stroke-width="1.5"
-                stroke-linecap="round"
-              />
-            </svg>
-          </div>
-          <div class="pinned-gift__body">
-            <div class="pinned-gift__label">SECRET GIFT IN PROGRESS</div>
-            <div class="pinned-gift__name">{{ pinnedGift.name }}</div>
-            <div class="pinned-gift__meta">
-              For {{ pinnedGift.target_user_name }} · unlocks
-              {{ formatPinnedDate(pinnedGift.unlock_date) }}
-            </div>
-          </div>
-          <div class="pinned-gift__amount">
-            {{ formatAmount(pinnedGift.collected_amount) }} /
-            {{ formatAmount(pinnedGift.goal_amount) }}
-            <span class="pinned-gift__currency">UAH</span>
-          </div>
-        </div>
         <!-- Skeleton під час першого завантаження (FE-03) -->
         <FeedSkeleton v-if="isLoadingFeed && transactions.length === 0" :count="5" />
 
@@ -477,10 +445,26 @@
     }
   }
 
-  // Перша активна подія для pinned banner
-  const pinnedGift = computed(() => {
-    return realGiftEvents.value.find((g) => g.status === 'ACTIVE') || null
-  })
+  // ─── Вікно видимості події на стрічці ───
+  // Подія лишається на feed, ПОКИ не минуло 24 год після її unlock_date.
+  // Тобто: до дати — видно (збір триває), 24 год після дати — ще видно
+  // (щоб встигли побачити результат), далі — ховаємо зі стрічки.
+  const GIFT_FEED_TTL_MS = 24 * 60 * 60 * 1000
+
+  // Реактивний "зараз" — оновлюється раз на хвилину, щоб подія сама зникла
+  // після 24 год навіть без перезавантаження сторінки.
+  const now = ref(Date.now())
+  let nowTimer = null
+
+  function isGiftWithinFeedWindow(g) {
+    const unlock = parseServerDate(g.unlock_date)
+    if (!unlock) return true // немає дати — не ховаємо
+    return now.value < unlock.getTime() + GIFT_FEED_TTL_MS
+  }
+
+  // Події, які ще "живі" на стрічці (з урахуванням 24-год вікна).
+  // Використовуються лише у правому блоці "Active Gift Events".
+  const visibleGiftEvents = computed(() => realGiftEvents.value.filter(isGiftWithinFeedWindow))
 
   function formatPinnedDate(iso) {
     const d = parseServerDate(iso)
@@ -501,6 +485,10 @@
     loadFirstPage()
     initCardReminder()
     loadGiftEvents()
+    // Тік раз на хвилину — щоб подія сама зникла зі стрічки після 24-год вікна.
+    nowTimer = setInterval(() => {
+      now.value = Date.now()
+    }, 60000)
   })
 
   const activeFilter = ref('all')
@@ -565,8 +553,9 @@
   )
 
   // Реальні активні події групи для правого блоку (заміна мок-заглушки Sofia's Birthday).
+  // Беремо лише події в межах 24-год вікна (visibleGiftEvents).
   const activeGiftEvents = computed(() =>
-    realGiftEvents.value
+    visibleGiftEvents.value
       .filter((g) => g.status === 'ACTIVE' || g.status === 'REVEALED')
       .map((g) => {
         const collected = Number(g.collected_amount) || 0
@@ -679,6 +668,7 @@
 
   onUnmounted(() => {
     if (reminderTimer) clearTimeout(reminderTimer)
+    if (nowTimer) clearInterval(nowTimer)
   })
 
   function cardOwnerName(card) {
@@ -1567,66 +1557,4 @@
     }
   }
 
-  .pinned-gift {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 14px 18px;
-    margin-bottom: 14px;
-    background: linear-gradient(135deg, #fbf7ec, #f4f1e9);
-    border: 1.5px solid #dfc876;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.18s;
-  }
-  .pinned-gift:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(184, 151, 58, 0.2);
-  }
-  .pinned-gift__icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #fff, #fbf7ec);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid #f2e9c8;
-    flex-shrink: 0;
-  }
-  .pinned-gift__body {
-    flex: 1;
-  }
-  .pinned-gift__label {
-    font-size: 9px;
-    font-weight: 700;
-    color: #9b7a25;
-    letter-spacing: 1.2px;
-    margin-bottom: 2px;
-  }
-  .pinned-gift__name {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: 16px;
-    font-weight: 600;
-    color: #0d0c0a;
-  }
-  .pinned-gift__meta {
-    font-size: 11px;
-    color: #6b6860;
-    margin-top: 2px;
-  }
-  .pinned-gift__amount {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: 17px;
-    font-weight: 600;
-    color: #9b7a25;
-    white-space: nowrap;
-  }
-  .pinned-gift__currency {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 10px;
-    font-weight: 500;
-    color: #b0ada7;
-    margin-left: 4px;
-  }
 </style>

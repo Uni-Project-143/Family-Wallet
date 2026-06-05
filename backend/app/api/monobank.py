@@ -6,6 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 import httpx
 from typing import List
+from beanie.odm.operators.update.general import Set, Inc
 
 # АДАПТУЙ: імпортуй свою функцію отримання поточного юзера та модель User
 from app.api.auth import get_current_user
@@ -84,6 +85,7 @@ async def connect_monobank_card(
         account_id=request.account_id,
         masked_pan=request.masked_pan,
         balance=request.balance,
+        virtual_balance=request.balance,
         status="ACTIVE"
     )
     await new_card.insert()
@@ -157,8 +159,14 @@ async def handle_monobank_webhook(payload: MonobankWebhookRequest):
     await new_transaction.insert()
 
     # 5. Оновлення балансу картки
-    card.balance = Decimal(str(mono_tx.balance / 100))
-    await card.save()
+    new_raw_balance = Decimal(str(mono_tx.amount / 100))
+
+    balance_diff = new_raw_balance - card.balance
+
+    await card.update(
+        Set({BankCard.balance: new_raw_balance}),
+        Inc({BankCard.virtual_balance: float(balance_diff)})
+    )
 
     ws_payload = {
         "event": "new_transaction",

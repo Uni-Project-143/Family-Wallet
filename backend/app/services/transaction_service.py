@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from bson import ObjectId
 from bson.errors import InvalidId
+from beanie.odm.operators.update.general import Inc
 
 from app.exceptions import (
     DomainException,
@@ -114,80 +115,71 @@ class TransactionService:
                     detail="Категорію не знайдено",
                 )
 
-        # Крок 9: обчислюємо effective_balance картки-відправника.
-        from_card_id_str = str(from_card.id)
-        deltas = await BankCardRepository.get_virtual_deltas_by_card_ids([from_card_id_str])
-        from_delta = deltas.get(from_card_id_str, Decimal("0"))
-        from_effective = from_card.balance + from_delta
+                # Крок 9: перевірка достатності коштів (використовуємо кешований virtual_balance)
+                from_card_id_str = str(from_card.id)
+                to_card_id_str = str(to_card.id)
+                amount = payload.amount
 
-        # Крок 10: перевірка достатності коштів.
-        amount = payload.amount
-        if from_effective < amount:
-            raise DomainException(status_code=400, detail="Недостатньо коштів")
+                if from_card.virtual_balance < amount:
+                    raise DomainException(status_code=400, detail="Недостатньо коштів")
 
-        # Крок 11: генеруємо transfer_id для парних транзакцій.
-        transfer_id = str(uuid.uuid4())
+                # Крок 10: генеруємо transfer_id для парних транзакцій.
+                transfer_id = str(uuid.uuid4())
 
-        # Крок 12: будуємо ноги переказу з нормалізованим знаком (defense-in-depth).
-        debit_amount = -abs(amount)
-        credit_amount = +abs(amount)
-        group_id_str = str(from_card.group_id)
-        to_card_id_str = str(to_card.id)
+                # Крок 11: будуємо ноги переказу з нормалізованим знаком (defense-in-depth).
+                debit_amount = -abs(amount)
+                credit_amount = +abs(amount)
+                group_id_str = str(from_card.group_id)
 
-        debit = Transaction(
-            card_id=from_card_id_str,
-            amount=debit_amount,
-            currency="UAH",
-            category_id=payload.category_id,
-            description=payload.description,
-            group_id=group_id_str,
-            is_virtual=True,
-            transfer_id=transfer_id,
-        )
-        credit = Transaction(
-            card_id=to_card_id_str,
-            amount=credit_amount,
-            currency="UAH",
-            category_id=payload.category_id,
-            description=payload.description,
-            group_id=group_id_str,
-            is_virtual=True,
-            transfer_id=transfer_id,
-        )
+                debit = Transaction(
+                    card_id=from_card_id_str,
+                    amount=debit_amount,
+                    currency="UAH",
+                    category_id=payload.category_id,
+                    description=payload.description,
+                    group_id=group_id_str,
+                    is_virtual=True,
+                    transfer_id=transfer_id,
+                )
+                credit = Transaction(
+                    card_id=to_card_id_str,
+                    amount=credit_amount,
+                    currency="UAH",
+                    category_id=payload.category_id,
+                    description=payload.description,
+                    group_id=group_id_str,
+                    is_virtual=True,
+                    transfer_id=transfer_id,
+                )
 
-        # Крок 13: атомарний парний insert (helper зі Slice 3).
-        debit_id, credit_id = await TransactionRepository.create_paired_virtual_transactions(
-            debit, credit,
-        )
+                # Крок 12: атомарний парний insert (helper зі Slice 3).
+                debit_id, credit_id = await TransactionRepository.create_paired_virtual_transactions(
+                    debit, credit,
+                )
 
-        # Крок 14: audit log (security recommendation #4.9).
-        logger.info(
-            "VIRTUAL_TRANSFER",
-            extra={
-                "user_id": str(current_user_id),
-                "transfer_id": transfer_id,
-                "from_card_id": from_card_id_str,
-                "to_card_id": to_card_id_str,
-                "amount": str(amount),
-            },
-        )
+                # Крок 13: Атомарне оновлення кешованих балансів ($inc)
+                # Це захищає нас від Race Condition на рівні бази даних
+                await from_card.update(Inc({BankCard.virtual_balance: float(debit_amount)}))
+                await to_card.update(Inc({BankCard.virtual_balance: float(credit_amount)}))
 
-        # Крок 15: повертаємо актуальні effective balances обох карток.
-        final_deltas = await BankCardRepository.get_virtual_deltas_by_card_ids(
-            [from_card_id_str, to_card_id_str],
-        )
-        from_effective_final = from_card.balance + final_deltas.get(
-            from_card_id_str, Decimal("0"),
-        )
-        to_effective_final = to_card.balance + final_deltas.get(
-            to_card_id_str, Decimal("0"),
-        )
+                # Крок 14: audit log (security recommendation #4.9).
+                logger.info(
+                    "VIRTUAL_TRANSFER",
+                    extra={
+                        "user_id": str(current_user_id),
+                        "transfer_id": transfer_id,
+                        "from_card_id": from_card_id_str,
+                        "to_card_id": to_card_id_str,
+                        "amount": str(amount),
+                    },
+                )
 
-        return TransferResponse(
-            transfer_id=transfer_id,
-            debit_transaction_id=debit_id,
-            credit_transaction_id=credit_id,
-            amount=amount,
-            from_effective_balance=from_effective_final,
-            to_effective_balance=to_effective_final,
-        )
+                # Крок 15: повертаємо актуальні кешовані баланси
+                return TransferResponse(
+                    transfer_id=transfer_id,
+                    debit_transaction_id=debit_id,
+                    credit_transaction_id=credit_id,
+                    amount=amount,
+                    from_effective_balance=from_card.virtual_balance - amount,
+                    to_effective_balance=to_card.virtual_balance + amount,
+                )

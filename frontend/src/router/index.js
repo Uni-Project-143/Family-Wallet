@@ -59,6 +59,12 @@ const routes = [
     meta: { requiresGuest: true },
   },
   {
+    path: '/reset-password',
+    name: 'ResetPassword',
+    component: () => import('../views/ResetPasswordView.vue'),
+    meta: { requiresGuest: true },
+  },
+  {
     path: '/feed',
     name: 'Feed',
     component: FeedView,

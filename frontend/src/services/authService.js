@@ -88,6 +88,20 @@ export async function requestPasswordReset(payload) {
   })
   return response.data
 }
+
+/**
+ * Встановлення нового пароля за токеном з email-лінки.
+ * POST /api/v1/auth/reset-password
+ * @param {{ token: string, new_password: string }} payload
+ * @returns {{ message: string }}
+ */
+export async function resetPassword(payload) {
+  const response = await apiClient.post('/api/v1/auth/reset-password', {
+    token: payload.token,
+    new_password: payload.new_password,
+  })
+  return response.data
+}
 // /**
 //  * Список учасників групи.
 //  * GET /api/v1/group/{group_id}/members

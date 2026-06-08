@@ -163,7 +163,7 @@
         <section class="right-panel__section">
           <div class="right-panel__title">Spending by Category</div>
 
-          <div v-if="categoryBreakdown.length" class="donut-wrap">
+          <div v-if="connectedCards.length && categoryBreakdown.length" class="donut-wrap">
             <svg width="152" height="152" viewBox="0 0 160 160">
               <circle cx="80" cy="80" r="56" fill="none" stroke="#F0EFED" stroke-width="26" />
               <circle

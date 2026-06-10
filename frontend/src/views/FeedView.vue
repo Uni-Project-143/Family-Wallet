@@ -161,6 +161,34 @@
 
       <!-- RIGHT PANEL -->
       <aside class="right-panel">
+        <!-- Вхідні запити коштів — показуємо лише коли є PENDING -->
+        <section v-if="incomingRequests.length" class="right-panel__section">
+          <div class="right-panel__title">Money Requests</div>
+          <div class="req-card" v-for="req in incomingRequests" :key="req.id">
+            <div class="req-card__head">
+              <span class="req-card__from">{{ requesterName(req) }}</span>
+              <span class="req-card__amount">{{ formatAmount(req.amount) }} UAH</span>
+            </div>
+            <div v-if="req.description" class="req-card__desc">{{ req.description }}</div>
+            <div class="req-card__actions">
+              <button
+                class="req-btn req-btn--accept"
+                :disabled="respondingId === req.id"
+                @click="respondRequest(req, 'ACCEPTED')"
+              >
+                Accept
+              </button>
+              <button
+                class="req-btn req-btn--decline"
+                :disabled="respondingId === req.id"
+                @click="respondRequest(req, 'DECLINED')"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        </section>
+
         <section class="right-panel__section">
           <div class="right-panel__title">Spending by Category</div>
 
@@ -287,7 +315,15 @@
     :sender-name="currentUser?.fullName || 'You'"
     :recipient="moneyRequestRecipient"
     @close="isMoneyRequestOpen = false"
+    @success="onMoneyRequestSent"
     @toast="showToast($event.message, $event.type)"
+  />
+  <RequestResponseModal
+    :is-open="!!responseModal"
+    :status="responseModal?.status || 'ACCEPTED'"
+    :responder-name="responseModal?.responderName || ''"
+    :amount="responseModal?.amount || 0"
+    @close="closeResponseModal"
   />
 </template>
 
@@ -314,7 +350,14 @@
   import CardDetailsModal from '../components/CardDetailsModal.vue'
   import TransferModal from '../components/TransferModal.vue'
   import MoneyRequestModal from '../components/MoneyRequestModal.vue'
+  import RequestResponseModal from '../components/RequestResponseModal.vue'
+  import { usePersistentState } from '../composables/usePersistentState'
   import { fetchGroupGiftEvents } from '../services/giftEventService'
+  import {
+    fetchIncomingRequests,
+    fetchOutgoingRequests,
+    respondToMoneyRequest,
+  } from '../services/moneyRequestService'
   import { parseServerDate } from '../utils/datetime'
   import { resolveCategory } from '../utils/categoryColors'
   import strings from '../locales/en'
@@ -360,6 +403,14 @@
     onReaction: (data) => {
       // Реал-тайм оновлення реакцій від інших учасників групи.
       if (data?.transaction_id) applyServerReactions(data.transaction_id, data.grouped_reactions)
+    },
+    onRequest: (data, event) => {
+      // new_request / request_updated → оновлюємо список вхідних запитів.
+      loadIncomingRequests()
+      // Якщо саме МІЙ вихідний запит вирішено — показуємо модалку-відповідь.
+      if (event === 'request_updated' && data?.request_id) {
+        handleRequestResolved(data.request_id, data.status)
+      }
     },
   })
 
@@ -505,10 +556,12 @@
 
   onMounted(async () => {
     await loadCards()
-    loadGroupMembers()
+    await loadGroupMembers()
     loadFirstPage()
     initCardReminder()
     loadGiftEvents()
+    loadIncomingRequests()
+    loadOutgoingResolved()
     // Тік раз на хвилину — щоб подія сама зникла зі стрічки після 24-год вікна.
     nowTimer = setInterval(() => {
       now.value = Date.now()
@@ -617,6 +670,159 @@
   function openMoneyRequestModal(member) {
     moneyRequestRecipient.value = member
     isMoneyRequestOpen.value = true
+  }
+
+  // Ключі localStorage прив'язуємо до id користувача — інакше при тестуванні кількох
+  // акаунтів в одному браузері сесії «бачать» чужі запити/позначки.
+  const reqStorageUid = currentUser.value?.id || 'anon'
+
+  // Вихідні запити поточного користувача: { [request_id]: { recipientName, amount } }.
+  // Зберігаємо локально (переживає reload), щоб показати відповідь, коли отримувач
+  // прийме/відхилить запит (WS подія request_updated).
+  const outgoingRequests = usePersistentState(`fw:outgoingRequests:${reqStorageUid}`, {})
+
+  function onMoneyRequestSent(payload) {
+    if (!payload?.request_id) return
+    outgoingRequests.value = {
+      ...outgoingRequests.value,
+      [payload.request_id]: {
+        recipientName: payload.recipientName,
+        amount: payload.amount,
+      },
+    }
+  }
+
+  // Вже ПОБАЧЕНІ (закриті користувачем) відповіді — щоб не показувати повторно.
+  // Позначаємо побаченим ЛИШЕ після закриття модалки (ack-on-close), а не при
+  // додаванні в чергу — інакше пропущена наживо відповідь більше ніколи не з'явиться.
+  const acknowledgedRequests = usePersistentState(`fw:ackRequests:v2:${reqStorageUid}`, [])
+  // Черга модалок-відповідей (можливо кілька вирішених за час офлайну).
+  const responseQueue = ref([]) // [{ id, status, responderName, amount }]
+  const responseModal = computed(() => responseQueue.value[0] || null)
+
+  function isAcked(id) {
+    return acknowledgedRequests.value.includes(id)
+  }
+
+  function enqueueResponse(id, status, responderName, amount) {
+    if (!id || isAcked(id)) return
+    if (responseQueue.value.some((x) => x.id === id)) return // вже в черзі
+    responseQueue.value = [
+      ...responseQueue.value,
+      { id, status: status || 'ACCEPTED', responderName, amount },
+    ]
+  }
+
+  function closeResponseModal() {
+    const current = responseQueue.value[0]
+    if (current && !acknowledgedRequests.value.includes(current.id)) {
+      acknowledgedRequests.value = [...acknowledgedRequests.value, current.id]
+    }
+    responseQueue.value = responseQueue.value.slice(1)
+  }
+
+  // Реал-тайм: мій вихідний запит вирішено (WS). Реагуємо ЛИШЕ якщо це справді
+  // мій вихідний запит (є в моїй мапі) — інакше це чужий запит у межах групи,
+  // і відправнику його покаже офлайн-шлях (loadOutgoingResolved) при вході.
+  function handleRequestResolved(requestId, status) {
+    const out = outgoingRequests.value[requestId]
+    if (!out) return
+    enqueueResponse(requestId, status, out.recipientName || 'A group member', out.amount)
+    const next = { ...outgoingRequests.value }
+    delete next[requestId]
+    outgoingRequests.value = next
+  }
+
+  // Офлайн-сценарій: при вході тягнемо вихідні запити й показуємо ще не побачені рішення.
+  async function loadOutgoingResolved() {
+    if (!currentUser.value?.id) return
+    try {
+      const data = await fetchOutgoingRequests()
+      for (const r of Array.isArray(data) ? data : []) {
+        const id = r.id || r._id
+        if ((r.status === 'ACCEPTED' || r.status === 'DECLINED') && !isAcked(id)) {
+          const name =
+            groupMembers.value.find((m) => String(m.id) === String(r.recipient_id))?.name ||
+            'A group member'
+          enqueueResponse(id, r.status, name, Number(r.amount))
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load outgoing requests:', err)
+    }
+  }
+
+  // ─── Вхідні запити коштів (я — отримувач, маю прийняти/відхилити) ───
+  const incomingRequests = ref([])
+  const respondingId = ref(null)
+
+  async function loadIncomingRequests() {
+    if (!currentUser.value?.id) return
+    try {
+      const data = await fetchIncomingRequests('PENDING')
+      // Beanie серіалізує ідентифікатор як _id — нормалізуємо до id,
+      // щоб PATCH /requests/{id} отримував валідний ObjectId.
+      incomingRequests.value = (Array.isArray(data) ? data : []).map((r) => ({
+        ...r,
+        id: r.id || r._id,
+      }))
+    } catch (err) {
+      console.warn('Failed to load incoming requests:', err)
+    }
+  }
+
+  /** Ім'я того, хто надіслав запит (мапимо requester_id на учасника групи). */
+  function requesterName(req) {
+    const m = groupMembers.value.find((x) => String(x.id) === String(req.requester_id))
+    return m?.name || 'Учасник групи'
+  }
+
+  /** Прийняти/відхилити запит. ACCEPTED → бек виконує переказ. */
+  async function respondRequest(req, status) {
+    if (respondingId.value) return
+
+    // Передперевірка: прийняти запит можна лише маючи СВОЮ активну картку в групі
+    // (саме з неї спишуться кошти). Інакше — зрозуміле повідомлення англійською.
+    if (status === 'ACCEPTED' && userOwnedActiveCards.value.length === 0) {
+      showToast(
+        "You haven't connected a card to this group. Connect your card first to accept money requests.",
+        'error',
+      )
+      return
+    }
+
+    respondingId.value = req.id
+    try {
+      await respondToMoneyRequest(req.id, status)
+      // Прибираємо з локального списку
+      incomingRequests.value = incomingRequests.value.filter((r) => r.id !== req.id)
+      if (status === 'ACCEPTED') {
+        showToast(`Request accepted — ${formatAmount(req.amount)} UAH sent`, 'success')
+        // Баланси змінились — перетягуємо картки і стрічку
+        await loadCards()
+        await loadFirstPage()
+      } else {
+        showToast('Request declined', 'info')
+      }
+    } catch (err) {
+      const httpStatus = err.response?.status
+      const detail = err.response?.data?.detail
+      let message
+      if (httpStatus === 400 && typeof detail === 'string' && detail.includes('картк')) {
+        // Бек: у когось зі сторін немає активної картки в цій групі.
+        message = 'This request can’t be completed: a participant has no active card in this group.'
+      } else if (httpStatus === 409) {
+        message = 'This request has already been resolved.'
+        // синхронізуємо список
+        incomingRequests.value = incomingRequests.value.filter((r) => r.id !== req.id)
+      } else {
+        message =
+          (typeof detail === 'string' && detail) || err.userMessage || 'Failed to process request'
+      }
+      showToast(message, 'error')
+    } finally {
+      respondingId.value = null
+    }
   }
 
   /**
@@ -1314,6 +1520,77 @@
     color: #b0ada7;
     margin-top: 6px;
     font-style: italic;
+  }
+
+  /* ── Money request cards ── */
+  .req-card {
+    background: #fff;
+    border: 1px solid #f2e9c8;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 2px rgba(13, 12, 10, 0.05);
+  }
+  .req-card__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .req-card__from {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0d0c0a;
+  }
+  .req-card__amount {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #9b7a25;
+    white-space: nowrap;
+  }
+  .req-card__desc {
+    font-size: 12px;
+    color: #6b6860;
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+  .req-card__actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .req-btn {
+    flex: 1;
+    height: 32px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+  .req-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .req-btn--accept {
+    background: linear-gradient(135deg, #b8973a, #c9a84c);
+    color: #fff;
+    border: none;
+    box-shadow: 0 2px 8px rgba(184, 151, 58, 0.22);
+  }
+  .req-btn--accept:hover:not(:disabled) {
+    background: linear-gradient(135deg, #9b7a25, #b8973a);
+  }
+  .req-btn--decline {
+    background: #fff;
+    color: #6b6860;
+    border: 1.5px solid #e2ddd2;
+  }
+  .req-btn--decline:hover:not(:disabled) {
+    background: #f4f1e9;
+    border-color: #d6d3ce;
   }
 
   .gift-card {

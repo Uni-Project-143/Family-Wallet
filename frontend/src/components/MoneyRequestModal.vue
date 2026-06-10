@@ -124,6 +124,7 @@
 <script setup>
   import { ref, computed, watch } from 'vue'
   import { useFocusTrap } from '../composables/useFocusTrap'
+  import { createMoneyRequest } from '../services/moneyRequestService'
 
   const props = defineProps({
     isOpen: { type: Boolean, required: true },
@@ -181,23 +182,33 @@
 
   async function handleSubmit() {
     if (!validate()) return
+    if (!props.recipient?.id) {
+      emit('toast', { message: 'Recipient is not specified', type: 'error' })
+      return
+    }
     isSubmitting.value = true
     try {
-      // TODO: підключити реальний endpoint, коли з'явиться на беку
-      // POST /api/v1/money-requests { recipient_id, amount, description }
-      // (зараз ендпоінта немає — поведінка як у sendDirectInvite: оптимістичний UX).
-      emit('success', {
-        recipient: props.recipient,
+      // POST /api/v1/requests/ — створює запит коштів (recipient має прийняти).
+      const result = await createMoneyRequest({
+        recipient_id: props.recipient.id,
         amount: parseFloat(amount.value),
         description: description.value || null,
+      })
+      emit('success', {
+        request_id: result?.request_id,
+        amount: parseFloat(amount.value),
+        recipientName: recipientName.value,
       })
       emit('toast', {
         message: `Request for ${parseFloat(amount.value)} UAH sent to ${recipientName.value}`,
         type: 'success',
       })
-      close()
-    } catch {
-      emit('toast', { message: 'Failed to send request. Try again.', type: 'error' })
+      // Закриваємо напряму (а не через close(), бо isSubmitting ще true і guard завадив би).
+      isSubmitting.value = false
+      emit('close')
+    } catch (err) {
+      const detail = err.response?.data?.detail || err.userMessage || 'Failed to send request. Try again.'
+      emit('toast', { message: typeof detail === 'string' ? detail : 'Failed to send request', type: 'error' })
     } finally {
       isSubmitting.value = false
     }

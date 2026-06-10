@@ -8,8 +8,9 @@ import { ref, onMounted, onUnmounted, watch, toValue } from 'vue'
  * Очікувані повідомлення:
  *   { event: 'new_transaction', data: {...} }
  *   { event: 'reaction_updated', data: { transaction_id, grouped_reactions, ... } }
+ *   { event: 'new_request' | 'request_updated', data: {...} }
  */
-export function useWebSocket({ groupId, onTransaction, onReaction } = {}) {
+export function useWebSocket({ groupId, onTransaction, onReaction, onRequest } = {}) {
   const isConnected = ref(false)
   const reconnectAttempts = ref(0)
   let ws = null
@@ -54,6 +55,8 @@ export function useWebSocket({ groupId, onTransaction, onReaction } = {}) {
             onTransaction?.(msg.data)
           } else if (msg.event === 'reaction_updated') {
             onReaction?.(msg.data)
+          } else if (msg.event === 'new_request' || msg.event === 'request_updated') {
+            onRequest?.(msg.data, msg.event)
           }
         } catch (err) {
           console.warn('WS message parse error:', err)

@@ -10,3 +10,4 @@ class CreateMoneyRequestDto(BaseModel):
 
 class UpdateMoneyRequestDto(BaseModel):
     status: RequestStatus
+    from_card_id: Optional[str] = None

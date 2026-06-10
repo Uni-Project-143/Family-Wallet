@@ -7,8 +7,9 @@ import { ref, onMounted, onUnmounted, watch, toValue } from 'vue'
  *
  * Очікувані повідомлення:
  *   { event: 'new_transaction', data: {...} }
+ *   { event: 'reaction_updated', data: { transaction_id, grouped_reactions, ... } }
  */
-export function useWebSocket({ groupId, onTransaction } = {}) {
+export function useWebSocket({ groupId, onTransaction, onReaction } = {}) {
   const isConnected = ref(false)
   const reconnectAttempts = ref(0)
   let ws = null
@@ -51,6 +52,8 @@ export function useWebSocket({ groupId, onTransaction } = {}) {
           const msg = JSON.parse(event.data)
           if (msg.event === 'new_transaction') {
             onTransaction?.(msg.data)
+          } else if (msg.event === 'reaction_updated') {
+            onReaction?.(msg.data)
           }
         } catch (err) {
           console.warn('WS message parse error:', err)

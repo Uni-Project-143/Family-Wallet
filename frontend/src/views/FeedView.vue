@@ -298,6 +298,7 @@
   import { useFeedTransactions } from '../composables/useFeedTransactions'
   import { useInfiniteScroll } from '../composables/useInfiniteScroll'
   import { useWebSocket } from '../composables/useWebSocket'
+  import { applyServerReactions, seedReactions } from '../composables/useReactions'
   import { fetchGroupMembers } from '../services/authService'
   import { fetchGroupCards } from '../services/cardService'
   import InviteMemberModal from '../components/InviteMemberModal.vue'
@@ -356,7 +357,19 @@
   const { isConnected: wsConnected } = useWebSocket({
     groupId: () => currentUser.value?.groupId,
     onTransaction: handleWsTransaction,
+    onReaction: (data) => {
+      // Реал-тайм оновлення реакцій від інших учасників групи.
+      if (data?.transaction_id) applyServerReactions(data.transaction_id, data.grouped_reactions)
+    },
   })
+
+  // Засів реакцій зі стрічки (бек віддає reactions + my_reaction) при кожній
+  // зміні набору транзакцій — нові сторінки/рефетч. seedReactions сіє раз на tx.
+  watch(
+    () => transactions.value.length,
+    () => transactions.value.forEach(seedReactions),
+    { immediate: true },
+  )
 
   function handleWsTransaction() {
     // Backend шле тільки сирі поля транзакції (без display_name, avatar, category_emoji).

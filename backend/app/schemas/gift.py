@@ -11,7 +11,7 @@ class CreateGiftRequest(BaseModel):
 
     @field_validator('unlock_date')
     def date_must_be_in_future(cls, v):
-        # Якщо дата менша за поточний час — викидаємо помилку (FastAPI перетворить її на 422 Unprocessable Entity)
+        # Якщо дата менша за поточний час — викидаємо помилку
         if v <= datetime.now(timezone.utc):
             raise ValueError('UnlockDate should be in the future')
         return v
@@ -19,3 +19,7 @@ class CreateGiftRequest(BaseModel):
 class CreateGiftResponse(BaseModel):
     status: str
     gift_id: str
+
+# ---> ДОДАНО: Схема для уніфікованого приєднання <---
+class JoinGiftRequest(BaseModel):
+    invite_link: str

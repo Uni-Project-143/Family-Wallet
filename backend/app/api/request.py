@@ -82,6 +82,19 @@ async def get_incoming_requests(
     ).to_list()
 
 
+@router.get("/outgoing", response_model=List[MoneyRequest])
+async def get_outgoing_requests(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Запити, які надіслав поточний користувач (для показу відповіді відправнику,
+    зокрема після того, як він був офлайн у момент рішення отримувача).
+    """
+    return await MoneyRequest.find(
+        MoneyRequest.requester_id == str(current_user.id)
+    ).sort(-MoneyRequest.created_at).to_list()
+
+
 @router.patch("/{request_id}")
 async def update_money_request(
     request_id: str,

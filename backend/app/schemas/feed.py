@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 
@@ -19,6 +19,9 @@ class FeedTransactionItem(BaseModel):
     category_emoji: Optional[str] = None  # Для іконки категорії
     category_code: Optional[str] = None  # slug категорії (groceries/fast_food/...) для мапінгу на фронті
     is_secret_gift: bool = False  # Для приховування подарунків
+    # Реакції: згруповані лічильники {"👍": 2, "❤️": 1} + емодзі поточного юзера (або None).
+    reactions: dict = Field(default_factory=dict)
+    my_reaction: Optional[str] = None
 
 
 class FeedResponse(BaseModel):

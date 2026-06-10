@@ -3,17 +3,17 @@ from datetime import datetime, timezone
 from beanie import PydanticObjectId
 from decimal import Decimal
 from pydantic import BaseModel
+import uuid
 
+from beanie.odm.operators.update.general import Inc
 from app.api.auth import get_current_user
 from app.models.user import User
 from app.models.group_membership import GroupMembership
 from app.models.transaction import Transaction
 from app.models.bank_card import BankCard
 from app.models.gift_event import GiftEvent, GiftStatus
-from app.schemas.gift import CreateGiftRequest, CreateGiftResponse
+from app.schemas.gift import CreateGiftRequest, CreateGiftResponse, JoinGiftRequest
 from app.models.gift_invite import GiftInvite
-import uuid
-
 
 router = APIRouter(prefix="/api/v1/gift", tags=["Secret Gift"])
 
@@ -29,11 +29,9 @@ async def create_gift_event(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid ID format")
 
-    # 1. Організатор намагається обрати себе як Target User -> 400
     if str(current_user.id) == request.target_user_id:
         raise HTTPException(status_code=400, detail="You cannot be the recipient of a gift.")
 
-    # 2. Безпека: Перевіряємо, чи сам організатор є в цій групі
     organizer_membership = await GroupMembership.find_one({
         "user_id": current_user_oid,
         "group_id": group_oid
@@ -41,7 +39,6 @@ async def create_gift_event(
     if not organizer_membership:
         raise HTTPException(status_code=403, detail="You are not a member of this group.")
 
-    # 3. Перевірка, чи Target User є учасником групи
     target_membership = await GroupMembership.find_one({
         "user_id": target_oid,
         "group_id": group_oid
@@ -49,7 +46,6 @@ async def create_gift_event(
     if not target_membership:
         raise HTTPException(status_code=400, detail="The recipient is not a member of this group.")
 
-    # 4. Створення події
     new_gift = GiftEvent(
         name=request.name,
         organizer_id=str(current_user.id),
@@ -63,7 +59,6 @@ async def create_gift_event(
 
     return CreateGiftResponse(status="success", gift_id=str(new_gift.id))
 
-
 @router.get("/{gift_id}/details", status_code=status.HTTP_200_OK)
 async def get_gift_details(gift_id: str, current_user: User = Depends(get_current_user)):
     try:
@@ -73,11 +68,9 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
 
     gift = await GiftEvent.get(gift_oid)
 
-    # 1. Negative AC: 404 для cancelled або неіснуючих
     if not gift or gift.status == GiftStatus.CANCELLED:
         raise HTTPException(status_code=404, detail="Подарунок не значено")
 
-    # 2. PROJ-58: ІЗОЛЯЦІЯ TARGET USER
     is_target_user = gift.target_user_id == str(current_user.id)
     now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     gift_unlock_date = gift.unlock_date.replace(tzinfo=None)
@@ -87,7 +80,6 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
     if is_target_user and is_locked:
         raise HTTPException(status_code=403, detail="Сюрприз! Ви поки не можете бачити цю сторінку.")
 
-    # 3. БОЙОВА ЛОГІКА: Підрахунок грошей та донорів
     gift_transactions = await Transaction.find(Transaction.gift_id == str(gift.id)).to_list()
 
     collected_amount = Decimal("0.0")
@@ -116,10 +108,6 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
         except Exception:
             continue
 
-    # ==========================================
-    # КРИТИЧНО: Цей блок стоїть ЖОРСТКО НА ОДНОМУ РІВНІ з циклами for!
-    # Навіть якщо донорів немає, Python обов'язково виконає цей код.
-    # ==========================================
     target_user = await User.get(PydanticObjectId(gift.target_user_id))
     organizer = await User.get(PydanticObjectId(gift.organizer_id))
 
@@ -140,10 +128,6 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
         "donors": donors_list
     }
 
-
-# ==========================================
-# PROJ-59: Генерація invite-лінку
-# ==========================================
 @router.post("/{gift_id}/invite", status_code=status.HTTP_200_OK)
 async def generate_gift_invite(gift_id: str, current_user: User = Depends(get_current_user)):
     try:
@@ -155,11 +139,9 @@ async def generate_gift_invite(gift_id: str, current_user: User = Depends(get_cu
     if not gift or gift.status == GiftStatus.CANCELLED:
         raise HTTPException(status_code=404, detail="Подарунок не знайдено")
 
-    # Перевірка: тільки Організатор може генерувати лінк (Negative AC)
     if gift.organizer_id != str(current_user.id):
         raise HTTPException(status_code=403, detail="Тільки організатор може генерувати запрошення")
 
-    # Перевіряємо, чи є вже активний лінк, щоб не плодити дублікати
     now_utc = datetime.now(timezone.utc)
     existing_invite = await GiftInvite.find_one({
         "gift_id": str(gift.id),
@@ -169,7 +151,6 @@ async def generate_gift_invite(gift_id: str, current_user: User = Depends(get_cu
     if existing_invite:
         token = existing_invite.token
     else:
-        # Генеруємо новий UUID (відповідає Technical AC: 128 bit entropy)
         token = str(uuid.uuid4())
         new_invite = GiftInvite(
             gift_id=str(gift.id),
@@ -178,22 +159,17 @@ async def generate_gift_invite(gift_id: str, current_user: User = Depends(get_cu
         )
         await new_invite.insert()
 
-    # Формуємо URL (у реальному проєкті домен береться з ENV конфігів)
-    invite_url = f"https://family-wallet.com/join/{token}"
+    invite_link = f"https://family-wallet.com/gift/join/{token}"
 
     return {
-        "invite_url": invite_url,
+        "invite_link": invite_link,
         "token": token
     }
 
+@router.post("/join", status_code=status.HTTP_200_OK)
+async def join_gift_by_invite(request: JoinGiftRequest, current_user: User = Depends(get_current_user)):
+    token = request.invite_link.strip("/").split("/")[-1]
 
-@router.post("/join/{token}", status_code=status.HTTP_200_OK)
-async def join_gift_by_invite(token: str, current_user: User = Depends(get_current_user)):
-    """
-    Ендпоінт для переходу за запрошенням на Secret Gift.
-    Валідує токен, перевіряє права доступу та ізолює іменинника.
-    """
-    # 1. Шукаємо активний токен в базі
     now_utc = datetime.now(timezone.utc)
     invite = await GiftInvite.find_one({
         "token": token,
@@ -206,7 +182,6 @@ async def join_gift_by_invite(token: str, current_user: User = Depends(get_curre
             detail="Запрошення не знайдено або його термін дії минув"
         )
 
-    # 2. Шукаємо сам подарунок
     try:
         gift_oid = PydanticObjectId(invite.gift_id)
     except Exception:
@@ -216,14 +191,12 @@ async def join_gift_by_invite(token: str, current_user: User = Depends(get_curre
     if not gift or gift.status == GiftStatus.CANCELLED:
         raise HTTPException(status_code=404, detail="Подарунок не знайдено або збір скасовано")
 
-    # 3. PROJ-58: Ізоляція іменинника (TARGET USER)
     if str(current_user.id) == gift.target_user_id:
         raise HTTPException(
             status_code=403,
             detail="Сюрприз! Ви не можете підглядати за власним подарунком 🎁"
         )
 
-    # 4. Перевірка: чи є юзер учасником сім'ї/групи
     membership = await GroupMembership.find_one({
         "user_id": PydanticObjectId(str(current_user.id)),
         "group_id": PydanticObjectId(gift.group_id)
@@ -235,7 +208,6 @@ async def join_gift_by_invite(token: str, current_user: User = Depends(get_curre
             detail="Тільки учасники цієї групи можуть долучитися до подарунка"
         )
 
-    # 5. Усе супер! Повертаємо дані фронтенду для редиректу
     return {
         "message": "Успішно звадільовано",
         "gift_id": str(gift.id),
@@ -243,9 +215,6 @@ async def join_gift_by_invite(token: str, current_user: User = Depends(get_curre
         "gift_name": gift.name
     }
 
-# ==========================================
-# БЛОКЕР: Отримання всіх подарунків групи для Sidebar
-# ==========================================
 @router.get("/group/{group_id}", status_code=status.HTTP_200_OK)
 async def get_group_gifts(group_id: str, current_user: User = Depends(get_current_user)):
     try:
@@ -253,32 +222,24 @@ async def get_group_gifts(group_id: str, current_user: User = Depends(get_curren
     except Exception:
         raise HTTPException(status_code=400, detail="Невалідний формат ID")
 
-    # Безпека: перевіряємо чи юзер у групі
     membership = await GroupMembership.find_one({"user_id": PydanticObjectId(str(current_user.id)), "group_id": group_oid})
     if not membership:
         raise HTTPException(status_code=403, detail="Ви не є учасником цієї групи")
 
-    # Шукаємо ACTIVE та REVEALED подарунки групи.
-    # REVEALED включаємо, щоб після розкриття іменинник мав точку входу
-    # до своєї події (→ WOW-екран). CANCELLED не показуємо.
     gifts = await GiftEvent.find({
-        "group_id": group_id,  # Або спробуй group_oid, якщо в базі це ObjectId
+        "group_id": group_id,
         "status": {"$in": [GiftStatus.ACTIVE.value, GiftStatus.REVEALED.value]}
     }).to_list()
 
     response_data = []
 
     for gift in gifts:
-        # Ізоляція Target User (PROJ-58): іменинник НЕ бачить свою подію,
-        # поки вона ACTIVE (не розкрита). Після REVEALED — бачить (це і є сюрприз).
         if gift.status == GiftStatus.ACTIVE and gift.target_user_id == str(current_user.id):
-            continue  # Пропускаємо нерозкриту подію для іменинника
+            continue
 
-        # Дістаємо ім'я іменинника (для UX)
         target_user = await User.get(PydanticObjectId(gift.target_user_id))
         target_name = target_user.full_name or getattr(target_user, 'email', None) or "Без імені" if target_user else "Невідомий"
 
-        # Рахуємо зібрану суму
         gift_txs = await Transaction.find(Transaction.gift_id == str(gift.id)).to_list()
         collected_amount = sum(abs(tx.amount) for tx in gift_txs)
 
@@ -295,11 +256,9 @@ async def get_group_gifts(group_id: str, current_user: User = Depends(get_curren
 
     return response_data
 
-
 class ContributeRequest(BaseModel):
     amount: float
     card_id: str
-
 
 @router.post("/{gift_id}/contribute", status_code=status.HTTP_200_OK)
 async def contribute_to_gift(
@@ -317,7 +276,6 @@ async def contribute_to_gift(
     if not gift:
         raise HTTPException(status_code=404, detail="Подарунок не знайдено")
 
-    # Валідація з контракту
     if gift.status != GiftStatus.ACTIVE:
         raise HTTPException(status_code=400, detail="Збір вже закрито")
 
@@ -342,12 +300,11 @@ async def contribute_to_gift(
     if not card or card.user_id != str(current_user.id):
         raise HTTPException(status_code=403, detail="Картка вам не належить")
 
-    # Створюємо транзакцію (amount з мінусом, бо це витрата)
     tx = Transaction(
         card_id=request.card_id,
         amount=Decimal(str(-request.amount)),
         group_id=gift.group_id,
-        category_id="gift_contribution",  # або інша дефолтна категорія
+        category_id="gift_contribution",
         description=f"Внесок до Secret Gift: {gift.name}",
         is_secret_gift=True,
         target_user_id=gift.target_user_id,
@@ -355,7 +312,9 @@ async def contribute_to_gift(
     )
     await tx.insert()
 
-    # Рахуємо нову суму для респонсу
+    # Атомарне списання грошей з картки донатера
+    await card.update(Inc({BankCard.virtual_balance: -float(request.amount)}))
+
     gift_txs = await Transaction.find(Transaction.gift_id == str(gift.id)).to_list()
     new_collected = sum(abs(t.amount) for t in gift_txs)
 

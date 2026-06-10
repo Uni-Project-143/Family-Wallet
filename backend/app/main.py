@@ -24,6 +24,8 @@ from app.services.gift_service import GiftService
 from app.api.auth import router as auth_router
 from app.api.request import router as requests_router
 
+# ---> Додано правильний імпорт роутера сповіщень <---
+from app.api.notifications import router as notifications_router
 
 # ==========================================
 # Менеджер життєвого циклу (Lifespan)
@@ -46,7 +48,6 @@ async def lifespan(app: FastAPI):
         except (asyncio.CancelledError, Exception):
             pass
 
-
 # ==========================================
 # Ініціалізація додатку
 # ==========================================
@@ -56,10 +57,6 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# ------------------------------------------
-# CORS — список origins береться з env CORS_ORIGINS
-# (через кому). За замовчуванням — продакшен-фронт + localhost для dev.
-# ------------------------------------------
 _default_origins = ",".join([
     "https://family-wallet.pages.dev",
     "http://localhost:5173",
@@ -81,10 +78,7 @@ app.add_middleware(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# 1. Підключаємо наше системне логування подій
 app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests_middleware)
-
-# 2. Підключаємо централізовані обробники помилок
 app.add_exception_handler(Exception, global_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 
@@ -97,11 +91,10 @@ app.include_router(bank_card_router)
 
 app.include_router(feed_router)
 app.include_router(monobank.router)
-
 app.include_router(ws_router)
-
 app.include_router(gift_router)
-
 app.include_router(auth_router)
-
 app.include_router(requests_router)
+
+# ---> Підключаємо новий роутер сповіщень <---
+app.include_router(notifications_router)

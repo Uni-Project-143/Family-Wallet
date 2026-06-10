@@ -8,6 +8,7 @@ class NotificationLog(Document):
     gift_id: str
     notification_type: str  # 'REVEAL', 'REMINDER_24H', 'REMINDER_9AM'
     idempotency_key: str = Field(..., description="Унікальний ключ для захисту від дублів")
+    is_read: bool = Field(default=False, description="Чи прочитане сповіщення")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     class Settings:

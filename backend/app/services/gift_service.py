@@ -1,7 +1,12 @@
 import asyncio
+from decimal import Decimal
 from datetime import datetime, timezone, timedelta
+from beanie.odm.operators.update.general import Inc
+
 from app.models.gift_event import GiftEvent, GiftStatus
 from app.models.group_membership import GroupMembership
+from app.models.bank_card import BankCard
+from app.models.transaction import Transaction
 from app.services.notification_service import NotificationService
 
 
@@ -13,22 +18,19 @@ class GiftService:
         try:
             while True:
                 try:
-                    # 1. Поточний час як НАЇВНИЙ UTC (без таймзони) для коректного
-                    #    порівняння з датами, які MongoDB повертає теж наївними (UTC).
                     now = datetime.now(timezone.utc).replace(tzinfo=None)
 
-                    # Шукаємо всі активні подарунки
                     active_gifts = await GiftEvent.find(
                         GiftEvent.status == GiftStatus.ACTIVE
                     ).to_list()
 
                     if active_gifts:
-                        print(f"[CRON] now(UTC)={now:%Y-%m-%d %H:%M:%S} | активних подій: {len(active_gifts)}")
+                        print(
+                            f"[CRON] now(UTC)={now:%Y-%m-%d %H:%M:%S} | активних подій: {len(active_gifts)}")
 
                     for gift in active_gifts:
                         gift_id_str = str(gift.id)
 
-                        # 2. Дату з бази також робимо наївною (UTC) перед порівняннями
                         unlock_date_naive = gift.unlock_date.replace(tzinfo=None)
                         seconds_left = (unlock_date_naive - now).total_seconds()
                         print(
@@ -36,30 +38,64 @@ class GiftService:
                             f"| залишилось {int(seconds_left)} с"
                         )
 
-                        # 1. РОЗКРИТТЯ ПОДАРУНКА (PROJ-64 BE-01)
+                        # 1. РОЗКРИТТЯ ПОДАРУНКА
                         if unlock_date_naive <= now:
                             gift.status = GiftStatus.REVEALED
                             await gift.save()
                             print(f"[CRON] 🎁 Подарунок '{gift.name}' РОЗКРИТО (unlock минув)!")
 
-                            # Надсилаємо імениннику
+                            # Підрахунок зібраних коштів та зарахування
+                            gift_txs = await Transaction.find(
+                                Transaction.gift_id == str(gift.id)).to_list()
+                            total_collected = sum(abs(tx.amount) for tx in gift_txs)
+
+                            if total_collected > 0:
+                                target_card = await BankCard.find_one(
+                                    BankCard.user_id == gift.target_user_id,
+                                    BankCard.group_id == gift.group_id,
+                                    BankCard.status == "ACTIVE"
+                                )
+                                if target_card:
+                                    # Атомарне зарахування всієї зібраної суми імениннику
+                                    await target_card.update(
+                                        Inc({BankCard.virtual_balance: float(total_collected)}))
+
+                                    # Транзакція поповнення для стрічки
+                                    payout_tx = Transaction(
+                                        card_id=str(target_card.id),
+                                        amount=Decimal(str(total_collected)),
+                                        currency="UAH",
+                                        group_id=gift.group_id,
+                                        category_id="gift_payout",
+                                        description=f"🎁 Отримано Secret Gift: {gift.name}",
+                                        is_virtual=True,
+                                        is_secret_gift=True,
+                                        gift_id=str(gift.id)
+                                    )
+                                    await payout_tx.insert()
+                                    print(
+                                        f"[CRON] 💰 Кошти ({total_collected}) успішно зараховано імениннику!")
+                                else:
+                                    print(
+                                        f"[CRON ERROR] В іменинника немає активної картки для зарахування!")
+
                             await NotificationService.send_notification(
                                 user_id=gift.target_user_id,
                                 gift=gift,
                                 notif_type="REVEAL",
                                 idempotency_key=f"{gift_id_str}_reveal"
                             )
-                            continue  # Ідемо до наступного подарунка
+                            continue
 
-                        # 2. НАГАДУВАННЯ ЗА 24 ГОДИНИ (BE-01)
+                        # 2. НАГАДУВАННЯ ЗА 24 ГОДИНИ
                         time_until_unlock = unlock_date_naive - now
-                        if timedelta(hours=23, minutes=58) <= time_until_unlock <= timedelta(hours=24, minutes=2):
+                        if timedelta(hours=23, minutes=58) <= time_until_unlock <= timedelta(
+                            hours=24, minutes=2):
                             await GiftService._notify_group_except_target(
                                 gift, "REMINDER_24H", f"{gift_id_str}_remind_24h"
                             )
 
-                        # 3. НАГАДУВАННЯ В ДЕНЬ РОЗКРИТТЯ (BE-02)
-                        # Якщо до розкриття менше 10 годин і це той самий день
+                        # 3. НАГАДУВАННЯ В ДЕНЬ РОЗКРИТТЯ
                         if timedelta(hours=0) < time_until_unlock <= timedelta(hours=10):
                             if now.date() == unlock_date_naive.date():
                                 await GiftService._notify_group_except_target(
@@ -69,7 +105,6 @@ class GiftService:
                 except Exception as e:
                     print(f"[CRON ERROR] Помилка виконання: {e}")
 
-                # Перевіряємо кожні 30 с → розкриття спрацьовує ≤30 с після unlock_date
                 await asyncio.sleep(30)
 
         except asyncio.CancelledError:
@@ -78,7 +113,6 @@ class GiftService:
     @staticmethod
     async def _notify_group_except_target(gift: GiftEvent, notif_type: str,
                                           idempotency_key_prefix: str):
-        """Допоміжний метод для надсилання листів учасникам збору (крім іменинника)"""
         memberships = await GroupMembership.find(
             GroupMembership.group_id == getattr(gift, 'group_id', None)
         ).to_list()
@@ -86,7 +120,6 @@ class GiftService:
         for m in memberships:
             member_id = str(m.user_id)
             if member_id != gift.target_user_id:
-                # Унікальний ключ для кожного юзера в рамках одного нагадування
                 user_idemp_key = f"{idempotency_key_prefix}_{member_id}"
                 await NotificationService.send_notification(
                     user_id=member_id,

@@ -1,11 +1,19 @@
 from beanie import Document
-from pydantic import Field, field_validator
-from datetime import datetime
+from pydantic import Field, field_validator, BaseModel
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 from bson.decimal128 import Decimal128
 from pymongo import IndexModel, ASCENDING
 import pymongo
+
+
+# ---> КРОК 1: Переносимо модель Reaction сюди, ДО класу Transaction <---
+class Reaction(BaseModel):
+    user_id: str
+    emoji: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 
 class Transaction(Document):
     card_id: str
@@ -14,7 +22,10 @@ class Transaction(Document):
     category_id: Optional[str] = None
     description: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    reactions: List[dict] = []
+
+    # ---> КРОК 1: Змінюємо List[dict] на List[Reaction] <---
+    reactions: List[Reaction] = Field(default_factory=list)
+
     group_id: str = Field(..., description="ID групи для швидкої фільтрації стрічки")
     is_secret_gift: bool = Field(default=False, description="Чи є це секретним подарунком")
     target_user_id: Optional[str] = Field(default=None,

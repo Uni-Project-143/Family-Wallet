@@ -22,6 +22,7 @@ from app.api.ws import router as ws_router
 from app.api.gift import router as gift_router
 from app.services.gift_service import GiftService
 from app.api.auth import router as auth_router
+from app.api.request import router as requests_router
 
 
 # ==========================================
@@ -102,3 +103,5 @@ app.include_router(ws_router)
 app.include_router(gift_router)
 
 app.include_router(auth_router)
+
+app.include_router(requests_router)

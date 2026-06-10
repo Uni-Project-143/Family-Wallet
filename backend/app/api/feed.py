@@ -9,6 +9,7 @@ from app.models.category import Category
 from app.models.gift_event import GiftEvent, GiftStatus
 from app.schemas.feed import FeedResponse, FeedTransactionItem
 from beanie import PydanticObjectId
+from collections import Counter
 import urllib.parse
 
 router = APIRouter(prefix="/api/v1/feed", tags=["Feed"])
@@ -117,6 +118,13 @@ async def get_unified_feed(
             # Сірий аватар зі знаком питання
             avatar = "https://ui-avatars.com/api/?name=?&background=808080&color=fff&size=128"
 
+        # Реакції: згруповані лічильники + емодзі поточного юзера (для підсвічування).
+        grouped_reactions = dict(Counter(r.emoji for r in tx.reactions))
+        my_reaction = next(
+            (r.emoji for r in tx.reactions if str(r.user_id) == str(current_user.id)),
+            None,
+        )
+
         # Формуємо фінальний об'єкт для фронтенду
         items.append(FeedTransactionItem(
             id=str(tx.id),
@@ -133,7 +141,9 @@ async def get_unified_feed(
             # slug категорії (groceries/fast_food/...) — фронт мапить його у назву/колір.
             # Якщо category_id порожній/"None" — віддаємо "other" (дефолт на фронті).
             category_code=tx.category_id if (tx.category_id and tx.category_id != "None") else "other",
-            is_secret_gift=tx.is_secret_gift
+            is_secret_gift=tx.is_secret_gift,
+            reactions=grouped_reactions,
+            my_reaction=my_reaction
         ))
 
     return FeedResponse(

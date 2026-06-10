@@ -132,14 +132,15 @@
             </button>
           </div>
         </div>
-        <!-- Skeleton під час першого завантаження (FE-03) -->
-        <FeedSkeleton v-if="isLoadingFeed && transactions.length === 0" :count="5" />
-
-        <!-- Empty: ще жодної картки в групі (FE-02 + AC negative) -->
-        <EmptyFeed
-          v-else-if="connectedCards.length === 0"
-          @connect-card="isConnectCardOpen = true"
+        <!-- Skeleton поки вантажаться картки/перша сторінка стрічки (FE-03) -->
+        <FeedSkeleton
+          v-if="isLoadingCards || (isLoadingFeed && transactions.length === 0)"
+          :count="5"
         />
+
+        <!-- Поки користувач НЕ під'єднав ВЛАСНУ картку — стрічка групи недоступна.
+             Показуємо запрошення підключити свою картку (а не транзакції групи). -->
+        <EmptyFeed v-else-if="!hasOwnCard" @connect-card="isConnectCardOpen = true" />
 
         <!-- Картки є, але транзакцій 0 -->
         <div v-else-if="transactions.length === 0" class="feed-empty">
@@ -163,7 +164,7 @@
         <section class="right-panel__section">
           <div class="right-panel__title">Spending by Category</div>
 
-          <div v-if="connectedCards.length && categoryBreakdown.length" class="donut-wrap">
+          <div v-if="hasOwnCard && categoryBreakdown.length" class="donut-wrap">
             <svg width="152" height="152" viewBox="0 0 160 160">
               <circle cx="80" cy="80" r="56" fill="none" stroke="#F0EFED" stroke-width="26" />
               <circle
@@ -297,6 +298,7 @@
   import { useFeedTransactions } from '../composables/useFeedTransactions'
   import { useInfiniteScroll } from '../composables/useInfiniteScroll'
   import { useWebSocket } from '../composables/useWebSocket'
+  import { applyServerReactions, seedReactions } from '../composables/useReactions'
   import { fetchGroupMembers } from '../services/authService'
   import { fetchGroupCards } from '../services/cardService'
   import InviteMemberModal from '../components/InviteMemberModal.vue'
@@ -355,7 +357,19 @@
   const { isConnected: wsConnected } = useWebSocket({
     groupId: () => currentUser.value?.groupId,
     onTransaction: handleWsTransaction,
+    onReaction: (data) => {
+      // Реал-тайм оновлення реакцій від інших учасників групи.
+      if (data?.transaction_id) applyServerReactions(data.transaction_id, data.grouped_reactions)
+    },
   })
+
+  // Засів реакцій зі стрічки (бек віддає reactions + my_reaction) при кожній
+  // зміні набору транзакцій — нові сторінки/рефетч. seedReactions сіє раз на tx.
+  watch(
+    () => transactions.value.length,
+    () => transactions.value.forEach(seedReactions),
+    { immediate: true },
+  )
 
   function handleWsTransaction() {
     // Backend шле тільки сирі поля транзакції (без display_name, avatar, category_emoji).
@@ -370,7 +384,9 @@
   const isInviteModalOpen = ref(false)
 
   const hasOwnCard = computed(() =>
-    connectedCards.value.some((c) => c.user_id === currentUser.value?.id),
+    connectedCards.value.some(
+      (c) => String(c.user_id) === String(currentUser.value?.id),
+    ),
   )
 
   // ─── Transfer between cards (UC-16) ───
@@ -1526,19 +1542,35 @@
       width: 100%;
       flex: none;
     }
-    .feed-main {
-      order: 1;
-      padding: 16px;
-    }
+    /* Порядок на мобільному (за вимогою UX):
+       1) аналітика — донат → secret gift → notifications (це right-panel),
+       2) стрічка транзакцій (feed-main),
+       3) учасники та картки (sidebar). */
     .right-panel {
-      order: 2;
+      order: 1;
       border-left: none;
-      border-top: 1px solid #eae8e4;
+      border-bottom: 1px solid #eae8e4;
+      padding: 16px 16px 8px;
+    }
+    .feed-main {
+      order: 2;
+      padding: 16px;
     }
     .sidebar {
       order: 3;
       border-right: none;
       border-top: 1px solid #eae8e4;
+      gap: 18px;
+    }
+    /* На мобільному прибираємо вкладений скрол — списки розкриваються повністю */
+    .sidebar__scroll--members,
+    .sidebar__scroll--cards {
+      max-height: none;
+      padding-right: 0;
+    }
+    /* Донат на всю ширину, по центру */
+    .right-panel__section {
+      margin-bottom: 18px;
     }
     .feed-main__header {
       flex-wrap: wrap;
@@ -1548,6 +1580,10 @@
       width: 100%;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .feed-filters::-webkit-scrollbar {
+      display: none;
     }
     .navbar__groups {
       display: none;
@@ -1555,8 +1591,20 @@
   }
 
   @media (max-width: 480px) {
+    .feed-main {
+      padding: 14px 12px;
+    }
+    .right-panel {
+      padding: 14px 12px 6px;
+    }
+    .sidebar {
+      padding: 16px 12px;
+    }
     .feed-main__title {
       font-size: 22px;
+    }
+    .feed-main__header {
+      align-items: flex-start;
     }
     .tx-card {
       padding: 14px;
@@ -1567,6 +1615,10 @@
     }
     .tx-card__name {
       font-size: 12px;
+    }
+    /* Чіпи фільтра зручніше тапати */
+    .feed-filter-chip {
+      padding: 7px 16px;
     }
   }
 

@@ -43,10 +43,3 @@
 | Переюзабельний навбар                                            | `components/NavBar.vue`                                                         |
 | Коректний парсинг дат з backend (наївний UTC)                    | `utils/datetime.js`                                                             |
 | Empty / Loading states                                           | `FeedView.vue`, `GiftEventDetailsView.vue`, `FeedSkeleton.vue`, `EmptyFeed.vue` |
-
-## Відомі обмеження (потребують backend)
-
-- `POST /group/{id}/invite/send` (email-invite учаснику) — endpoint відсутній → stub у `SettingsView`/`InviteMemberModal`.
-- Money request (US.10) — endpoint відсутній → кнопка «$» декоративна.
-- Агрегація витрат за категоріями — endpoint відсутній → donut рахується з завантажених транзакцій стрічки.
-- In-app стрічка нотифікацій — endpoint відсутній → панель Notifications показує empty state (нагадування йдуть email/push).

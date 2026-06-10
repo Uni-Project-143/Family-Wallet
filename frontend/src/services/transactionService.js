@@ -47,6 +47,20 @@ export async function fetchFeed(groupId, page = 1, limit = 20) {
  * @param {string|null} payload.category_id
  * @returns {Promise<{transfer_id, debit_transaction_id, credit_transaction_id, amount, from_effective_balance, to_effective_balance}>}
  */
+/**
+ * Поставити / зняти емодзі-реакцію на транзакцію (UPSERT + TOGGLE на беку).
+ * POST /api/v1/transactions/{transactionId}/react
+ *
+ * Повторний клік по тому самому емодзі знімає реакцію (toggle вирішує бек).
+ * @param {string} transactionId
+ * @param {string} emoji
+ * @returns {Promise<{ status: string, total_count: number, grouped_reactions: Record<string, number> }>}
+ */
+export async function reactToTransaction(transactionId, emoji) {
+  const response = await apiClient.post(`/api/v1/transactions/${transactionId}/react`, { emoji })
+  return response.data
+}
+
 export async function createTransfer({
   from_card_id,
   to_card_id,

@@ -6,6 +6,7 @@ from decimal import Decimal
 from bson import ObjectId
 from bson.errors import InvalidId
 from beanie.odm.operators.update.general import Inc
+from collections import Counter
 
 from datetime import datetime, timezone
 from app.core.websockets import ws_manager
@@ -196,7 +197,7 @@ class TransactionService:
         emoji: str
     ) -> dict:
         """
-        Додає або оновлює (UPSERT) реакцію користувача на транзакцію.
+        Додає, оновлює (UPSERT) або видаляє (TOGGLE) реакцію користувача на транзакцію.
         """
         # 1. Знаходимо транзакцію (Negative AC: 404)
         try:
@@ -209,7 +210,6 @@ class TransactionService:
             raise ResourceNotFoundError(detail="Транзакцію не знайдено")
 
         # 2. Перевірка доступу до групи (Negative AC: 403)
-        # Перевіряємо, чи юзер є в тій самій групі, що й транзакція
         membership = await GroupMembership.find_one({
             "user_id": ObjectId(user_id),
             "group_id": ObjectId(transaction.group_id)
@@ -217,43 +217,49 @@ class TransactionService:
         if not membership:
             raise ForbiddenAccessError(detail="Ви не можете реагувати на транзакції іншої групи")
 
-        # 3. Реалізація UPSERT (BE-01)
-        # Шукаємо, чи юзер вже залишав реакцію на цю транзакцію
+        # 3. Реалізація UPSERT та TOGGLE
         existing_reaction_idx = next(
             (i for i, r in enumerate(transaction.reactions) if str(r.user_id) == str(user_id)),
             None
         )
 
         if existing_reaction_idx is not None:
-            # Юзер вже ставив реакцію -> Оновлюємо емодзі (Replace)
-            transaction.reactions[existing_reaction_idx].emoji = emoji
-            transaction.reactions[existing_reaction_idx].created_at = datetime.now(timezone.utc)
+            if transaction.reactions[existing_reaction_idx].emoji == emoji:
+                # TOGGLE: Юзер натиснув на той самий емодзі -> Видаляємо реакцію
+                transaction.reactions.pop(existing_reaction_idx)
+            else:
+                # UPSERT: Юзер змінив емодзі
+                transaction.reactions[existing_reaction_idx].emoji = emoji
+                transaction.reactions[existing_reaction_idx].created_at = datetime.now(timezone.utc)
         else:
-            # Це перша реакція від цього юзера -> Додаємо нову
+            # Це перша реакція від цього юзера
             new_reaction = Reaction(user_id=user_id, emoji=emoji)
             transaction.reactions.append(new_reaction)
 
         # Зберігаємо оновлений документ в БД
         await transaction.save()
 
-        # 4. Рахуємо загальну кількість всіх реакцій для лічильника
+        # 4. РАХУЄМО ЗГРУПОВАНІ ЕМОДЗІ ДЛЯ ФРОНТА (напр. {"👍": 2, "❤️": 1})
         total_count = len(transaction.reactions)
+        grouped_reactions = dict(Counter(r.emoji for r in transaction.reactions))
 
         # 5. Відправляємо WebSocket event (BE-02)
         ws_payload = {
-            "event": "reaction_added",
+            "event": "reaction_updated",  # Змінимо назву івенту, щоб було логічніше
             "data": {
                 "transaction_id": transaction_id,
-                "emoji": emoji,
                 "user_id": user_id,
-                "count": total_count
+                "emoji": emoji,  # Емодзі, на яке клікнули
+                "total_count": total_count,  # Загальна кількість всіх реакцій
+                "grouped_reactions": grouped_reactions  # <--- РЯТІВНЕ КОЛО ДЛЯ ФРОНТА
             }
         }
-        # Пушимо в кімнату конкретної групи (щоб побачили всі члени сім'ї)
+
         await ws_manager.broadcast_to_group(str(transaction.group_id), ws_payload)
 
+        # Також повертаємо ці дані у відповіді на POST-запит
         return {
             "status": "success",
-            "message": "Reaction saved",
-            "count": total_count
+            "total_count": total_count,
+            "grouped_reactions": grouped_reactions
         }

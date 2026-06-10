@@ -104,23 +104,35 @@ async def update_money_request(
         raise HTTPException(status_code=409, detail="Запит вже вирішено")
 
     if payload.status == RequestStatus.ACCEPTED:
+        # Перевірка, чи фронтенд надіслав ID картки
+        if not payload.from_card_id:
+            raise HTTPException(status_code=400, detail="Необхідно вибрати картку для оплати")
+
+        try:
+            from_card_oid = ObjectId(payload.from_card_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Невалідний ID картки")
+
+        # Шукаємо САМЕ ТУ картку, яку вибрав користувач
         from_card = await BankCard.find_one(
+            BankCard.id == from_card_oid,
             BankCard.user_id == money_request.recipient_id,
-            BankCard.group_id == money_request.group_id,
             BankCard.status == "ACTIVE"
         )
+
         to_card = await BankCard.find_one(
             BankCard.user_id == money_request.requester_id,
             BankCard.group_id == money_request.group_id,
             BankCard.status == "ACTIVE"
         )
 
-        if not from_card or not to_card:
-            raise HTTPException(status_code=400,
-                                detail="У сторін відсутні активні картки в межах цієї сімейної групи")
+        if not from_card:
+            raise HTTPException(status_code=400, detail="Вибрана картка не знайдена або неактивна")
+        if not to_card:
+            raise HTTPException(status_code=400, detail="У отримувача немає активної картки")
 
         if from_card.virtual_balance < money_request.amount:
-            raise HTTPException(status_code=400, detail="Недостатньо коштів на вашій картці")
+            raise HTTPException(status_code=400, detail="Недостатньо коштів на вибраній картці")
 
         transfer_id = str(uuid.uuid4())
         debit_amount = -abs(money_request.amount)
@@ -146,6 +158,8 @@ async def update_money_request(
         )
 
         await TransactionRepository.create_paired_virtual_transactions(debit, credit)
+
+        # Атомарне оновлення балансів
         await from_card.update(Inc({BankCard.virtual_balance: float(debit_amount)}))
         await to_card.update(Inc({BankCard.virtual_balance: float(credit_amount)}))
 
@@ -163,6 +177,5 @@ async def update_money_request(
 
     return {
         "status": "success",
-        "message": f"Запит успішно {'прийнято' if money_request.status == RequestStatus.ACCEPTED else 'відхилено'}",
-        "request_status": money_request.status
+        "message": "Запит успішно оброблено"
     }

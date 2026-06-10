@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from datetime import datetime, timezone
 from beanie import PydanticObjectId
 from decimal import Decimal
+from pydantic import BaseModel
 import uuid
 
+from beanie.odm.operators.update.general import Inc
 from app.api.auth import get_current_user
 from app.models.user import User
 from app.models.group_membership import GroupMembership
@@ -57,7 +59,6 @@ async def create_gift_event(
     await new_gift.insert()
 
     return CreateGiftResponse(status="success", gift_id=str(new_gift.id))
-
 
 @router.get("/{gift_id}/details", status_code=status.HTTP_200_OK)
 async def get_gift_details(gift_id: str, current_user: User = Depends(get_current_user)):
@@ -171,6 +172,9 @@ async def generate_gift_invite(gift_id: str, current_user: User = Depends(get_cu
         "token": token
     }
 
+@router.post("/join", status_code=status.HTTP_200_OK)
+async def join_gift_by_invite(request: JoinGiftRequest, current_user: User = Depends(get_current_user)):
+    token = request.invite_link.strip("/").split("/")[-1]
 
 # ==========================================
 # ОНОВЛЕНО: Тепер приймає JSON з лінкою, а не токен в URL
@@ -332,6 +336,9 @@ async def contribute_to_gift(
         gift_id=str(gift.id)
     )
     await tx.insert()
+
+    # Атомарне списання грошей з картки донатера
+    await card.update(Inc({BankCard.virtual_balance: -float(request.amount)}))
 
     gift_txs = await Transaction.find(Transaction.gift_id == str(gift.id)).to_list()
     new_collected = sum(abs(t.amount) for t in gift_txs)

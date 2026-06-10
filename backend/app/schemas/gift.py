@@ -10,6 +10,7 @@ class CreateGiftRequest(BaseModel):
     unlock_date: datetime
 
     @field_validator('unlock_date')
+    @classmethod
     def date_must_be_in_future(cls, v):
         # Якщо дата менша за поточний час — викидаємо помилку
         if v <= datetime.now(timezone.utc):
@@ -20,6 +21,6 @@ class CreateGiftResponse(BaseModel):
     status: str
     gift_id: str
 
-# ---> ДОДАНО: Схема для уніфікованого приєднання <---
+# ---> ДОДАНО: Схема для приєднання за лінкою <---
 class JoinGiftRequest(BaseModel):
     invite_link: str

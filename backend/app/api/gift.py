@@ -164,7 +164,7 @@ async def generate_gift_invite(gift_id: str, current_user: User = Depends(get_cu
         )
         await new_invite.insert()
 
-    # ---> ОНОВЛЕНО: Формуємо URL спеціально для Secret Gift <---
+    # Формуємо URL так само, як group-invite (https://family-wallet.com).
     invite_link = f"https://family-wallet.com/gift/join/{token}"
 
     return {

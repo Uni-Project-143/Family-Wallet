@@ -67,12 +67,11 @@ export function useAuth() {
       }
 
       persistAuthSession(data.access_token, userInfo)
-      initPush() // реєстрація push (дозвіл + FCM-токен → backend)
-      scheduleAfterRegistration() // запланувати reminder через 5 хв
+      initPush()
+      scheduleAfterRegistration()
 
       router.push('/group-setup')
     } catch (err) {
-      // 409 — окремий зрозумілий текст; решта — централізоване повідомлення
       authError.value =
         err.response?.status === 409
           ? 'User with this email already exists'
@@ -87,22 +86,19 @@ export function useAuth() {
     authError.value = null
 
     try {
-      // Крок 1: токен + дані юзера з бекенду
       const data = await loginUser(credentials)
       localStorage.setItem(STORAGE_TOKEN_KEY, data.access_token)
 
-      // Крок 2: тягнемо групи
       let groups = []
       try {
         groups = await fetchMyGroups()
-      } catch (err) {
-        console.warn('fetchMyGroups failed:', err)
+      } catch {
+        // групи необов'язкові — продовжуємо без них
       }
 
-      // Крок 3: зберігаємо БАЗОВУ інформацію юзера БЕЗ конкретної групи
       const userInfo = {
         id: data.user?.id || null,
-        fullName: data.user?.fullName || data.user?.full_name || '', // ← підтримує обидва формати
+        fullName: data.user?.fullName || data.user?.full_name || '',
         email: data.user?.email || credentials.email,
         role: null,
         groupId: null,
@@ -110,20 +106,14 @@ export function useAuth() {
       }
       persistAuthSession(data.access_token, userInfo)
 
-      // Реєструємо push-сповіщення (дозвіл + FCM-токен → backend). Fire-and-forget.
       initPush()
 
-      // Крок 4: маршрутизація залежно від кількості груп
       if (!Array.isArray(groups) || groups.length === 0) {
-        // Немає груп — на створення/приєднання
         router.push('/group-setup')
       } else if (groups.length === 1) {
-        // Одна група — авто-вибір, на feed
         setActiveGroup(groups[0])
         router.push('/feed')
       } else {
-        // Кілька груп — юзер сам обирає
-        // Передаємо список груп через router state (не зберігаємо в БД, бо це тимчасово)
         router.push({
           name: 'SelectGroup',
           state: { groups },
@@ -135,7 +125,6 @@ export function useAuth() {
       if (status === 429) {
         authError.value = 'Too many attempts. Please try again in 15 minutes'
       } else {
-        // 401 і інші — однакове повідомлення (захист від user enumeration)
         authError.value = 'Invalid email or password'
       }
     } finally {
@@ -143,22 +132,11 @@ export function useAuth() {
     }
   }
 
-  /**
-   * Logout — повний flow:
-   * 1. Викликаємо POST /auth/logout — бек додає токен у blacklist
-   * 2. Чистимо локальний стан незалежно від результату беку
-   * 3. Редирект на /login
-   *
-   * Якщо бек впав (network error, 5xx) — все одно вилогінюємо локально.
-   * Інакше юзер застрягне у "залогіненому" стані з невалідним токеном.
-   */
   async function logout() {
     isLoading.value = true
     try {
       await logoutUser()
-    } catch (err) {
-      // Логуємо, але не блокуємо логаут
-      console.warn('Logout API failed:', err)
+    } catch {
     } finally {
       localStorage.removeItem(STORAGE_TOKEN_KEY)
       currentUser.value = null

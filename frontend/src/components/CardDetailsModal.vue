@@ -4,7 +4,7 @@
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
         <Transition name="modal">
           <div v-if="isOpen" ref="modalRootRef" class="modal-card" role="dialog" aria-modal="true">
-            <button class="modal-close" @click="close" aria-label="Close">
+            <button class="modal-close" aria-label="Close" @click="close">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d="M1 1L13 13M13 1L1 13"
@@ -41,7 +41,9 @@
               <div v-if="isOwnCard" class="details-row">
                 <span class="details-row__label">Balance</span>
                 <span class="details-row__value details-row__value--accent">
-                  {{ formatBalance(card.virtual_balance ?? card.effective_balance ?? card.balance) }}
+                  {{
+                    formatBalance(card.virtual_balance ?? card.effective_balance ?? card.balance)
+                  }}
                   <span class="details-row__currency">UAH</span>
                 </span>
               </div>

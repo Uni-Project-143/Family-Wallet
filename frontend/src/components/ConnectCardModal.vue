@@ -4,7 +4,7 @@
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
         <Transition name="modal">
           <div v-if="isOpen" ref="modalRootRef" class="modal-card" role="dialog" aria-modal="true">
-            <button class="modal-close" @click="close" aria-label="Close">
+            <button class="modal-close" aria-label="Close" @click="close">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d="M1 1L13 13M13 1L1 13"
@@ -445,15 +445,6 @@
     } else {
       serverError.value = err.userMessage || 'Something went wrong. Please try again.'
     }
-  }
-
-  function formatBalance(balance) {
-    const num = Number(balance)
-    if (isNaN(num)) return balance
-    return new Intl.NumberFormat('uk-UA', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(num)
   }
 
   function resetForm() {

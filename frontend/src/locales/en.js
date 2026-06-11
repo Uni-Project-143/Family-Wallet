@@ -1,16 +1,10 @@
-/**
- * Централізовані рядки інтерфейсу (єдине джерело істини).
- *
- * Структуровано під майбутню повноцінну i18n (vue-i18n): достатньо
- * додати інший файл локалі з тією ж структурою і підключити плагін.
- * Поки що імпортуємо об'єкт напряму: `import t from '@/locales/en'`.
- */
 export default {
   common: {
     retry: 'Retry',
     cancel: 'Cancel',
     back: 'Go back',
     loading: 'Loading…',
+    reload: 'Reload page',
   },
 
   empty: {
@@ -32,6 +26,8 @@ export default {
   },
 
   errors: {
+    boundaryTitle: 'Something went wrong',
+    boundaryHint: 'This section failed to load. You can try again or reload the page.',
     fallback: 'Something went wrong. Please try again.',
     network: 'No connection to the server. Check your internet and try again.',
     timeout: 'The request timed out. Please try again.',

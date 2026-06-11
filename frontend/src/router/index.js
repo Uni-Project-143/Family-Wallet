@@ -5,19 +5,13 @@ const LoginView = () => import('../views/LoginView.vue')
 const ForgotPasswordView = () => import('../views/ForgotPasswordView.vue')
 const FeedView = () => import('../views/FeedView.vue')
 
-// function hasValidToken() {
-//   return !!localStorage.getItem('accessToken')
-// }
-
 function hasValidToken() {
   const token = localStorage.getItem('accessToken')
   if (!token) return false
 
   try {
-    // JWT складається з трьох частин через крапку
-    // payload — друга частина, закодована у base64
     const payload = JSON.parse(atob(token.split('.')[1]))
-    // exp у JWT — це Unix timestamp у секундах
+
     const isExpired = payload.exp * 1000 < Date.now()
     if (isExpired) {
       localStorage.removeItem('accessToken')
@@ -26,7 +20,6 @@ function hasValidToken() {
     }
     return true
   } catch {
-    // Якщо токен зіпсований — чистимо і повертаємо false
     localStorage.removeItem('accessToken')
     localStorage.removeItem('currentUser')
     return false
@@ -100,7 +93,13 @@ const routes = [
     component: () => import('../views/GiftEventDetailsView.vue'),
     meta: { requiresAuth: true },
   },
-  // Catch-all 404 — публічна, без redirect-guard'ів
+  {
+    path: '/gift/join/:token',
+    name: 'GiftJoin',
+    component: () => import('../views/GiftJoinView.vue'),
+    meta: { requiresAuth: true },
+  },
+
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',

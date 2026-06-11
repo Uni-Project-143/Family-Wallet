@@ -335,13 +335,11 @@
 
 <script setup>
   import { ref, computed, onMounted, watch } from 'vue'
-  import { useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
   import { fetchGroupMembers } from '../services/authService'
   import { createGiftEvent, generateGiftInviteLink } from '../services/giftEventService'
   import NavBar from '../components/NavBar.vue'
 
-  const router = useRouter()
   const { currentUser } = useAuth()
 
   // ─── Group members з API ───
@@ -460,10 +458,8 @@
    */
   const minDateTime = computed(() => {
     const d = new Date()
-    // ⚠️ ТИМЧАСОВО ДЛЯ ТЕСТУВАННЯ: дозволяємо сьогодні (min = поточний момент).
-    // Для продакшну повернути мінімум "завтра" (PROJ-56), розкоментувавши 2 рядки:
-    // d.setDate(d.getDate() + 1)
-    // d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() + 1)
+    d.setHours(0, 0, 0, 0)
     return formatLocalDateTime(d)
   })
 

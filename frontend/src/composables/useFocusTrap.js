@@ -44,7 +44,6 @@ export function useFocusTrap(rootRef, isActive) {
     previousFocus = document.activeElement
     document.getElementById('app')?.setAttribute('inert', '')
 
-    // Чекаємо поки модалка зрендериться, далі — focus на перший елемент
     setTimeout(() => {
       const focusable = getFocusableElements()
       focusable[0]?.focus()

@@ -115,6 +115,14 @@
             >
               {{ isLinkCopied ? 'Copied!' : 'Copy' }}
             </button>
+            <button
+              class="btn-regen"
+              :disabled="isGeneratingLink"
+              title="Regenerate link"
+              @click="generateLink"
+            >
+              {{ isGeneratingLink ? '…' : 'Regenerate' }}
+            </button>
           </div>
           <button v-else class="btn-secondary" :disabled="isGeneratingLink" @click="generateLink">
             {{ isGeneratingLink ? 'Generating...' : 'Get invite link' }}
@@ -148,10 +156,16 @@
                 </option>
               </select>
             </div>
-            <button class="btn-gold contribute-btn" :disabled="isContributing" @click="submitContribution">
+            <button
+              class="btn-gold contribute-btn"
+              :disabled="isContributing"
+              @click="submitContribution"
+            >
               {{ isContributing ? 'Sending…' : 'Contribute' }}
             </button>
-            <p class="contribute-note">Your contribution stays hidden from the recipient until unlock.</p>
+            <p class="contribute-note">
+              Your contribution stays hidden from the recipient until unlock.
+            </p>
           </template>
         </div>
 
@@ -187,7 +201,7 @@
 
 <script setup>
   import { ref, computed, onMounted, nextTick } from 'vue'
-  import { useRoute, useRouter } from 'vue-router'
+  import { useRoute } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
   import {
     fetchGiftEventDetails,
@@ -199,7 +213,6 @@
   import NavBar from '../components/NavBar.vue'
 
   const route = useRoute()
-  const router = useRouter()
   const { currentUser } = useAuth()
 
   const giftId = computed(() => route.params.id)
@@ -289,9 +302,8 @@
         })
         if (Date.now() < end) requestAnimationFrame(frame)
       })()
-    } catch (err) {
+    } catch {
       // canvas-confetti не встановлений — wow-екран без конфеті
-      console.warn('canvas-confetti not available:', err)
     }
   }
 
@@ -339,8 +351,12 @@
     isGeneratingLink.value = true
     try {
       const data = await generateGiftInviteLink(giftId.value)
-      inviteUrl.value = data.invite_url
-      showToast('Link generated', 'success')
+      // Бек повертає поле invite_link (так само, як group-invite — на family-wallet.com).
+      inviteUrl.value = data.invite_link || data.invite_url || ''
+      showToast(
+        inviteUrl.value ? 'Invite link ready' : 'Failed to generate link',
+        inviteUrl.value ? 'success' : 'error',
+      )
     } catch (err) {
       showToast(err.userMessage || 'Failed to generate link.', 'error')
     } finally {
@@ -415,6 +431,8 @@
       // Оновлюємо деталі, щоб одразу побачити нову суму + себе у списку донорів
       if (gift.value) gift.value.collected_amount = res.new_collected_amount
       await loadDetails()
+      // Бек реально списав кошти з картки — перетягуємо картки, щоб баланс був актуальним.
+      await loadMyCards()
       contributeAmount.value = null
       showToast('Thank you for your contribution!', 'success')
     } catch (err) {
@@ -787,6 +805,27 @@
   }
   .btn-copy--copied {
     color: #2a6b2a;
+  }
+  .btn-regen {
+    padding: 0 16px;
+    background: #fff;
+    border: none;
+    border-left: 1px solid #f2e9c8;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b6860;
+    cursor: pointer;
+    transition: all 0.18s;
+    white-space: nowrap;
+  }
+  .btn-regen:hover:not(:disabled) {
+    background: #fbf7ec;
+    color: #9b7a25;
+  }
+  .btn-regen:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   /* Contribute */

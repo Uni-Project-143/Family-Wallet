@@ -49,7 +49,7 @@
     isOpen: { type: Boolean, default: false },
   })
 
-  const emit = defineEmits(['connect-now', 'later'])
+  defineEmits(['connect-now', 'later'])
 
   const modalRootRef = ref(null)
   useFocusTrap(modalRootRef, () => props.isOpen)

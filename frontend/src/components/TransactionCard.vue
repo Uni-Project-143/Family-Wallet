@@ -12,7 +12,11 @@
 
           <div class="tx-card__category" :style="categoryBadgeStyle">
             <span v-if="category.emoji" class="tx-card__category-emoji">{{ category.emoji }}</span>
-            <span v-else class="tx-card__category-dot" :style="{ background: category.color }"></span>
+            <span
+              v-else
+              class="tx-card__category-dot"
+              :style="{ background: category.color }"
+            ></span>
             {{ category.label }}
           </div>
 

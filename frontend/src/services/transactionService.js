@@ -1,12 +1,6 @@
 import apiClient from './apiClient'
 
 /**
- * Список транзакцій групи з фільтрами і сортуванням.
- * GET /api/v1/transactions/group/{group_id}?...filters
- *
- * Призначений для сторінки детального перегляду транзакцій
- * з фільтрацією за категорією, типом, сумою, датами.
- *
  * @param {string} groupId
  * @param {object} filters
  * @returns {Promise<{items, total, page, size, pages}>}
@@ -36,22 +30,15 @@ export async function fetchFeed(groupId, page = 1, limit = 20) {
 }
 
 /**
- * Створює віртуальний переказ між картками сімейної групи.
- * POST /api/v1/transactions/transfer
- *
  * @param {object} payload
  * @param {string} payload.from_card_id
  * @param {string} payload.to_card_id
- * @param {string|number} payload.amount — сума (буде серіалізована як Decimal на беку)
+ * @param {string|number} payload.amount
  * @param {string|null} payload.description
  * @param {string|null} payload.category_id
  * @returns {Promise<{transfer_id, debit_transaction_id, credit_transaction_id, amount, from_effective_balance, to_effective_balance}>}
  */
 /**
- * Поставити / зняти емодзі-реакцію на транзакцію (UPSERT + TOGGLE на беку).
- * POST /api/v1/transactions/{transactionId}/react
- *
- * Повторний клік по тому самому емодзі знімає реакцію (toggle вирішує бек).
  * @param {string} transactionId
  * @param {string} emoji
  * @returns {Promise<{ status: string, total_count: number, grouped_reactions: Record<string, number> }>}

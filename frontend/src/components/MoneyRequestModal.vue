@@ -99,7 +99,14 @@
               <div class="actions">
                 <button type="submit" class="btn-dark" :disabled="isSubmitting">
                   <span v-if="!isSubmitting">Send a Request</span>
-                  <svg v-else class="spinner" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <svg
+                    v-else
+                    class="spinner"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                  >
                     <circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,.3)" stroke-width="2" />
                     <path
                       d="M8 2A6 6 0 0 1 14 8"
@@ -207,8 +214,12 @@
       isSubmitting.value = false
       emit('close')
     } catch (err) {
-      const detail = err.response?.data?.detail || err.userMessage || 'Failed to send request. Try again.'
-      emit('toast', { message: typeof detail === 'string' ? detail : 'Failed to send request', type: 'error' })
+      const detail =
+        err.response?.data?.detail || err.userMessage || 'Failed to send request. Try again.'
+      emit('toast', {
+        message: typeof detail === 'string' ? detail : 'Failed to send request',
+        type: 'error',
+      })
     } finally {
       isSubmitting.value = false
     }

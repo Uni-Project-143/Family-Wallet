@@ -5,7 +5,7 @@
         <Transition name="modal">
           <div v-if="isOpen" ref="modalRootRef" class="modal-card" role="dialog" aria-modal="true">
             <!-- Close button -->
-            <button class="modal-close" :disabled="isSubmitting" @click="close" aria-label="Close">
+            <button class="modal-close" :disabled="isSubmitting" aria-label="Close" @click="close">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d="M1 1L13 13M13 1L1 13"
@@ -140,12 +140,7 @@
 
               <!-- Actions -->
               <div class="actions">
-                <button
-                  type="button"
-                  class="btn-secondary"
-                  :disabled="isSubmitting"
-                  @click="close"
-                >
+                <button type="button" class="btn-secondary" :disabled="isSubmitting" @click="close">
                   Скасувати
                 </button>
                 <button type="submit" class="btn-gold" :disabled="isSubmitting">
@@ -219,9 +214,7 @@
     amount: '',
   })
 
-  const availableToCards = computed(() =>
-    props.groupCards.filter((c) => c.id !== fromCardId.value),
-  )
+  const availableToCards = computed(() => props.groupCards.filter((c) => c.id !== fromCardId.value))
 
   const fromCard = computed(() => props.userCards.find((c) => c.id === fromCardId.value) || null)
 

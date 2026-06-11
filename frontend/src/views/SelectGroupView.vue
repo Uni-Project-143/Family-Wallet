@@ -84,8 +84,8 @@
   async function reloadGroups() {
     try {
       groups.value = await fetchMyGroups()
-    } catch (err) {
-      console.warn('fetchMyGroups failed:', err)
+    } catch {
+      // Не вдалося оновити список груп — залишаємо попередній стан
     }
   }
 

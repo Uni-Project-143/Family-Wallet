@@ -152,8 +152,7 @@
     } catch (err) {
       const status = err.response?.status
       if (status === 400) {
-        serverError.value =
-          'This reset link is invalid or has expired. Please request a new one.'
+        serverError.value = 'This reset link is invalid or has expired. Please request a new one.'
       } else {
         serverError.value = err.userMessage || 'Something went wrong. Please try again'
       }

@@ -119,14 +119,16 @@ export function useAuth() {
           state: { groups },
         })
       }
+      return { ok: true }
     } catch (err) {
       localStorage.removeItem(STORAGE_TOKEN_KEY)
       const status = err.response?.status
       if (status === 429) {
-        authError.value = 'Too many attempts. Please try again in 15 minutes'
-      } else {
-        authError.value = 'Invalid email or password'
+        const retryAfter = Number(err.response?.headers?.['retry-after']) || null
+        return { ok: false, status, retryAfter }
       }
+      authError.value = 'Invalid email or password'
+      return { ok: false, status }
     } finally {
       isLoading.value = false
     }
@@ -137,6 +139,7 @@ export function useAuth() {
     try {
       await logoutUser()
     } catch {
+      // вихід локально в будь-якому разі
     } finally {
       localStorage.removeItem(STORAGE_TOKEN_KEY)
       currentUser.value = null

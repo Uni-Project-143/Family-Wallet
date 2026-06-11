@@ -94,7 +94,7 @@
   import { ref, computed, watch, onUnmounted } from 'vue'
   import BaseInput from '../components/BaseInput.vue'
   import { useAuth } from '../composables/useAuth'
-  import { recordFailedAttempt, isBlocked, getRemainingBlockMs } from '../utils/authRateLimit'
+  import { applyServerBlock, isBlocked, getRemainingBlockMs } from '../utils/authRateLimit'
 
   const { login, isLoading, authError } = useAuth()
 
@@ -154,14 +154,14 @@
   async function handleSubmit() {
     if (!canSubmit.value) return
 
-    await login({
+    const result = await login({
       email: email.value.trim().toLowerCase(),
       password: password.value,
     })
 
-    // Бек повернув помилку — фіксуємо невдалу спробу
-    if (authError.value) {
-      recordFailedAttempt(blockKey.value)
+    // Бек заблокував (429) — ставимо блок за точним Retry-After від сервера
+    if (result?.status === 429) {
+      applyServerBlock(blockKey.value, result.retryAfter || 15 * 60)
       refreshBlockStatus()
     }
   }

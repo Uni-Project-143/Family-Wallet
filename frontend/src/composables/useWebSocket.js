@@ -1,15 +1,5 @@
 import { ref, onMounted, onUnmounted, watch, toValue } from 'vue'
 
-/**
- * WebSocket-клієнт з auto-reconnect і ping/pong heartbeat.
- *
- * Endpoint: ws://localhost:8000/ws/feed/{group_id}
- *
- * Очікувані повідомлення:
- *   { event: 'new_transaction', data: {...} }
- *   { event: 'reaction_updated', data: { transaction_id, grouped_reactions, ... } }
- *   { event: 'new_request' | 'request_updated', data: {...} }
- */
 export function useWebSocket({ groupId, onTransaction, onReaction, onRequest } = {}) {
   const isConnected = ref(false)
   const reconnectAttempts = ref(0)
@@ -22,13 +12,11 @@ export function useWebSocket({ groupId, onTransaction, onReaction, onRequest } =
 
   function connect() {
     if (!ENABLED) {
-      console.info('WebSocket disabled (VITE_WS_ENABLED != true)')
       return
     }
 
     const gid = toValue(groupId)
     if (!gid) {
-      console.info('WebSocket: no group_id yet, skipping connect')
       return
     }
 
@@ -38,9 +26,7 @@ export function useWebSocket({ groupId, onTransaction, onReaction, onRequest } =
       ws.onopen = () => {
         isConnected.value = true
         reconnectAttempts.value = 0
-        console.info(`WebSocket connected to group ${gid}`)
 
-        // Heartbeat — кожні 30 сек шлемо ping (бек ігнорує payload, просто тримає з'єднання)
         pingInterval = setInterval(() => {
           if (ws?.readyState === WebSocket.OPEN) {
             ws.send('ping')
@@ -58,8 +44,8 @@ export function useWebSocket({ groupId, onTransaction, onReaction, onRequest } =
           } else if (msg.event === 'new_request' || msg.event === 'request_updated') {
             onRequest?.(msg.data, msg.event)
           }
-        } catch (err) {
-          console.warn('WS message parse error:', err)
+        } catch {
+          // Невалідний JSON у WS-повідомленні — ігноруємо
         }
       }
 
@@ -72,11 +58,9 @@ export function useWebSocket({ groupId, onTransaction, onReaction, onRequest } =
         scheduleReconnect()
       }
 
-      ws.onerror = () => {
-        // onclose спрацює автоматично — не дублюємо logic
-      }
-    } catch (err) {
-      console.warn('WS connection failed:', err)
+      ws.onerror = () => {}
+    } catch {
+      // Не вдалося відкрити з'єднання — плануємо повторну спробу
       scheduleReconnect()
     }
   }
@@ -104,7 +88,7 @@ export function useWebSocket({ groupId, onTransaction, onReaction, onRequest } =
       pingInterval = null
     }
     if (ws) {
-      ws.onclose = null // щоб не тригернути scheduleReconnect
+      ws.onclose = null
       ws.close()
       ws = null
     }
@@ -112,7 +96,6 @@ export function useWebSocket({ groupId, onTransaction, onReaction, onRequest } =
   }
 
   onMounted(() => {
-    // Якщо groupId переданий як getter (функція) — чекаємо доки значення з'явиться
     if (typeof groupId === 'function') {
       watch(
         () => toValue(groupId),

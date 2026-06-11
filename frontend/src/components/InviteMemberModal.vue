@@ -5,7 +5,7 @@
         <Transition name="modal">
           <div v-if="isOpen" ref="modalRootRef" class="modal-card" role="dialog" aria-modal="true">
             <!-- Close button -->
-            <button class="modal-close" @click="close" aria-label="Close">
+            <button class="modal-close" aria-label="Close" @click="close">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d="M1 1L13 13M13 1L1 13"

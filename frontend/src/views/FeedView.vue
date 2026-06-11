@@ -29,7 +29,7 @@
 
           <!-- Loading -->
           <div v-if="isLoadingMembers && !groupMembers.length" class="sidebar__loading">
-            <div class="sidebar__skeleton-row" v-for="n in 3" :key="n"></div>
+            <div v-for="n in 3" :key="n" class="sidebar__skeleton-row"></div>
           </div>
           <!-- Empty -->
           <div v-else-if="!groupMembers.length" class="sidebar__empty">
@@ -55,7 +55,7 @@
               </button>
             </div>
           </div>
-          <!-- + Invite member — тільки Admin (US 1.3)        !!!!!!!!!!!!!!!!!!!!!!!! -->
+          <!-- + Invite member — тільки Admin (US 1.3) -->
           <button v-if="isAdmin" class="invite-btn" @click="isInviteModalOpen = true">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path
@@ -164,7 +164,7 @@
         <!-- Вхідні запити коштів — показуємо лише коли є PENDING -->
         <section v-if="incomingRequests.length" class="right-panel__section">
           <div class="right-panel__title">Money Requests</div>
-          <div class="req-card" v-for="req in incomingRequests" :key="req.id">
+          <div v-for="req in incomingRequests" :key="req.id" class="req-card">
             <div class="req-card__head">
               <span class="req-card__from">{{ requesterName(req) }}</span>
               <span class="req-card__amount">{{ formatAmount(req.amount) }} UAH</span>
@@ -272,8 +272,24 @@
         </section>
 
         <section class="right-panel__section">
-          <div class="right-panel__title">Notifications</div>
-          <div class="right-panel__empty">{{ strings.empty.notifications }}</div>
+          <div class="right-panel__title notif-head">
+            <span>Notifications</span>
+            <button v-if="unreadNotifCount" class="notif-markread" @click="markNotifsRead">
+              Mark all read
+            </button>
+          </div>
+          <div v-if="visibleNotifications.length" class="notif-list">
+            <div
+              v-for="n in visibleNotifications"
+              :key="n.id"
+              class="notif-item"
+              :class="{ 'notif-item--unread': !n.is_read }"
+            >
+              <div class="notif-item__title">{{ notifIcon(n) }} {{ notifText(n) }}</div>
+              <div class="notif-item__sub">{{ notifTime(n.created_at) }}</div>
+            </div>
+          </div>
+          <div v-else class="right-panel__empty">{{ strings.empty.notifications }}</div>
         </section>
       </aside>
     </div>
@@ -325,6 +341,12 @@
     :amount="responseModal?.amount || 0"
     @close="closeResponseModal"
   />
+  <SelectCardModal
+    :is-open="isSelectCardOpen"
+    :cards="userOwnedActiveCards"
+    @close="isSelectCardOpen = false"
+    @select="onSelectPayCard"
+  />
 </template>
 
 <script setup>
@@ -351,6 +373,7 @@
   import TransferModal from '../components/TransferModal.vue'
   import MoneyRequestModal from '../components/MoneyRequestModal.vue'
   import RequestResponseModal from '../components/RequestResponseModal.vue'
+  import SelectCardModal from '../components/SelectCardModal.vue'
   import { usePersistentState } from '../composables/usePersistentState'
   import { fetchGroupGiftEvents } from '../services/giftEventService'
   import {
@@ -358,6 +381,7 @@
     fetchOutgoingRequests,
     respondToMoneyRequest,
   } from '../services/moneyRequestService'
+  import { fetchNotifications, markNotificationsRead } from '../services/notificationService'
   import { parseServerDate } from '../utils/datetime'
   import { resolveCategory } from '../utils/categoryColors'
   import strings from '../locales/en'
@@ -374,8 +398,8 @@
     isLoadingCards.value = true
     try {
       connectedCards.value = await fetchGroupCards(currentUser.value.groupId)
-    } catch (err) {
-      console.warn('Failed to load cards:', err)
+    } catch {
+      // Не вдалося завантажити картки — залишаємо попередній список
     } finally {
       isLoadingCards.value = false
     }
@@ -390,10 +414,8 @@
     transactions,
     isLoading: isLoadingFeed,
     isLoadingMore,
-    hasMore,
     loadFirstPage,
     loadMore,
-    // prependTransaction,
   } = useFeedTransactions(() => currentUser.value?.groupId)
 
   // ─── WebSocket для real-time (PROJ-50). Поки VITE_WS_ENABLED=false — no-op. ───
@@ -435,9 +457,7 @@
   const isInviteModalOpen = ref(false)
 
   const hasOwnCard = computed(() =>
-    connectedCards.value.some(
-      (c) => String(c.user_id) === String(currentUser.value?.id),
-    ),
+    connectedCards.value.some((c) => String(c.user_id) === String(currentUser.value?.id)),
   )
 
   // ─── Transfer between cards (UC-16) ───
@@ -562,9 +582,12 @@
     loadGiftEvents()
     loadIncomingRequests()
     loadOutgoingResolved()
-    // Тік раз на хвилину — щоб подія сама зникла зі стрічки після 24-год вікна.
+    loadNotifications()
+    // Тік раз на хвилину — оновлюємо `now` (для 24/48-год вікон) і підтягуємо
+    // свіжі сповіщення (бек створює їх через cron, без WS — тож опитуємо).
     nowTimer = setInterval(() => {
       now.value = Date.now()
+      loadNotifications()
     }, 60000)
   })
 
@@ -625,12 +648,9 @@
       })
   })
 
-  const categoryTotal = computed(() =>
-    categoryBreakdown.value.reduce((s, c) => s + c.value, 0),
-  )
+  const categoryTotal = computed(() => categoryBreakdown.value.reduce((s, c) => s + c.value, 0))
 
-  // Реальні активні події групи для правого блоку (заміна мок-заглушки Sofia's Birthday).
-  // Беремо лише події в межах 24-год вікна (visibleGiftEvents).
+  // Активні події групи для правого блоку — лише в межах 24-год вікна (visibleGiftEvents).
   const activeGiftEvents = computed(() =>
     visibleGiftEvents.value
       .filter((g) => g.status === 'ACTIVE' || g.status === 'REVEALED')
@@ -747,9 +767,74 @@
           enqueueResponse(id, r.status, name, Number(r.amount))
         }
       }
-    } catch (err) {
-      console.warn('Failed to load outgoing requests:', err)
+    } catch {
+      // Не вдалося завантажити вихідні запити
     }
+  }
+
+  // ─── Notifications (історія сповіщень з беку) ───
+  const notifications = ref([])
+
+  // Сповіщення живуть на панелі 48 годин після створення, далі — зникають.
+  // Використовуємо реактивний `now` (тікає щохвилини), щоб ховались самі без F5.
+  const NOTIF_FEED_TTL_MS = 48 * 60 * 60 * 1000
+  const visibleNotifications = computed(() =>
+    notifications.value.filter((n) => {
+      const created = parseServerDate(n.created_at)
+      if (!created) return true
+      return now.value < created.getTime() + NOTIF_FEED_TTL_MS
+    }),
+  )
+  const unreadNotifCount = computed(
+    () => visibleNotifications.value.filter((n) => !n.is_read).length,
+  )
+
+  async function loadNotifications() {
+    if (!currentUser.value?.id) return
+    try {
+      const data = await fetchNotifications()
+      notifications.value = (Array.isArray(data) ? data : []).map((n) => ({
+        ...n,
+        id: n.id || n._id,
+      }))
+    } catch {
+      // Не вдалося завантажити сповіщення
+    }
+  }
+
+  async function markNotifsRead() {
+    try {
+      await markNotificationsRead()
+      notifications.value = notifications.value.map((n) => ({ ...n, is_read: true }))
+    } catch {
+      showToast('Failed to mark notifications as read', 'error')
+    }
+  }
+
+  // Мапінг типу сповіщення → текст/іконка (бек віддає лише notification_type + gift_id).
+  const NOTIF_TEXT = {
+    REVEAL: 'A secret gift was revealed!',
+    REMINDER_24H: 'A gift unlocks in 24 hours',
+    REMINDER_DAY_OF: 'A gift unlocks today',
+    REMINDER_9AM: 'Gift unlock reminder',
+  }
+  const NOTIF_ICON = {
+    REVEAL: '🎉',
+    REMINDER_24H: '⏰',
+    REMINDER_DAY_OF: '🎈',
+    REMINDER_9AM: '🔔',
+  }
+  const notifText = (n) => NOTIF_TEXT[n.notification_type] || 'New notification'
+  const notifIcon = (n) => NOTIF_ICON[n.notification_type] || '🔔'
+  function notifTime(iso) {
+    const d = parseServerDate(iso)
+    if (!d) return ''
+    return d.toLocaleString('uk-UA', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   }
 
   // ─── Вхідні запити коштів (я — отримувач, маю прийняти/відхилити) ───
@@ -766,8 +851,8 @@
         ...r,
         id: r.id || r._id,
       }))
-    } catch (err) {
-      console.warn('Failed to load incoming requests:', err)
+    } catch {
+      // Не вдалося завантажити вхідні запити
     }
   }
 
@@ -777,28 +862,50 @@
     return m?.name || 'Учасник групи'
   }
 
-  /** Прийняти/відхилити запит. ACCEPTED → бек виконує переказ. */
+  // Вибір картки-платника (якщо в отримувача кілька карток у групі).
+  const isSelectCardOpen = ref(false)
+  const pendingAcceptReq = ref(null)
+
+  /** Прийняти/відхилити запит. ACCEPTED → треба вибрати картку, з якої платимо. */
   async function respondRequest(req, status) {
     if (respondingId.value) return
 
-    // Передперевірка: прийняти запит можна лише маючи СВОЮ активну картку в групі
-    // (саме з неї спишуться кошти). Інакше — зрозуміле повідомлення англійською.
-    if (status === 'ACCEPTED' && userOwnedActiveCards.value.length === 0) {
+    if (status !== 'ACCEPTED') {
+      return doRespond(req, 'DECLINED', null)
+    }
+
+    const cards = userOwnedActiveCards.value
+    if (cards.length === 0) {
       showToast(
         "You haven't connected a card to this group. Connect your card first to accept money requests.",
         'error',
       )
       return
     }
+    if (cards.length === 1) {
+      return doRespond(req, 'ACCEPTED', cards[0].id)
+    }
+    // Кілька карток — питаємо, з якої списувати.
+    pendingAcceptReq.value = req
+    isSelectCardOpen.value = true
+  }
 
+  function onSelectPayCard(cardId) {
+    isSelectCardOpen.value = false
+    const req = pendingAcceptReq.value
+    pendingAcceptReq.value = null
+    if (req && cardId) doRespond(req, 'ACCEPTED', cardId)
+  }
+
+  /** Власне виклик беку для відповіді на запит. */
+  async function doRespond(req, status, fromCardId) {
+    if (respondingId.value) return
     respondingId.value = req.id
     try {
-      await respondToMoneyRequest(req.id, status)
-      // Прибираємо з локального списку
+      await respondToMoneyRequest(req.id, status, fromCardId)
       incomingRequests.value = incomingRequests.value.filter((r) => r.id !== req.id)
       if (status === 'ACCEPTED') {
         showToast(`Request accepted — ${formatAmount(req.amount)} UAH sent`, 'success')
-        // Баланси змінились — перетягуємо картки і стрічку
         await loadCards()
         await loadFirstPage()
       } else {
@@ -809,11 +916,9 @@
       const detail = err.response?.data?.detail
       let message
       if (httpStatus === 400 && typeof detail === 'string' && detail.includes('картк')) {
-        // Бек: у когось зі сторін немає активної картки в цій групі.
-        message = 'This request can’t be completed: a participant has no active card in this group.'
+        message = (typeof detail === 'string' && detail) || 'Card issue: please check your cards.'
       } else if (httpStatus === 409) {
         message = 'This request has already been resolved.'
-        // синхронізуємо список
         incomingRequests.value = incomingRequests.value.filter((r) => r.id !== req.id)
       } else {
         message =
@@ -1642,12 +1747,37 @@
     background: #fbf7ec;
   }
 
+  .notif-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .notif-markread {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    text-transform: none;
+    color: #9b7a25;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+  .notif-markread:hover {
+    color: #b8973a;
+    text-decoration: underline;
+  }
   .notif-item {
     padding: 10px 12px;
     border-radius: 8px;
     background: #f4f1e9;
     border: 1px solid #eae8e4;
     margin-bottom: 8px;
+  }
+  .notif-item--unread {
+    background: #fbf7ec;
+    border-color: #f2e9c8;
   }
   .notif-item--unread {
     border-left: 3px solid #b8973a;
@@ -1898,5 +2028,4 @@
       padding: 7px 16px;
     }
   }
-
 </style>

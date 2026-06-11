@@ -512,7 +512,7 @@
       const data = await fetchGroupMembers(storedUser.groupId)
       const members = Array.isArray(data) ? data : data.members || []
       groupMembers.value = members.map((m) => mapMemberFromApi(m, currentUser.value?.id))
-    } catch (err) {
+    } catch {
       showToast('Failed to load group members', 'error')
     } finally {
       isLoadingMembers.value = false
@@ -666,8 +666,7 @@
     isLoadingCards.value = true
     try {
       connectedCards.value = await fetchGroupCards(currentUser.value.groupId)
-    } catch (err) {
-      console.warn('Failed to load cards:', err)
+    } catch {
       showToast('Failed to load connected cards', 'error')
     } finally {
       isLoadingCards.value = false

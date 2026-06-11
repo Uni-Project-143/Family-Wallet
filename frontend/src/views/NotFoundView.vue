@@ -3,9 +3,7 @@
     <div class="nf-card">
       <div class="nf-code">404</div>
       <h1 class="nf-title">Page not found</h1>
-      <p class="nf-text">
-        The page you're looking for doesn't exist or may have been moved.
-      </p>
+      <p class="nf-text">The page you're looking for doesn't exist or may have been moved.</p>
       <div class="nf-actions">
         <button class="nf-btn nf-btn--ghost" @click="goBack">← Go back</button>
         <button class="nf-btn nf-btn--gold" @click="goHome">Go to {{ homeLabel }}</button>

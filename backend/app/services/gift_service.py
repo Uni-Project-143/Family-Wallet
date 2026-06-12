@@ -1,6 +1,7 @@
 import asyncio
 from decimal import Decimal
 from datetime import datetime, timezone, timedelta
+from beanie import PydanticObjectId
 from beanie.odm.operators.update.general import Inc
 
 from app.models.gift_event import GiftEvent, GiftStatus
@@ -113,8 +114,18 @@ class GiftService:
     @staticmethod
     async def _notify_group_except_target(gift: GiftEvent, notif_type: str,
                                           idempotency_key_prefix: str):
+        # gift.group_id зберігається рядком, а GroupMembership.group_id — ObjectId
+        # (до того ж у базі трапляються обидві форми). Шукаємо за обома, інакше
+        # запит знаходить 0 учасників і нагадування не надсилаються нікому.
+        gid = getattr(gift, 'group_id', None)
+        gid_variants = [gid]
+        try:
+            gid_variants.append(PydanticObjectId(gid))
+        except Exception:
+            pass
+
         memberships = await GroupMembership.find(
-            GroupMembership.group_id == getattr(gift, 'group_id', None)
+            {"group_id": {"$in": gid_variants}}
         ).to_list()
 
         for m in memberships:

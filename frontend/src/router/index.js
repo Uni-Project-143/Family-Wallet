@@ -119,7 +119,7 @@ router.beforeEach((to) => {
   const isAuthenticated = hasValidToken()
 
   if (to.meta.requiresAuth && !isAuthenticated) {
-    return { name: 'Login' }
+    return { name: 'Login', query: { redirect: to.fullPath } }
   }
 
   if (to.meta.requiresGuest && isAuthenticated) {

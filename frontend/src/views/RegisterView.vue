@@ -234,7 +234,7 @@
     gdpr: '',
   })
 
-  const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
+  const EMAIL_REGEX = /^[a-z0-9._%+-]+@gmail\.com$/
   const FULL_NAME_REGEX = /^[А-ЯІЇЄA-Z][а-яіїєa-z']+\s[А-ЯІЇЄA-Z][а-яіїєa-z']+$/
 
   /**
@@ -261,6 +261,10 @@
     if (fieldName === 'email') {
       if (!email.value.trim()) {
         fieldErrors.value.email = 'Email is required'
+        return false
+      }
+      if (/[A-Z]/.test(email.value)) {
+        fieldErrors.value.email = 'Email must be lowercase — capital letters are not allowed'
         return false
       }
       if (!EMAIL_REGEX.test(email.value)) {

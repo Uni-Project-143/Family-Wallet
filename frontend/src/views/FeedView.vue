@@ -606,8 +606,18 @@
   })
 
   const filteredTransactions = computed(() => {
-    if (activeFilter.value === 'all') return transactions.value
-    return transactions.value.filter((tx) => tx.author_id === activeFilter.value)
+    const list =
+      activeFilter.value === 'all'
+        ? transactions.value
+        : transactions.value.filter((tx) => tx.author_id === activeFilter.value)
+    // Найновіші — завжди зверху. Сортуємо за timestamp спадно на клієнті, щоб
+    // порядок був детермінованим незалежно від джерела (переказ / gift-внесок /
+    // Mono) і від WS-рефетчу.
+    return [...list].sort((a, b) => {
+      const ta = parseServerDate(a.timestamp)?.getTime() ?? 0
+      const tb = parseServerDate(b.timestamp)?.getTime() ?? 0
+      return tb - ta
+    })
   })
 
   // ─── Spending by Category (реальні дані зі стрічки, без моків) ───

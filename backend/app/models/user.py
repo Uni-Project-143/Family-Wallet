@@ -1,5 +1,5 @@
 from beanie import Document
-from typing import List, Optional
+from typing import Optional
 from pydantic import EmailStr, Field
 from datetime import datetime
 

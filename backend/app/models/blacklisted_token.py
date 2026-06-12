@@ -1,7 +1,7 @@
 from datetime import datetime
 from beanie import Document
 from pydantic import Field
-import pymongo # Додаємо цей імпорт для створення індексу
+import pymongo
 
 class BlacklistedToken(Document):
     token: str
@@ -9,8 +9,6 @@ class BlacklistedToken(Document):
 
     class Settings:
         name = "blacklisted_tokens"
-        # НОВЕ: Кажемо базі видаляти запис через певний час (наприклад, 7 днів = 604800 секунд)
-        # Час треба ставити такий самий, як час життя твого JWT токена!
         indexes = [
             pymongo.IndexModel(
                 [("added_at", pymongo.ASCENDING)],

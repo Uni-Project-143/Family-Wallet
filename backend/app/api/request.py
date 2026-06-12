@@ -17,7 +17,6 @@ from app.core.websockets import ws_manager
 
 router = APIRouter(prefix="/api/v1/requests", tags=["Money Requests"])
 
-
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_money_request(
     payload: CreateMoneyRequestDto,
@@ -70,7 +69,6 @@ async def create_money_request(
         "message": "Запит успішно надіслано"
     }
 
-
 @router.get("/incoming", response_model=List[MoneyRequest])
 async def get_incoming_requests(
     status: RequestStatus = RequestStatus.PENDING,
@@ -81,19 +79,16 @@ async def get_incoming_requests(
         MoneyRequest.status == status
     ).to_list()
 
-
 @router.get("/outgoing", response_model=List[MoneyRequest])
 async def get_outgoing_requests(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Запити, які надіслав поточний користувач (для показу відповіді відправнику,
-    зокрема після того, як він був офлайн у момент рішення отримувача).
+    Запити, які надіслав поточний користувач (для показу відповіді відправнику).
     """
     return await MoneyRequest.find(
         MoneyRequest.requester_id == str(current_user.id)
     ).sort(-MoneyRequest.created_at).to_list()
-
 
 @router.patch("/{request_id}")
 async def update_money_request(
@@ -117,7 +112,6 @@ async def update_money_request(
         raise HTTPException(status_code=409, detail="Запит вже вирішено")
 
     if payload.status == RequestStatus.ACCEPTED:
-        # Перевірка, чи фронтенд надіслав ID картки
         if not payload.from_card_id:
             raise HTTPException(status_code=400, detail="Необхідно вибрати картку для оплати")
 
@@ -126,7 +120,6 @@ async def update_money_request(
         except Exception:
             raise HTTPException(status_code=400, detail="Невалідний ID картки")
 
-        # Шукаємо САМЕ ТУ картку, яку вибрав користувач
         from_card = await BankCard.find_one(
             BankCard.id == from_card_oid,
             BankCard.user_id == money_request.recipient_id,
@@ -172,7 +165,6 @@ async def update_money_request(
 
         await TransactionRepository.create_paired_virtual_transactions(debit, credit)
 
-        # Атомарне оновлення балансів
         await from_card.update(Inc({BankCard.virtual_balance: float(debit_amount)}))
         await to_card.update(Inc({BankCard.virtual_balance: float(credit_amount)}))
 

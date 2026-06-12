@@ -3,7 +3,6 @@ from typing import List
 from app.api.auth import get_current_user
 from app.models.user import User
 from app.models.notification import NotificationLog
-from beanie.odm.operators.update.general import Set
 
 router = APIRouter(prefix="/api/v1/notifications", tags=["Notifications"])
 
@@ -22,16 +21,14 @@ async def get_my_notifications(current_user: User = Depends(get_current_user)):
 @router.patch("/mark-read", status_code=200)
 async def mark_all_as_read(current_user: User = Depends(get_current_user)):
     """
-    Позначає всі непрочитані сповіщення користувача як прочитані (Raw MongoDB query).
+    Позначає всі непрочитані сповіщення користувача як прочитані.
     """
-    # Використовуємо словники {} для 100% гарантії правильного MongoDB запиту
     update_result = await NotificationLog.find(
         {"user_id": str(current_user.id), "is_read": False}
     ).update(
         {"$set": {"is_read": True}}
     )
 
-    # Повертаємо кількість реально змінених документів (modified_count)
     return {
         "status": "success",
         "message": "All notifications marked as read",

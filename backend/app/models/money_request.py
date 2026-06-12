@@ -22,7 +22,6 @@ class MoneyRequest(Document):
     status: RequestStatus = Field(default=RequestStatus.PENDING)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    # Рятівний валідатор для конвертації MongoDB Decimal128 у Python Decimal
     @field_validator('amount', mode='before')
     @classmethod
     def convert_decimal128(cls, v):

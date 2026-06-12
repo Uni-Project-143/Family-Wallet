@@ -2,6 +2,7 @@ from beanie import Document
 from pydantic import Field
 from datetime import datetime, timezone
 from enum import Enum
+import pymongo
 
 class GiftStatus(str, Enum):
     ACTIVE = "ACTIVE"
@@ -21,3 +22,7 @@ class GiftEvent(Document):
 
     class Settings:
         name = "gift_events"
+        indexes = [
+            pymongo.IndexModel([("group_id", pymongo.ASCENDING)]),
+            pymongo.IndexModel([("target_user_id", pymongo.ASCENDING), ("status", pymongo.ASCENDING)])
+        ]

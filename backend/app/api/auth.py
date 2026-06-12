@@ -1,8 +1,8 @@
 import os
 from datetime import datetime, timezone
-from fastapi import APIRouter, status, Request, Depends, HTTPException, BackgroundTasks # <--- Додали BackgroundTasks
+from fastapi import APIRouter, status, Request, Depends, HTTPException, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr # <--- Додали EmailStr
+from pydantic import BaseModel, EmailStr
 
 from app.schemas.auth import UserRegisterRequest, UserLoginRequest, TokenResponse
 from app.services.auth_service import AuthService
@@ -12,25 +12,21 @@ from app.models.password_reset import PasswordResetToken
 from app.services.notification_service import NotificationService
 from app.core.dependencies import get_current_user
 from app.repositories.token_repository import TokenRepository
-# Додаємо імпорт хешування пароля (переконайся, що шлях правильний для твого проєкту)
 from app.core.security import get_password_hash
 
 router = APIRouter()
 security = HTTPBearer()
-
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=TokenResponse)
 async def register(request_data: UserRegisterRequest):
     """Реєстрація нового користувача."""
     return await AuthService.register(request_data)
 
-
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("5/15minutes")
 async def login(request: Request, login_data: UserLoginRequest):
     """Авторизація користувача та отримання JWT токена."""
     return await AuthService.login(login_data)
-
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
 async def logout(
@@ -41,12 +37,8 @@ async def logout(
     Вихід користувача з системи.
     Додає поточний JWT токен у чорний список.
     """
-    # Дістаємо сам рядок токена
     token = credentials.credentials
-
-    # Записуємо його в базу (чорний список)
     await TokenRepository.add_to_blacklist(token)
-
     return {"message": "Successfully logged out"}
 
 class FcmTokenRequest(BaseModel):
@@ -62,38 +54,28 @@ async def update_fcm_token(
     await current_user.save()
     return {"success": True, "message": "FCM token updated"}
 
-
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
-
 
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
 
-
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)
 async def forgot_password(request: ForgotPasswordRequest, background_tasks: BackgroundTasks):
-    # 1. Шукаємо юзера в базі
     user = await User.find_one({"email": request.email})
 
-    # 🔒 Безпека: якщо юзера немає, ми ВСЕ ОДНО повертаємо 200 OK.
-    # Це захищає систему від перебору імейлів хакерами (Email Enumeration).
     if not user:
         return {"message": "Якщо цей email зареєстрований, лист для відновлення пароля надіслано."}
 
-    # 2. Видаляємо старі токени цього юзера, якщо вони були, щоб не плодити дублікати
     await PasswordResetToken.find({"email": request.email}).delete()
 
-    # 3. Генеруємо новий токен відновлення
     reset_record = PasswordResetToken(email=request.email)
     await reset_record.insert()
 
-    # 4. Формуємо посилання на фронтенд сторінку скидання пароля
     frontend_base = os.getenv("FRONTEND_URL", "http://localhost:5173")
     reset_link = f"{frontend_base}/reset-password?token={reset_record.token}"
 
-    # 5. Відправляємо email у фоновому потоці через SendGrid
     html_content = f"""
         <h3>Відновлення пароля</h3>
         <p>Хтось запросив скидання пароля для вашого акаунту.</p>
@@ -111,10 +93,8 @@ async def forgot_password(request: ForgotPasswordRequest, background_tasks: Back
 
     return {"message": "Лист для відновлення пароля успішно надіслано."}
 
-
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
 async def reset_password(request: ResetPasswordRequest):
-    # 1. Шукаємо токен в базі та перевіряємо експірацію
     now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
     reset_record = await PasswordResetToken.find_one({
         "token": request.token,
@@ -127,7 +107,6 @@ async def reset_password(request: ResetPasswordRequest):
             detail="Токен невалідний або його термін дії минув."
         )
 
-    # 2. Знаходимо користувача
     user = await User.find_one({"email": reset_record.email})
     if not user:
         raise HTTPException(
@@ -135,11 +114,9 @@ async def reset_password(request: ResetPasswordRequest):
             detail="Користувача не знайдено."
         )
 
-    # 3. Хешуємо та оновлюємо новий пароль
     user.hashed_password = get_password_hash(request.new_password)
     await user.save()
 
-    # 4. Обов'язково видаляємо токен з бази, щоб його не використали вдруге
     await reset_record.delete()
 
     return {"message": "Пароль успішно змінено. Тепер ви можете увійти."}

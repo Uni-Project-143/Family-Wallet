@@ -21,10 +21,8 @@ class GroupRepository:
 
     @staticmethod
     async def get_user_memberships(user_id: ObjectId, session=None):
-        """Знаходить всі записи про участь юзера в групах"""
         return await GroupMembership.find(GroupMembership.user_id == user_id, session=session).to_list()
 
     @staticmethod
     async def get_groups_by_ids(group_ids: list[ObjectId], session=None):
-        """Шукає самі групи за списком їх ID"""
         return await Group.find({"_id": {"$in": group_ids}}, session=session).to_list()

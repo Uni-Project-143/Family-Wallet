@@ -14,7 +14,6 @@ import urllib.parse
 
 router = APIRouter(prefix="/api/v1/feed", tags=["Feed"])
 
-
 @router.get("/{group_id}", response_model=FeedResponse)
 async def get_unified_feed(
     group_id: str,
@@ -22,58 +21,41 @@ async def get_unified_feed(
     limit: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user)
 ):
-    # 1. Очищаємо рядок (щоб Swagger не ламав запит випадковими лапками)
     clean_group_id = group_id.strip(' "\'\n')
 
-    # 2. КОНВЕРТУЄМО очищений group_id в ObjectId
     try:
         group_oid = PydanticObjectId(clean_group_id)
     except Exception:
         raise HTTPException(status_code=400, detail=f"Невалідний ID групи: {clean_group_id}")
 
-    # 3. ПЕРЕВІРКА ДОСТУПУ
     membership = await GroupMembership.find_one({
         "user_id": current_user.id,
         "group_id": group_oid
     })
 
     if not membership:
-        print(f"DEBUG: Шукаю user={current_user.id} в group={group_oid}")
         raise HTTPException(status_code=403, detail="Ви не є учасником цієї групи")
 
-    # 4. Фільтр Secret Gift (PROJ-58: Ізоляція Target User)
-    # Ховаємо транзакції від іменинника, ПОКИ його подія НЕ розкрита (status == ACTIVE).
-    # Прив'язка до статусу, а не до unlock_date, робить ізоляцію стійкою до таймзон
-    # і до затримки cron: щойно cron переведе подію в REVEALED — іменинник побачить внески.
     locked_gifts = await GiftEvent.find(
         GiftEvent.target_user_id == str(current_user.id),
         GiftEvent.status == GiftStatus.ACTIVE
     ).to_list()
 
-    # Витягуємо їхні ID у список
     locked_gift_ids = [str(g.id) for g in locked_gifts]
 
-    # Формуємо запит.
     query = {
         "group_id": clean_group_id,
         "$nor": [
-            # 1. Захист для старих транзакцій (без прив'язки до події)
             {"is_secret_gift": True, "target_user_id": str(current_user.id), "gift_id": None},
-            # 2. Приховуємо транзакції нерозкритих подій, де юзер — іменинник
             {"gift_id": {"$in": locked_gift_ids}},
-            # 3. Підстраховка: будь-яка секретна транзакція, що таргетить юзера,
-            #    поки в нього є нерозкрита подія (на випадок розбіжності gift_id)
-            {"is_secret_gift": True, "target_user_id": str(current_user.id),
-             "gift_id": {"$in": locked_gift_ids}},
+            {"is_secret_gift": True, "target_user_id": str(current_user.id), "gift_id": {"$in": locked_gift_ids}},
         ]
     }
 
-    # 5. Отримання даних з пагінацією (BE-02)
     skip = (page - 1) * limit
     total = await Transaction.find(query).count()
     transactions = await Transaction.find(query).sort("-timestamp").skip(skip).limit(limit).to_list()
 
-    # 6. Збагачення даними юзерів (ім'я/аватар/категорії)
     items = []
     for tx in transactions:
         card = None
@@ -97,49 +79,36 @@ async def get_unified_feed(
             except Exception:
                 pass
 
-        # ==========================================
-        # НОВА ЛОГІКА ІДЕНТИФІКАЦІЇ (Fallback Logic)
-        # ==========================================
         if owner:
-            # Якщо full_name пусте, беремо email, якщо і він пустий - "Без імені"
             display_name = owner.full_name or getattr(owner, 'email', None) or "Без імені"
-
-            # Якщо є avatar_url з бази - беремо його. Якщо ні - генеруємо аватар з ініціалами.
             avatar_url = getattr(owner, 'avatar_url', None)
             if avatar_url:
                 avatar = avatar_url
             else:
-                # url-encode для безпечної передачі українських літер та пробілів
                 safe_name = urllib.parse.quote(display_name)
                 avatar = f"https://ui-avatars.com/api/?name={safe_name}&background=random&color=fff&size=128"
         else:
-            # Negative AC: Транзакція без прив'язки до user
             display_name = "Невідомий учасник"
-            # Сірий аватар зі знаком питання
             avatar = "https://ui-avatars.com/api/?name=?&background=808080&color=fff&size=128"
 
-        # Реакції: згруповані лічильники + емодзі поточного юзера (для підсвічування).
         grouped_reactions = dict(Counter(r.emoji for r in tx.reactions))
         my_reaction = next(
             (r.emoji for r in tx.reactions if str(r.user_id) == str(current_user.id)),
             None,
         )
 
-        # Формуємо фінальний об'єкт для фронтенду
         items.append(FeedTransactionItem(
             id=str(tx.id),
             amount=float(tx.amount),
             currency=tx.currency,
             description=tx.description or "Без опису",
             timestamp=tx.timestamp,
-            display_name=display_name,  # <-- Оновлено
-            avatar=avatar,  # <-- Оновлено
+            display_name=display_name,
+            avatar=avatar,
             card_masked_pan=card.masked_pan if card else "****",
             author_id=str(owner.id) if owner else None,
             category_name=category.name if category else "Інше",
             category_emoji=category.icon if category else "💰",
-            # slug категорії (groceries/fast_food/...) — фронт мапить його у назву/колір.
-            # Якщо category_id порожній/"None" — віддаємо "other" (дефолт на фронті).
             category_code=tx.category_id if (tx.category_id and tx.category_id != "None") else "other",
             is_secret_gift=tx.is_secret_gift,
             reactions=grouped_reactions,

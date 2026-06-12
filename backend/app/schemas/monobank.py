@@ -1,27 +1,25 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from decimal import Decimal
+
 class Category(BaseModel):
     name: str
     icon: str
 
-# Схеми для отримання списку карток (Крок 2-5)
 class ClientInfoRequest(BaseModel):
     personal_token: str
-
 
 class CardInfoResponse(BaseModel):
     account_id: str
     masked_pan: str
-    type: str  # 'black', 'white', 'platinum' тощо
+    type: str
     balance: Decimal
     currency: int
-
 
 class ConnectMonobankRequest(BaseModel):
     group_id: str
     personal_token: str
     account_id: str
-    masked_pan: str  # Фронт передає нам ці дані з попереднього кроку
+    masked_pan: str
     balance: Decimal
 
 class ConnectMonobankResponse(BaseModel):
@@ -35,7 +33,7 @@ class StatementItem(BaseModel):
     time: int
     description: str
     mcc: int
-    amount: int  # Монобанк присилає в копійках!
+    amount: int
     operationAmount: int
     currencyCode: int
     balance: int

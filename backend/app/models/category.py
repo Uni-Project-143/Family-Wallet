@@ -3,7 +3,7 @@ from typing import List
 
 class Category(Document):
     name: str
-    icon: str  # Тут зберігається назва іконки або emoji
+    icon: str
     color: str
     mcc_list: List[int] = []
 

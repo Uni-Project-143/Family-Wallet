@@ -1,8 +1,9 @@
 from decimal import Decimal
-from typing import List, Any, Optional
+from typing import List, Optional
 from beanie import Document
 from pydantic import field_validator, Field
 from bson import Decimal128
+import pymongo
 
 class BankCard(Document):
     user_id: str
@@ -16,14 +17,17 @@ class BankCard(Document):
     transaction_ids: List[str] = []
     owner_full_name: Optional[str] = None
 
-    # Додаємо цей валідатор, щоб Pydantic розумів числа з MongoDB
     @field_validator("balance", "virtual_balance", mode="before")
     @classmethod
     def parse_decimal128(cls, value):
-        """Конвертує MongoDB Decimal128 у стандартний Python Decimal"""
         if isinstance(value, Decimal128):
             return value.to_decimal()
         return value
 
     class Settings:
         name = "bank_cards"
+        indexes = [
+            pymongo.IndexModel([("account_id", pymongo.ASCENDING)], unique=True, sparse=True),
+            pymongo.IndexModel([("group_id", pymongo.ASCENDING)]),
+            pymongo.IndexModel([("user_id", pymongo.ASCENDING)])
+        ]

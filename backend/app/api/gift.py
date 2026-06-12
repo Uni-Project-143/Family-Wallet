@@ -13,7 +13,6 @@ from app.models.group_membership import GroupMembership
 from app.models.transaction import Transaction
 from app.models.bank_card import BankCard
 from app.models.gift_event import GiftEvent, GiftStatus
-# ---> ДОДАНО ІМПОРТ JoinGiftRequest <---
 from app.schemas.gift import CreateGiftRequest, CreateGiftResponse, JoinGiftRequest
 from app.models.gift_invite import GiftInvite
 from app.core.websockets import ws_manager
@@ -72,7 +71,7 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
     gift = await GiftEvent.get(gift_oid)
 
     if not gift or gift.status == GiftStatus.CANCELLED:
-        raise HTTPException(status_code=404, detail="Подарунок не значено")
+        raise HTTPException(status_code=404, detail="Подарунок не знайдено")
 
     is_target_user = gift.target_user_id == str(current_user.id)
     now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -131,10 +130,6 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
         "donors": donors_list
     }
 
-
-# ==========================================
-# PROJ-59: Генерація invite-лінку (ОНОВЛЕНО)
-# ==========================================
 @router.post("/{gift_id}/invite", status_code=status.HTTP_200_OK)
 async def generate_gift_invite(gift_id: str, current_user: User = Depends(get_current_user)):
     try:
@@ -176,19 +171,14 @@ async def generate_gift_invite(gift_id: str, current_user: User = Depends(get_cu
         "token": token
     }
 
-# ==========================================
-# Приймає JSON з лінкою, витягує токен, валідує та ізолює іменинника.
-# ==========================================
 @router.post("/join", status_code=status.HTTP_200_OK)
 async def join_gift_by_invite(request: JoinGiftRequest, current_user: User = Depends(get_current_user)):
     """
     Ендпоінт для переходу за запрошенням на Secret Gift.
     Витягує токен з лінки, валідує його та ізолює іменинника.
     """
-    # 1. Екстракція токена з лінки (напр. https://family-wallet.com/gift/join/abc-123 -> abc-123)
     token = request.invite_link.strip("/").split("/")[-1]
 
-    # 2. Шукаємо активний токен в базі
     now_utc = datetime.now(timezone.utc)
     invite = await GiftInvite.find_one({
         "token": token,
@@ -201,7 +191,6 @@ async def join_gift_by_invite(request: JoinGiftRequest, current_user: User = Dep
             detail="Запрошення не знайдено або його термін дії минув"
         )
 
-    # 3. Шукаємо сам подарунок
     try:
         gift_oid = PydanticObjectId(invite.gift_id)
     except Exception:
@@ -211,14 +200,12 @@ async def join_gift_by_invite(request: JoinGiftRequest, current_user: User = Dep
     if not gift or gift.status == GiftStatus.CANCELLED:
         raise HTTPException(status_code=404, detail="Подарунок не знайдено або збір скасовано")
 
-    # 4. PROJ-58: Ізоляція іменинника
     if str(current_user.id) == gift.target_user_id:
         raise HTTPException(
             status_code=403,
             detail="Сюрприз! Ви не можете підглядати за власним подарунком 🎁"
         )
 
-    # 5. Перевірка: чи є юзер учасником сім'ї/групи
     membership = await GroupMembership.find_one({
         "user_id": PydanticObjectId(str(current_user.id)),
         "group_id": PydanticObjectId(gift.group_id)
@@ -236,7 +223,6 @@ async def join_gift_by_invite(request: JoinGiftRequest, current_user: User = Dep
         "group_id": gift.group_id,
         "gift_name": gift.name
     }
-
 
 @router.get("/group/{group_id}", status_code=status.HTTP_200_OK)
 async def get_group_gifts(group_id: str, current_user: User = Depends(get_current_user)):
@@ -279,8 +265,6 @@ async def get_group_gifts(group_id: str, current_user: User = Depends(get_curren
 
     return response_data
 
-
-from pydantic import BaseModel
 class ContributeRequest(BaseModel):
     amount: float
     card_id: str
@@ -337,7 +321,6 @@ async def contribute_to_gift(
     )
     await tx.insert()
 
-    # Атомарне списання грошей з картки донатера
     await card.update(Inc({BankCard.virtual_balance: -float(request.amount)}))
 
     gift_txs = await Transaction.find(Transaction.gift_id == str(gift.id)).to_list()

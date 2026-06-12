@@ -28,7 +28,6 @@ class InviteRepository:
 
     @staticmethod
     async def invalidate_all_for_group(group_id: ObjectId, current_time: datetime, session=None):
-        # Передаємо session у find(), щоб update відпрацював у межах транзакції
         await InviteToken.find(
             InviteToken.group_id == group_id,
             InviteToken.expires_at > current_time,

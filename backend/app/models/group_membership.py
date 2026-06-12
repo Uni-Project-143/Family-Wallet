@@ -1,6 +1,7 @@
 from beanie import Document, PydanticObjectId
 from pydantic import Field
 from datetime import datetime, timezone
+import pymongo
 
 class GroupMembership(Document):
     user_id: PydanticObjectId
@@ -11,3 +12,7 @@ class GroupMembership(Document):
 
     class Settings:
         name = "group_memberships"
+        indexes = [
+            pymongo.IndexModel([("user_id", pymongo.ASCENDING), ("group_id", pymongo.ASCENDING)], unique=True),
+            pymongo.IndexModel([("group_id", pymongo.ASCENDING)])
+        ]

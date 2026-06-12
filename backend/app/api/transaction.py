@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from beanie import PydanticObjectId
 from app.api.auth import get_current_user
 from app.core.limiter import limiter
@@ -60,6 +60,7 @@ async def get_group_transactions(
 @limiter.limit("30/minute")
 async def create_transfer(
     request: Request,
+    response: Response,
     payload: TransferRequest,
     current_user: User = Depends(get_current_user),
 ):

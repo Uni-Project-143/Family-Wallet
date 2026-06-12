@@ -81,7 +81,7 @@ export function useAuth() {
     }
   }
 
-  async function login(credentials) {
+  async function login(credentials, redirect = null) {
     isLoading.value = true
     authError.value = null
 
@@ -106,12 +106,23 @@ export function useAuth() {
       }
       persistAuthSession(data.access_token, userInfo)
 
+      // Якщо є одна група — одразу робимо її активною (потрібно стрічці/деталям)
+      if (Array.isArray(groups) && groups.length === 1) {
+        setActiveGroup(groups[0])
+      }
+
       initPush()
+
+      // Повернення на захищений шлях, з якого юзера відправили на логін
+      // (напр. /gift/join/:token зі secret-gift лінки)
+      if (redirect) {
+        router.replace(redirect)
+        return { ok: true }
+      }
 
       if (!Array.isArray(groups) || groups.length === 0) {
         router.push('/group-setup')
       } else if (groups.length === 1) {
-        setActiveGroup(groups[0])
         router.push('/feed')
       } else {
         router.push({
@@ -119,14 +130,16 @@ export function useAuth() {
           state: { groups },
         })
       }
+      return { ok: true }
     } catch (err) {
       localStorage.removeItem(STORAGE_TOKEN_KEY)
       const status = err.response?.status
       if (status === 429) {
-        authError.value = 'Too many attempts. Please try again in 15 minutes'
-      } else {
-        authError.value = 'Invalid email or password'
+        const retryAfter = Number(err.response?.headers?.['retry-after']) || null
+        return { ok: false, status, retryAfter }
       }
+      authError.value = 'Invalid email or password'
+      return { ok: false, status }
     } finally {
       isLoading.value = false
     }
@@ -137,6 +150,7 @@ export function useAuth() {
     try {
       await logoutUser()
     } catch {
+      // вихід локально в будь-якому разі
     } finally {
       localStorage.removeItem(STORAGE_TOKEN_KEY)
       currentUser.value = null

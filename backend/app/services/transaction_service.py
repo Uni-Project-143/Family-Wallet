@@ -125,6 +125,23 @@ class TransactionService:
             },
         )
 
+        # Крок 15: real-time push у стрічку групи — щоб переказ зʼявився
+        # у всіх учасників без перезавантаження (фронт робить рефетч /feed).
+        await ws_manager.broadcast_to_group(
+            group_id_str,
+            {
+                "event": "new_transaction",
+                "data": {
+                    "transfer_id": transfer_id,
+                    "from_card_id": from_card_id_str,
+                    "to_card_id": to_card_id_str,
+                    "amount": str(amount),
+                    "group_id": group_id_str,
+                },
+            },
+        )
+
+        # Крок 16: повертаємо актуальні кешовані баланси
         return TransferResponse(
             transfer_id=transfer_id,
             debit_transaction_id=debit_id,

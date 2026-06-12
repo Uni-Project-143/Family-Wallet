@@ -1,8 +1,17 @@
 <template>
   <div class="join-page">
-    <div class="join-card">
-      <!-- Завантаження -->
-      <template v-if="state === 'loading'">
+    <div class="join-card" role="dialog" aria-modal="true">
+      <template v-if="state === 'confirm'">
+        <div class="join-icon">🎁</div>
+        <h1 class="join-title">Secret Gift Invitation</h1>
+        <p class="join-sub">Do you want to join this Secret Gift?</p>
+        <div class="join-actions">
+          <button class="btn-ghost" @click="cancel">Cancel</button>
+          <button class="btn-gold" @click="confirmJoin">Yes, join</button>
+        </div>
+      </template>
+
+      <template v-else-if="state === 'loading'">
         <svg class="spinner-icon" width="32" height="32" viewBox="0 0 32 32" fill="none">
           <circle cx="16" cy="16" r="13" stroke="rgba(184,151,58,0.25)" stroke-width="3" />
           <path
@@ -12,11 +21,10 @@
             stroke-linecap="round"
           />
         </svg>
-        <h1 class="join-title">Opening the gift…</h1>
+        <h1 class="join-title">Joining the gift…</h1>
         <p class="join-sub">Validating your invitation link.</p>
       </template>
 
-      <!-- Помилка -->
       <template v-else>
         <div class="join-icon">🎁</div>
         <h1 class="join-title">{{ errorTitle }}</h1>
@@ -28,31 +36,31 @@
 </template>
 
 <script setup>
-  import { ref, onMounted } from 'vue'
+  import { ref } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import { joinGiftByInvite } from '../services/giftEventService'
 
   const route = useRoute()
   const router = useRouter()
 
-  const state = ref('loading') // loading | error
+  const state = ref('confirm')
   const errorTitle = ref('Invitation Error')
   const errorMessage = ref('')
 
-  onMounted(async () => {
+  async function confirmJoin() {
     const token = route.params.token
     if (!token) {
-      state.value = 'error'
+      errorTitle.value = 'Invitation Error'
       errorMessage.value = 'This invitation link is invalid.'
+      state.value = 'error'
       return
     }
 
-    // Відновлюємо повну лінку у форматі, який очікує бек (він бере останній сегмент).
+    state.value = 'loading'
     const inviteLink = `https://family-wallet.com/gift/join/${token}`
 
     try {
       const data = await joinGiftByInvite(inviteLink)
-      // Успіх → ведемо одразу на сторінку події.
       router.replace(`/gift-events/${data.gift_id}`)
     } catch (err) {
       state.value = 'error'
@@ -62,17 +70,20 @@
         errorMessage.value =
           'This invitation was not found or has expired. Ask the organizer for a new link.'
       } else if (status === 403) {
-        // Ізоляція іменинника або не учасник групи
         errorTitle.value = 'Access Restricted'
         errorMessage.value =
           err.response?.data?.detail ||
-          'You cannot open this gift — it may be a surprise for you, or you are not a member of this group.'
+          'You cannot join this gift — it may be a surprise for you, or you are not a member of this group.'
       } else {
         errorMessage.value =
           err.userMessage || 'Something went wrong while opening the gift. Please try again.'
       }
     }
-  })
+  }
+
+  function cancel() {
+    router.replace('/feed')
+  }
 </script>
 
 <style scoped>
@@ -113,6 +124,11 @@
     line-height: 1.6;
     margin: 0 0 24px;
   }
+  .join-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
   .btn-gold {
     display: inline-flex;
     align-items: center;
@@ -134,6 +150,25 @@
   .btn-gold:hover {
     background: linear-gradient(135deg, #9b7a25, #b8973a);
     transform: translateY(-1px);
+  }
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 46px;
+    padding: 0 24px;
+    background: #fff;
+    color: #6b6860;
+    border: 1px solid #d6d3ce;
+    border-radius: 8px;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+  .btn-ghost:hover {
+    background: #f4f2ee;
   }
   .spinner-icon {
     animation: spin 0.8s linear infinite;

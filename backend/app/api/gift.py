@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from datetime import datetime, timezone
 from beanie import PydanticObjectId
@@ -14,6 +15,7 @@ from app.models.bank_card import BankCard
 from app.models.gift_event import GiftEvent, GiftStatus
 from app.schemas.gift import CreateGiftRequest, CreateGiftResponse, JoinGiftRequest
 from app.models.gift_invite import GiftInvite
+from app.core.websockets import ws_manager
 
 router = APIRouter(prefix="/api/v1/gift", tags=["Secret Gift"])
 
@@ -159,7 +161,10 @@ async def generate_gift_invite(gift_id: str, current_user: User = Depends(get_cu
         )
         await new_invite.insert()
 
-    invite_link = f"https://family-wallet.com/gift/join/{token}"
+    # Базовий URL фронтенду беремо з env (як у reset-password), а не хардкодимо.
+    # Локально → http://localhost:5173, у проді → задається FRONTEND_URL.
+    frontend_base = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    invite_link = f"{frontend_base}/gift/join/{token}"
 
     return {
         "invite_link": invite_link,
@@ -320,5 +325,21 @@ async def contribute_to_gift(
 
     gift_txs = await Transaction.find(Transaction.gift_id == str(gift.id)).to_list()
     new_collected = sum(abs(t.amount) for t in gift_txs)
+
+    # Real-time push у стрічку групи — внесок зʼявляється у всіх учасників без
+    # перезавантаження (фронт робить рефетч /feed). Іменинник його все одно не
+    # побачить — його стрічка фільтрує секретні транзакції (PROJ-58 ізоляція).
+    await ws_manager.broadcast_to_group(
+        str(gift.group_id),
+        {
+            "event": "new_transaction",
+            "data": {
+                "transaction_id": str(tx.id),
+                "gift_id": str(gift.id),
+                "group_id": str(gift.group_id),
+                "is_secret_gift": True,
+            },
+        },
+    )
 
     return {"success": True, "new_collected_amount": float(new_collected)}

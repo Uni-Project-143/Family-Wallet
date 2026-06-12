@@ -1,6 +1,9 @@
 import os
 import httpx
 from datetime import datetime
+from fastapi import APIRouter, Depends, status, HTTPException, Request
+from app.services.monobank_service import MonobankService
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List
 from fastapi import APIRouter, Depends, status, HTTPException
@@ -103,7 +106,11 @@ async def handle_monobank_webhook(payload: MonobankWebhookRequest):
         return {"status": "ignored", "detail": "Transaction already processed"}
 
     amount_in_uah = Decimal(str(mono_tx.amount / 100))
-    tx_time = datetime.fromtimestamp(mono_tx.time)
+    # Monobank віддає Unix-час (UTC). fromtimestamp() без tz дає ЛОКАЛЬНИЙ час сервера,
+    # через що Mono-транзакції зміщувались на годинниковий пояс і «перекривали» новіші
+    # внутрішні транзакції у стрічці. Зберігаємо як наївний UTC — як datetime.utcnow().
+    tx_time = datetime.fromtimestamp(mono_tx.time, tz=timezone.utc).replace(tzinfo=None)
+
     resolved_category_id = get_category_id_by_mcc(mono_tx.mcc)
 
     new_transaction = Transaction(

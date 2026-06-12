@@ -383,19 +383,24 @@
           <div class="settings-section__header">
             <h2 class="settings-section__title">Notifications</h2>
           </div>
-          <div class="toggle-list">
-            <div v-for="pref in notifPreferences" :key="pref.key" class="toggle-row">
-              <div class="toggle-row__info">
-                <div class="toggle-row__label">{{ pref.label }}</div>
-                <div class="toggle-row__desc">{{ pref.description }}</div>
+          <div class="privacy-info">
+            <div class="info-box">Family Wallet keeps you informed in two ways:</div>
+
+            <div class="notif-type">
+              <div class="notif-type__title">🎁 Secret Gift — push &amp; email</div>
+              <div class="notif-type__desc">
+                A reminder 24 hours before a gift unlocks, a reminder on the unlock day, and a
+                notification the moment the gift is revealed. Browser push requires granting
+                notification permission; you always see these in your in-app notifications as well.
               </div>
-              <button
-                class="toggle-track"
-                :class="{ 'toggle-track--on': pref.isEnabled }"
-                @click="pref.isEnabled = !pref.isEnabled"
-              >
-                <span class="toggle-thumb"></span>
-              </button>
+            </div>
+
+            <div class="notif-type">
+              <div class="notif-type__title">⚡ Real-time feed updates</div>
+              <div class="notif-type__desc">
+                New transactions and card-to-card transfers, incoming money requests, and emoji
+                reactions appear instantly in your feed via a live connection — no setup required.
+              </div>
             </div>
           </div>
         </section>
@@ -412,9 +417,6 @@
               <a href="/privacy" target="_blank" class="link">Privacy Policy</a> for details. (GDPR
               NFR-06)
             </div>
-            <button class="btn-danger" style="margin-top: 20px" @click="confirmDeleteAccount">
-              Delete my account and data
-            </button>
           </div>
         </section>
       </main>
@@ -443,7 +445,6 @@
   import ConfirmDialog from '../components/ConfirmDialog.vue'
   import NavBar from '../components/NavBar.vue'
   import { useRoute } from 'vue-router'
-  import { usePersistentState } from '../composables/usePersistentState'
   import CardDetailsModal from '../components/CardDetailsModal.vue'
 
   const route = useRoute()
@@ -733,40 +734,6 @@
   function cancelDisconnect() {
     isConfirmOpen.value = false
     cardToDisconnect.value = null
-  }
-
-  // ─── Notifications ───
-  const notifPreferences = usePersistentState('settings:notifPrefs', [
-    {
-      key: 'gift_unlock',
-      label: 'Gift Event unlock reminders',
-      description: '24h before and on unlock day',
-      isEnabled: true,
-    },
-    {
-      key: 'reactions',
-      label: 'Reaction notifications',
-      description: 'When someone reacts to your transaction',
-      isEnabled: true,
-    },
-    {
-      key: 'money_req',
-      label: 'Money Request alerts',
-      description: 'When you receive a transfer request',
-      isEnabled: true,
-    },
-    {
-      key: 'new_member',
-      label: 'New member joined',
-      description: 'When someone joins via invite link',
-      isEnabled: false,
-    },
-  ])
-
-  function confirmDeleteAccount() {
-    if (confirm('This will permanently delete your account and all data. Are you sure?')) {
-      showToast('Account deletion — contact support', 'error')
-    }
   }
 
   // ─── Toast ───
@@ -1137,66 +1104,20 @@
     background: #2a6b2a;
   }
 
-  /* ── Toggle list ── */
-  .toggle-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    background: #fff;
-    border: 1px solid #eae8e4;
-    border-radius: 12px;
-    overflow: hidden;
+  /* ── Notification types ── */
+  .notif-type {
+    margin-top: 14px;
   }
-  .toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 20px;
-    border-bottom: 1px solid #eae8e4;
-  }
-  .toggle-row:last-child {
-    border-bottom: none;
-  }
-  .toggle-row__info {
-    flex: 1;
-  }
-  .toggle-row__label {
+  .notif-type__title {
     font-size: 13px;
     font-weight: 600;
     color: #0d0c0a;
-    margin-bottom: 2px;
+    margin-bottom: 4px;
   }
-  .toggle-row__desc {
-    font-size: 12px;
-    color: #b0ada7;
-  }
-  .toggle-track {
-    width: 44px;
-    height: 24px;
-    border-radius: 9999px;
-    background: #d6d3ce;
-    position: relative;
-    border: none;
-    cursor: pointer;
-    transition: background 0.2s;
-    flex-shrink: 0;
-  }
-  .toggle-track--on {
-    background: #b8973a;
-  }
-  .toggle-thumb {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: #fff;
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    box-shadow: 0 1px 3px rgba(13, 12, 10, 0.12);
-    transition: transform 0.2s;
-  }
-  .toggle-track--on .toggle-thumb {
-    transform: translateX(20px);
+  .notif-type__desc {
+    font-size: 13px;
+    color: #6b6860;
+    line-height: 1.6;
   }
 
   /* ── Privacy ── */

@@ -167,53 +167,6 @@
                 Only Admin can generate invite links. Members receive forbidden access.
               </div>
             </div>
-
-            <div class="section-divider"></div>
-
-            <!-- Direct email invite section -->
-            <div class="section">
-              <div class="section__label">Or send invite directly by email</div>
-              <div class="email-row">
-                <div class="i-field-wrap" :class="{ 'i-field-wrap--error': emailError }">
-                  <input
-                    v-model="directEmail"
-                    class="i-field"
-                    type="email"
-                    placeholder="member@example.com"
-                    :disabled="isSending"
-                    @blur="validateEmail"
-                    @input="onEmailInput"
-                    @keydown.enter="sendInvite"
-                  />
-                </div>
-                <button
-                  class="btn-send"
-                  :disabled="!directEmail.trim() || isSending"
-                  @click="sendInvite"
-                >
-                  <span v-if="!isSending">Send Invite</span>
-                  <svg
-                    v-else
-                    class="spinner"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                  >
-                    <circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,.3)" stroke-width="2" />
-                    <path
-                      d="M8 2A6 6 0 0 1 14 8"
-                      stroke="white"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <Transition name="fade-down">
-                <p v-if="emailError" class="i-error">{{ emailError }}</p>
-              </Transition>
-            </div>
           </div>
         </Transition>
       </div>
@@ -310,55 +263,6 @@
       }, 2500)
     } catch {
       emit('toast', { message: 'Failed to copy. Please copy manually.', type: 'error' })
-    }
-  }
-
-  const directEmail = ref('')
-  const emailError = ref('')
-  const emailTouched = ref(false)
-  const isSending = ref(false)
-
-  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-  /**
-   * Валідація поля email.
-   * @returns {boolean}
-   */
-  function validateEmail() {
-    emailTouched.value = true
-    emailError.value = ''
-    if (!directEmail.value.trim()) return true
-    if (!EMAIL_REGEX.test(directEmail.value)) {
-      emailError.value = 'Enter a valid email'
-      return false
-    }
-    return true
-  }
-
-  function onEmailInput() {
-    if (emailTouched.value) validateEmail()
-  }
-
-  /**
-   * Відправляє запрошення на email.
-   * TODO: підключити POST /api/v1/group/{groupId}/invite/send коли з'явиться endpoint
-   */
-  async function sendInvite() {
-    if (!validateEmail()) return
-    if (!directEmail.value.trim()) return
-
-    isSending.value = true
-    try {
-      // TODO: реальний запит після появи endpoint
-      // const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-      // await apiClient.post(`/api/v1/group/${storedUser.groupId}/invite/send`, { email: directEmail.value })
-      emit('toast', { message: `Invite sent to ${directEmail.value}`, type: 'success' })
-      directEmail.value = ''
-      emailTouched.value = false
-    } catch {
-      emit('toast', { message: 'Failed to send invite. Try again.', type: 'error' })
-    } finally {
-      isSending.value = false
     }
   }
 
@@ -470,12 +374,6 @@
     margin-left: 4px;
   }
 
-  .section-divider {
-    height: 1px;
-    background: #eae8e4;
-    margin: 20px 0;
-  }
-
   .invite-box {
     display: flex;
     align-items: stretch;
@@ -572,12 +470,6 @@
     border-radius: 6px;
   }
 
-  .email-row {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-  }
-
   .i-field-wrap {
     flex: 1;
     border: 1.5px solid #eae8e4;
@@ -652,32 +544,6 @@
     opacity: 0.4;
     cursor: not-allowed;
     transform: none;
-  }
-
-  .btn-send {
-    height: 44px;
-    padding: 0 20px;
-    background: #0d0c0a;
-    color: #ffffff;
-    border: none;
-    border-radius: 8px;
-    font-family: 'DM Sans', system-ui, sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.18s;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .btn-send:hover:not(:disabled) {
-    background: #2d2b27;
-  }
-  .btn-send:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
   }
 
   .spinner {

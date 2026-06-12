@@ -2,7 +2,7 @@ import os
 
 from fastapi import APIRouter, Depends, status, HTTPException, Request
 from app.services.monobank_service import MonobankService
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 import httpx
 from typing import List
@@ -139,7 +139,10 @@ async def handle_monobank_webhook(payload: MonobankWebhookRequest):
 
     # 3. Підготовка даних (конвертація копійок у гривні, Unix-часу у datetime)
     amount_in_uah = Decimal(str(mono_tx.amount / 100))
-    tx_time = datetime.fromtimestamp(mono_tx.time)
+    # Monobank віддає Unix-час (UTC). fromtimestamp() без tz дає ЛОКАЛЬНИЙ час сервера,
+    # через що Mono-транзакції зміщувались на годинниковий пояс і «перекривали» новіші
+    # внутрішні транзакції у стрічці. Зберігаємо як наївний UTC — як datetime.utcnow().
+    tx_time = datetime.fromtimestamp(mono_tx.time, tz=timezone.utc).replace(tzinfo=None)
 
     resolved_category_id = get_category_id_by_mcc(mono_tx.mcc)
 

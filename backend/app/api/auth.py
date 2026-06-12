@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timezone
-from fastapi import APIRouter, status, Request, Depends, HTTPException, BackgroundTasks # <--- Додали BackgroundTasks
+from fastapi import APIRouter, status, Request, Response, Depends, HTTPException, BackgroundTasks # <--- Додали BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr # <--- Додали EmailStr
 
@@ -27,8 +27,10 @@ async def register(request_data: UserRegisterRequest):
 
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("5/15minutes")
-async def login(request: Request, login_data: UserLoginRequest):
+async def login(request: Request, response: Response, login_data: UserLoginRequest):
     """Авторизація користувача та отримання JWT токена."""
+    # `response: Response` обов'язковий: slowapi (headers_enabled=True) вписує в нього
+    # заголовки X-RateLimit-*; без нього кидає 500 на кожен запит логіну.
     return await AuthService.login(login_data)
 
 

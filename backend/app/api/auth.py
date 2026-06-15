@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timezone
-from fastapi import APIRouter, status, Request, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, status, Request, Response, Depends, HTTPException, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 

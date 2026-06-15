@@ -22,7 +22,6 @@
   const homeLabel = computed(() => (isAuthenticated.value ? 'Feed' : 'Login'))
 
   function goHome() {
-    // '/' редіректить на /feed або /login залежно від авторизації
     router.push('/')
   }
 

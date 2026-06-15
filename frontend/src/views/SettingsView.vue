@@ -2,9 +2,7 @@
   <div class="settings-page">
     <NavBar />
 
-    <!-- ═══ BODY ═══ -->
     <div class="settings-layout">
-      <!-- ─── Settings sidebar nav ─── -->
       <aside class="settings-nav">
         <button
           v-for="item in navItems"
@@ -18,15 +16,12 @@
         </button>
       </aside>
 
-      <!-- ─── Main content ─── -->
       <main class="settings-main">
-        <!-- GROUP MEMBERS section -->
         <section v-if="activeSection === 'members'">
           <div class="settings-section__header">
             <h2 class="settings-section__title">Group Members</h2>
           </div>
 
-          <!-- Members table -->
           <div class="members-table-wrap">
             <table class="members-table">
               <thead>
@@ -59,7 +54,6 @@
                   </td>
                   <td data-label="Joined" class="td-date">{{ member.joinedAt }}</td>
                   <td data-label="Actions">
-                    <!-- Admin не може сам себе видалити -->
                     <button
                       v-if="isAdmin && !member.isCurrentUser"
                       class="btn-remove"
@@ -74,23 +68,19 @@
             </table>
           </div>
 
-          <!-- ══ INVITE NEW MEMBER (US 1.3 FE-01, FE-02) ══ -->
           <div class="invite-section">
             <h3 class="invite-section__title">Invite New Member</h3>
 
-            <!-- Тільки Admin бачить цю секцію (FE-01 conditional rendering) -->
             <template v-if="isAdmin">
               <p class="invite-section__desc">
                 Share this link with your family member. The link is valid for 48 hours.
               </p>
 
-              <!-- Group Invite Code -->
               <div class="invite-section__label">
                 Group Invite Code
                 <span class="invite-section__label-note">Only Admin can generate invite links</span>
               </div>
 
-              <!-- Link box (FE-02) -->
               <div class="invite-link-box">
                 <div
                   class="invite-link-box__url"
@@ -132,7 +122,6 @@
                   </template>
                 </div>
 
-                <!-- Copy button (Clipboard API FE-02) -->
                 <button
                   v-if="inviteUrl && !isGeneratingLink"
                   class="btn-copy"
@@ -169,7 +158,6 @@
                 </button>
               </div>
 
-              <!-- TTL note -->
               <div v-if="inviteUrl && inviteExpiresAt" class="invite-ttl">
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                   <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2" />
@@ -183,7 +171,6 @@
                 Valid for {{ inviteTtlLabel }}
               </div>
 
-              <!-- Action buttons -->
               <div class="invite-actions">
                 <button class="btn-gold" :disabled="isGeneratingLink" @click="generateInviteLink">
                   <svg
@@ -217,7 +204,6 @@
                 /group/invite.
               </div>
 
-              <!-- Direct email invite -->
               <div class="invite-direct">
                 <div class="invite-section__label" style="margin-bottom: 8px">
                   Or send invite directly by email
@@ -257,7 +243,6 @@
               </div>
             </template>
 
-            <!-- Member бачить заглушку замість invite (FE-01 conditional render) -->
             <template v-else>
               <div class="invite-restricted">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -280,19 +265,16 @@
           </div>
         </section>
 
-        <!-- CONNECTED CARDS section -->
         <section v-if="activeSection === 'cards'">
           <div class="settings-section__header">
             <h2 class="settings-section__title">Connected Cards</h2>
           </div>
 
-          <!-- Loading state -->
           <div v-if="isLoadingCards" class="cards-loading">
             <div class="card-skeleton"></div>
             <div class="card-skeleton"></div>
           </div>
 
-          <!-- Empty state -->
           <div v-else-if="connectedCards.length === 0" class="cards-empty">
             <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
               <rect
@@ -310,7 +292,6 @@
             <span>Connect your Monobank card to start tracking family expenses automatically.</span>
           </div>
 
-          <!-- Active cards list -->
           <div v-else class="cards-list">
             <div v-for="card in connectedCards" :key="card.id" class="card-item">
               <div class="card-item__icon">
@@ -334,8 +315,6 @@
                   {{ card.status }}
                 </span>
                 <button class="btn-details" @click="openCardDetails(card)">Details</button>
-                <!-- Видалити можна ВИКЛЮЧНО власну картку (порівняння через String,
-                     бо user_id/ id можуть бути різного типу після серіалізації). -->
                 <button v-if="isOwnCard(card)" class="btn-remove" @click="askDisconnect(card)">
                   Disconnect
                 </button>
@@ -347,7 +326,6 @@
             + Connect Card
           </button>
 
-          <!-- PROJ-49: модалка підключення -->
           <ConnectCardModal
             :is-open="isConnectCardOpen"
             @close="isConnectCardOpen = false"
@@ -355,7 +333,6 @@
             @connected="handleCardConnected"
           />
 
-          <!-- PROJ-63 FE-01: підтвердження disconnect -->
           <ConfirmDialog
             :is-open="isConfirmOpen"
             title="Disconnect this card?"
@@ -378,7 +355,6 @@
           />
         </section>
 
-        <!-- NOTIFICATIONS section -->
         <section v-if="activeSection === 'notifications'">
           <div class="settings-section__header">
             <h2 class="settings-section__title">Notifications</h2>
@@ -405,7 +381,6 @@
           </div>
         </section>
 
-        <!-- PRIVACY section -->
         <section v-if="activeSection === 'privacy'">
           <div class="settings-section__header">
             <h2 class="settings-section__title">Privacy & Data</h2>
@@ -424,7 +399,6 @@
       </main>
     </div>
 
-    <!-- Toast -->
     <Transition name="toast">
       <div v-if="toast.isVisible" class="toast" :class="`toast--${toast.type}`" role="alert">
         {{ toast.message }}
@@ -460,7 +434,6 @@
     { immediate: true },
   )
 
-  // Реальна роль з localStorage через useAuth
   const { currentUser, isAdmin } = useAuth()
 
   const navItems = [
@@ -470,7 +443,6 @@
     { key: 'privacy', icon: '🛡', label: 'Privacy & Data' },
   ]
 
-  // ─── Group Members з API ───
   const groupMembers = ref([])
   const isLoadingMembers = ref(false)
 
@@ -527,16 +499,11 @@
     loadCards()
   })
 
-  /**
-   * Видаляє учасника з групи.
-   * TODO: підключити DELETE /api/v1/group/{groupId}/members/{userId} коли з'явиться
-   */
   function removeMember(member) {
     if (!confirm(`Remove ${member.name} from the group?`)) return
     showToast('Remove member endpoint not available yet', 'info')
   }
 
-  // ─── Invite link ───
   const inviteUrl = ref('')
   const inviteExpiresAt = ref(null)
   const isGeneratingLink = ref(false)
@@ -552,10 +519,6 @@
     return 'less than 1 hour'
   })
 
-  /**
-   * Генерує або перегенеровує invite-лінк.
-   * GET /api/v1/group/{groupId}/invite
-   */
   async function generateInviteLink() {
     isGeneratingLink.value = true
 
@@ -575,7 +538,6 @@
 
       const data = await fn()
 
-      // Бекенд повертає invite_link та expires_at
       inviteUrl.value = data.invite_link
       inviteExpiresAt.value = data.expires_at
 
@@ -583,7 +545,7 @@
     } catch (err) {
       const status = err.response?.status
       if (status === 403) {
-        showToast('Only Admin can generate invite links (Rule-02)', 'error')
+        showToast('Only Admin can generate invite links', 'error')
       } else {
         showToast(err.userMessage || 'Error generating invite link. Try again.', 'error')
       }
@@ -592,9 +554,6 @@
     }
   }
 
-  /**
-   * Копіює invite URL через Clipboard API.
-   */
   async function copyInviteLink() {
     if (!inviteUrl.value) return
     try {
@@ -609,16 +568,10 @@
     }
   }
 
-  /**
-   * Відправляє запрошення напряму на email.
-   * TODO: підключити POST /api/v1/group/{groupId}/invite/send коли з'явиться endpoint
-   */
   async function sendDirectInvite() {
     if (!directEmail.value.trim()) return
     isSendingDirectInvite.value = true
     try {
-      // TODO: реальний запит після появи endpoint
-      // await apiClient.post(`/api/v1/group/${groupId}/invite/send`, { email: directEmail.value })
       showToast(`Invite sent to ${directEmail.value}`, 'success')
       directEmail.value = ''
     } catch {
@@ -628,12 +581,10 @@
     }
   }
 
-  // ─── Cards ───
   const connectedCards = ref([])
   const isLoadingCards = ref(false)
   const isConnectCardOpen = ref(false)
 
-  // Confirm dialog для disconnect (PROJ-63)
   const isConfirmOpen = ref(false)
   const isCardDetailsOpen = ref(false)
   const selectedCardForDetails = ref(null)
@@ -651,19 +602,10 @@
   const cardToDisconnect = ref(null)
   const isDisconnecting = ref(false)
 
-  /**
-   * Чи належить картка поточному користувачу.
-   * Порівнюємо через String — user_id з беку та currentUser.id можуть мати різні типи.
-   */
   function isOwnCard(card) {
     return String(card.user_id) === String(currentUser.value?.id)
   }
 
-  /**
-   * Завантажує всі картки групи з беку.
-   * GET /api/v1/bank-cards/group/{group_id}
-   * Доступно будь-якому учаснику групи (бек повертає всі картки крім encrypted_token).
-   */
   async function loadCards() {
     if (!currentUser.value?.groupId) return
     isLoadingCards.value = true
@@ -676,28 +618,15 @@
     }
   }
 
-  /**
-   * Викликається з ConnectCardModal після успішного підключення.
-   * Замість локального push — перезавантажуємо повний список з беку,
-   * щоб всі учасники групи бачили актуальний стан.
-   */
   async function handleCardConnected() {
     await loadCards()
   }
 
-  /**
-   * PROJ-63 FE-01: відкриває confirmation dialog перед disconnect.
-   */
   function askDisconnect(card) {
     cardToDisconnect.value = card
     isConfirmOpen.value = true
   }
 
-  /**
-   * PROJ-63 FE-02: реальний disconnect через бек.
-   * Бек робить HARD DELETE — картка фізично видаляється з БД.
-   * Після успіху перезавантажуємо список з беку.
-   */
   async function confirmDisconnect() {
     if (!cardToDisconnect.value) return
 
@@ -707,7 +636,6 @@
     try {
       await disconnectMonobankCard(card.id)
 
-      // Hard delete — просто прибираємо з UI, бек видалив документ з БД
       connectedCards.value = connectedCards.value.filter((c) => c.id !== card.id)
 
       showToast('Card disconnected successfully. Transaction history is preserved.', 'success')
@@ -738,11 +666,9 @@
     cardToDisconnect.value = null
   }
 
-  // ─── Toast ───
   const toast = ref({ isVisible: false, message: '', type: 'success' })
 
   /**
-   * Показує toast-повідомлення.
    * @param {string} message
    * @param {'success'|'error'|'info'} type
    */
@@ -755,7 +681,6 @@
 </script>
 
 <style scoped>
-  /* ── Page ── */
   .settings-page {
     min-height: 100vh;
     display: flex;
@@ -763,7 +688,6 @@
     background: #faf8f3;
   }
 
-  /* ── Layout ── */
   .settings-layout {
     display: flex;
     flex: 1;
@@ -771,7 +695,6 @@
     overflow: hidden;
   }
 
-  /* ── Settings sidebar nav ── */
   .settings-nav {
     width: 224px;
     background: #fff;
@@ -815,7 +738,6 @@
     font-size: 15px;
   }
 
-  /* ── Settings main ── */
   .settings-main {
     flex: 1;
     padding: 36px 48px;
@@ -837,7 +759,6 @@
     margin: 0;
   }
 
-  /* ── Members table ── */
   .members-table-wrap {
     background: #fff;
     border: 1px solid #eae8e4;
@@ -896,7 +817,6 @@
     color: #b0ada7;
   }
 
-  /* ── Invite section ── */
   .invite-section {
     background: #fff;
     border: 1px solid #eae8e4;
@@ -934,7 +854,6 @@
     margin-left: 4px;
   }
 
-  /* Link box */
   .invite-link-box {
     display: flex;
     align-items: stretch;
@@ -998,7 +917,6 @@
     color: #2a6b2a;
   }
 
-  /* TTL */
   .invite-ttl {
     display: flex;
     align-items: center;
@@ -1008,7 +926,6 @@
     margin-bottom: 16px;
   }
 
-  /* Action buttons */
   .invite-actions {
     display: flex;
     gap: 10px;
@@ -1039,7 +956,6 @@
     max-width: 520px;
   }
 
-  /* Restricted (Member view) */
   .invite-restricted {
     display: flex;
     align-items: center;
@@ -1052,7 +968,6 @@
     margin-top: 12px;
   }
 
-  /* ── Cards list ── */
   .cards-list {
     display: flex;
     flex-direction: column;
@@ -1106,7 +1021,6 @@
     background: #2a6b2a;
   }
 
-  /* ── Notification types ── */
   .notif-type {
     margin-top: 14px;
   }
@@ -1122,7 +1036,6 @@
     line-height: 1.6;
   }
 
-  /* ── Privacy ── */
   .info-box {
     background: #fbf7ec;
     border: 1px solid #f2e9c8;
@@ -1136,7 +1049,6 @@
     color: #b8973a;
   }
 
-  /* ── Shared components ── */
   .i-field {
     height: 46px;
     border: 1.5px solid #eae8e4;
@@ -1487,7 +1399,6 @@
       padding: 24px 16px;
     }
 
-    /* Members table — стає cards-stack */
     .members-table-wrap {
       background: transparent;
       border: none;
@@ -1526,7 +1437,6 @@
       text-transform: uppercase;
     }
 
-    /* Invite section */
     .invite-section {
       padding: 20px 16px;
     }
@@ -1548,7 +1458,6 @@
       flex-direction: column;
     }
 
-    /* Cards list */
     .card-item {
       flex-wrap: wrap;
       gap: 10px;

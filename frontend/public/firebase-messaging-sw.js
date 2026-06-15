@@ -1,4 +1,4 @@
-/* global importScripts, firebase */
+/* global importScripts, firebase, self */
 // ============================================================
 // Firebase Messaging Service Worker — фонові push-сповіщення
 // (працює, навіть коли вкладку закрито).

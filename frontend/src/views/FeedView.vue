@@ -1,6 +1,5 @@
 <template>
   <div class="feed-page">
-    <!-- ═══ NAVBAR ═══ -->
     <NavBar :show-logout="true">
       <template #left>
         <div class="navbar__groups">
@@ -20,22 +19,19 @@
       </template>
     </NavBar>
 
-    <!-- ═══ BODY ═══ -->
     <div class="feed-layout">
-      <!-- SIDEBAR -->
       <aside class="sidebar">
         <section class="sidebar__section">
           <div class="sidebar__section-title">Group Members</div>
 
-          <!-- Loading -->
           <div v-if="isLoadingMembers && !groupMembers.length" class="sidebar__loading">
             <div v-for="n in 3" :key="n" class="sidebar__skeleton-row"></div>
           </div>
-          <!-- Empty -->
+
           <div v-else-if="!groupMembers.length" class="sidebar__empty">
             {{ strings.empty.members }}
           </div>
-          <!-- List -->
+
           <div v-else class="sidebar__scroll sidebar__scroll--members">
             <div v-for="member in groupMembers" :key="member.id" class="member-row">
               <div class="member-row__left">
@@ -55,7 +51,7 @@
               </button>
             </div>
           </div>
-          <!-- + Invite member — тільки Admin (US 1.3) -->
+
           <button v-if="isAdmin" class="invite-btn" @click="isInviteModalOpen = true">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path
@@ -67,7 +63,7 @@
             </svg>
             Invite member
           </button>
-          <!-- 3б. Сам компонент модалки -->
+
           <InviteMemberModal
             :is-open="isInviteModalOpen"
             @close="isInviteModalOpen = false"
@@ -132,22 +128,17 @@
             </button>
           </div>
         </div>
-        <!-- Skeleton поки вантажаться картки/перша сторінка стрічки (FE-03) -->
         <FeedSkeleton
           v-if="isLoadingCards || (isLoadingFeed && transactions.length === 0)"
           :count="5"
         />
 
-        <!-- Поки користувач НЕ під'єднав ВЛАСНУ картку — стрічка групи недоступна.
-             Показуємо запрошення підключити свою картку (а не транзакції групи). -->
         <EmptyFeed v-else-if="!hasOwnCard" @connect-card="isConnectCardOpen = true" />
 
-        <!-- Картки є, але транзакцій 0 -->
         <div v-else-if="transactions.length === 0" class="feed-empty">
           <p>{{ strings.empty.transactions }}</p>
         </div>
 
-        <!-- Список (FE-01) -->
         <template v-else>
           <TransitionGroup name="tx-list" tag="div" class="tx-list">
             <TransactionCard v-for="tx in filteredTransactions" :key="tx.id" :transaction="tx" />
@@ -159,9 +150,7 @@
         </template>
       </main>
 
-      <!-- RIGHT PANEL -->
       <aside class="right-panel">
-        <!-- Вхідні запити коштів — показуємо лише коли є PENDING -->
         <section v-if="incomingRequests.length" class="right-panel__section">
           <div class="right-panel__title">Money Requests</div>
           <div v-for="req in incomingRequests" :key="req.id" class="req-card">
@@ -294,7 +283,6 @@
       </aside>
     </div>
 
-    <!-- Toast -->
     <Transition name="toast">
       <div v-if="toast.isVisible" class="toast" :class="`toast--${toast.type}`" role="alert">
         {{ toast.message }}
@@ -387,7 +375,7 @@
 
   const router = useRouter()
   const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-  // СТАЛО — все через useAuth
+
   const { currentUser, isAdmin } = useAuth()
   const connectedCards = ref([])
   const isLoadingCards = ref(false)
@@ -404,11 +392,10 @@
     }
   }
 
-  // Після успішного connect — перезавантажуємо список з беку
   async function handleCardConnected() {
     await loadCards()
   }
-  // ─── Feed (PROJ-52) ───
+
   const {
     transactions,
     isLoading: isLoadingFeed,
@@ -418,26 +405,21 @@
     loadMore,
   } = useFeedTransactions(() => currentUser.value?.groupId)
 
-  // ─── WebSocket для real-time (PROJ-50). Поки VITE_WS_ENABLED=false — no-op. ───
   const { isConnected: wsConnected } = useWebSocket({
     groupId: () => currentUser.value?.groupId,
     onTransaction: handleWsTransaction,
     onReaction: (data) => {
-      // Реал-тайм оновлення реакцій від інших учасників групи.
       if (data?.transaction_id) applyServerReactions(data.transaction_id, data.grouped_reactions)
     },
     onRequest: (data, event) => {
-      // new_request / request_updated → оновлюємо список вхідних запитів.
       loadIncomingRequests()
-      // Якщо саме МІЙ вихідний запит вирішено — показуємо модалку-відповідь.
+
       if (event === 'request_updated' && data?.request_id) {
         handleRequestResolved(data.request_id, data.status)
       }
     },
   })
 
-  // Засів реакцій зі стрічки (бек віддає reactions + my_reaction) при кожній
-  // зміні набору транзакцій — нові сторінки/рефетч. seedReactions сіє раз на tx.
   watch(
     () => transactions.value.length,
     () => transactions.value.forEach(seedReactions),
@@ -445,8 +427,6 @@
   )
 
   function handleWsTransaction() {
-    // Backend шле тільки сирі поля транзакції (без display_name, avatar, category_emoji).
-    // Тому рефетч першої сторінки — отримуємо вже збагачені дані з /api/v1/feed.
     loadFirstPage()
     showToast('New transaction', 'info')
   }
@@ -457,7 +437,6 @@
     connectedCards.value.some((c) => String(c.user_id) === String(currentUser.value?.id)),
   )
 
-  // ─── Transfer between cards (UC-16) ───
   const isTransferModalOpen = ref(false)
 
   const userOwnedActiveCards = computed(() =>
@@ -468,24 +447,18 @@
 
   async function handleTransferSuccess(_result) {
     isTransferModalOpen.value = false
-    // Re-fetch cards (to pick up new effective_balance) and feed without page reload
+
     await loadCards()
     await loadFirstPage()
   }
 
   const groups = ref([{ id: 1, name: storedUser.groupName || 'Family' }])
 
-  // Для ролі. Замість const isAdmin = ref(true)
-  // const isAdmin = computed(() => storedUser.role === 'ADMIN')
   const activeGroupId = ref(1)
-  // ─── Group Members з API ───
+
   const groupMembers = ref([])
   const isLoadingMembers = ref(false)
 
-  /**
-   * Транформує бекенд-формат у формат для UI.
-   * Бекенд повертає user_id, full_name, role, joined_at.
-   */
   function mapMemberFromApi(apiMember, currentUserId) {
     const fullName = apiMember.name || 'User'
     const initials = fullName
@@ -523,9 +496,6 @@
     }
   }
 
-  // Реальні активні події групи (замість мок activeGiftEvents).
-  // GET /api/v1/gift/group/{group_id} — бек віддає лише ACTIVE і приховує
-  // події, де поточний користувач є target до unlock_date (PROJ-58).
   const realGiftEvents = ref([])
 
   async function loadGiftEvents() {
@@ -537,14 +507,8 @@
     }
   }
 
-  // ─── Вікно видимості події на стрічці ───
-  // Подія лишається на feed, ПОКИ не минуло 24 год після її unlock_date.
-  // Тобто: до дати — видно (збір триває), 24 год після дати — ще видно
-  // (щоб встигли побачити результат), далі — ховаємо зі стрічки.
   const GIFT_FEED_TTL_MS = 24 * 60 * 60 * 1000
 
-  // Реактивний "зараз" — оновлюється раз на хвилину, щоб подія сама зникла
-  // після 24 год навіть без перезавантаження сторінки.
   const now = ref(Date.now())
   let nowTimer = null
 
@@ -554,8 +518,6 @@
     return now.value < unlock.getTime() + GIFT_FEED_TTL_MS
   }
 
-  // Події, які ще "живі" на стрічці (з урахуванням 24-год вікна).
-  // Використовуються лише у правому блоці "Active Gift Events".
   const visibleGiftEvents = computed(() => realGiftEvents.value.filter(isGiftWithinFeedWindow))
 
   function formatPinnedDate(iso) {
@@ -580,8 +542,7 @@
     loadIncomingRequests()
     loadOutgoingResolved()
     loadNotifications()
-    // Тік раз на хвилину — оновлюємо `now` (для 24/48-год вікон) і підтягуємо
-    // свіжі сповіщення (бек створює їх через cron, без WS — тож опитуємо).
+
     nowTimer = setInterval(() => {
       now.value = Date.now()
       loadNotifications()
@@ -607,9 +568,7 @@
       activeFilter.value === 'all'
         ? transactions.value
         : transactions.value.filter((tx) => tx.author_id === activeFilter.value)
-    // Найновіші — завжди зверху. Сортуємо за timestamp спадно на клієнті, щоб
-    // порядок був детермінованим незалежно від джерела (переказ / gift-внесок /
-    // Mono) і від WS-рефетчу.
+
     return [...list].sort((a, b) => {
       const ta = parseServerDate(a.timestamp)?.getTime() ?? 0
       const tb = parseServerDate(b.timestamp)?.getTime() ?? 0
@@ -617,17 +576,12 @@
     })
   })
 
-  // ─── Spending by Category (реальні дані зі стрічки, без моків) ───
-  const DONUT_CIRCUMFERENCE = 351.86 // 2π·56 (r=56)
-
-  // Розбивка витрат за категоріями з завантажених транзакцій (тільки витрати — від'ємні суми).
-  // Категорія визначається через resolveCategory(tx) — той самий резолвер, що й у бейджі
-  // транзакції (slug із беку → fallback на назву), тож діаграма й список завжди узгоджені.
+  const DONUT_CIRCUMFERENCE = 351.86
   const categoryBreakdown = computed(() => {
     const totals = new Map() // label → { value, color }
     for (const tx of transactions.value) {
       const amt = Number(tx.amount)
-      if (!amt || amt >= 0) continue // лише витрати
+      if (!amt || amt >= 0) continue
       const { label, color } = resolveCategory(tx)
       const prev = totals.get(label) || { value: 0, color }
       prev.value += Math.abs(amt)
@@ -657,7 +611,6 @@
 
   const categoryTotal = computed(() => categoryBreakdown.value.reduce((s, c) => s + c.value, 0))
 
-  // Активні події групи для правого блоку — лише в межах 24-год вікна (visibleGiftEvents).
   const activeGiftEvents = computed(() =>
     visibleGiftEvents.value
       .filter((g) => g.status === 'ACTIVE' || g.status === 'REVEALED')
@@ -679,7 +632,6 @@
   const toast = ref({ isVisible: false, message: '', type: 'success' })
 
   /**
-   * Показує toast-повідомлення.
    * @param {string} message
    * @param {'success'|'error'|'info'} type
    */
@@ -690,7 +642,6 @@
     }, 4000)
   }
 
-  // ─── Money Request (кнопка "$" біля учасника) ───
   const isMoneyRequestOpen = ref(false)
   const moneyRequestRecipient = ref(null)
 
@@ -699,13 +650,8 @@
     isMoneyRequestOpen.value = true
   }
 
-  // Ключі localStorage прив'язуємо до id користувача — інакше при тестуванні кількох
-  // акаунтів в одному браузері сесії «бачать» чужі запити/позначки.
   const reqStorageUid = currentUser.value?.id || 'anon'
 
-  // Вихідні запити поточного користувача: { [request_id]: { recipientName, amount } }.
-  // Зберігаємо локально (переживає reload), щоб показати відповідь, коли отримувач
-  // прийме/відхилить запит (WS подія request_updated).
   const outgoingRequests = usePersistentState(`fw:outgoingRequests:${reqStorageUid}`, {})
 
   function onMoneyRequestSent(payload) {
@@ -719,12 +665,9 @@
     }
   }
 
-  // Вже ПОБАЧЕНІ (закриті користувачем) відповіді — щоб не показувати повторно.
-  // Позначаємо побаченим ЛИШЕ після закриття модалки (ack-on-close), а не при
-  // додаванні в чергу — інакше пропущена наживо відповідь більше ніколи не з'явиться.
   const acknowledgedRequests = usePersistentState(`fw:ackRequests:v2:${reqStorageUid}`, [])
-  // Черга модалок-відповідей (можливо кілька вирішених за час офлайну).
-  const responseQueue = ref([]) // [{ id, status, responderName, amount }]
+
+  const responseQueue = ref([])
   const responseModal = computed(() => responseQueue.value[0] || null)
 
   function isAcked(id) {
@@ -733,7 +676,7 @@
 
   function enqueueResponse(id, status, responderName, amount) {
     if (!id || isAcked(id)) return
-    if (responseQueue.value.some((x) => x.id === id)) return // вже в черзі
+    if (responseQueue.value.some((x) => x.id === id)) return
     responseQueue.value = [
       ...responseQueue.value,
       { id, status: status || 'ACCEPTED', responderName, amount },
@@ -748,9 +691,6 @@
     responseQueue.value = responseQueue.value.slice(1)
   }
 
-  // Реал-тайм: мій вихідний запит вирішено (WS). Реагуємо ЛИШЕ якщо це справді
-  // мій вихідний запит (є в моїй мапі) — інакше це чужий запит у межах групи,
-  // і відправнику його покаже офлайн-шлях (loadOutgoingResolved) при вході.
   function handleRequestResolved(requestId, status) {
     const out = outgoingRequests.value[requestId]
     if (!out) return
@@ -760,7 +700,6 @@
     outgoingRequests.value = next
   }
 
-  // Офлайн-сценарій: при вході тягнемо вихідні запити й показуємо ще не побачені рішення.
   async function loadOutgoingResolved() {
     if (!currentUser.value?.id) return
     try {
@@ -779,11 +718,8 @@
     }
   }
 
-  // ─── Notifications (історія сповіщень з беку) ───
   const notifications = ref([])
 
-  // Сповіщення живуть на панелі 48 годин після створення, далі — зникають.
-  // Використовуємо реактивний `now` (тікає щохвилини), щоб ховались самі без F5.
   const NOTIF_FEED_TTL_MS = 48 * 60 * 60 * 1000
   const visibleNotifications = computed(() =>
     notifications.value.filter((n) => {
@@ -818,7 +754,6 @@
     }
   }
 
-  // Мапінг типу сповіщення → текст/іконка (бек віддає лише notification_type + gift_id).
   const NOTIF_TEXT = {
     REVEAL: 'A secret gift was revealed!',
     REMINDER_24H: 'A gift unlocks in 24 hours',
@@ -844,7 +779,6 @@
     })
   }
 
-  // ─── Вхідні запити коштів (я — отримувач, маю прийняти/відхилити) ───
   const incomingRequests = ref([])
   const respondingId = ref(null)
 
@@ -852,8 +786,6 @@
     if (!currentUser.value?.id) return
     try {
       const data = await fetchIncomingRequests('PENDING')
-      // Beanie серіалізує ідентифікатор як _id — нормалізуємо до id,
-      // щоб PATCH /requests/{id} отримував валідний ObjectId.
       incomingRequests.value = (Array.isArray(data) ? data : []).map((r) => ({
         ...r,
         id: r.id || r._id,
@@ -863,17 +795,14 @@
     }
   }
 
-  /** Ім'я того, хто надіслав запит (мапимо requester_id на учасника групи). */
   function requesterName(req) {
     const m = groupMembers.value.find((x) => String(x.id) === String(req.requester_id))
     return m?.name || 'Учасник групи'
   }
 
-  // Вибір картки-платника (якщо в отримувача кілька карток у групі).
   const isSelectCardOpen = ref(false)
   const pendingAcceptReq = ref(null)
 
-  /** Прийняти/відхилити запит. ACCEPTED → треба вибрати картку, з якої платимо. */
   async function respondRequest(req, status) {
     if (respondingId.value) return
 
@@ -892,7 +821,6 @@
     if (cards.length === 1) {
       return doRespond(req, 'ACCEPTED', cards[0].id)
     }
-    // Кілька карток — питаємо, з якої списувати.
     pendingAcceptReq.value = req
     isSelectCardOpen.value = true
   }
@@ -904,7 +832,6 @@
     if (req && cardId) doRespond(req, 'ACCEPTED', cardId)
   }
 
-  /** Власне виклик беку для відповіді на запит. */
   async function doRespond(req, status, fromCardId) {
     if (respondingId.value) return
     respondingId.value = req.id
@@ -938,7 +865,6 @@
   }
 
   /**
-   * Форматує суму у гривнях.
    * @param {number} amount
    * @returns {string}
    */
@@ -962,7 +888,6 @@
     selectedCardForDetails.value = null
   }
 
-  // ─── Card connection reminder ───
   const isReminderOpen = ref(false)
   let reminderTimer = null
 
@@ -997,11 +922,10 @@
 
   function handleReminderLater() {
     isReminderOpen.value = false
-    scheduleLater() // +30 хв
-    initCardReminder() // перезапускаємо таймер на новий інтервал
+    scheduleLater()
+    initCardReminder()
   }
 
-  // Якщо картка з'явилась (через будь-який шлях) — закриваємо reminder назавжди
   watch(hasOwnCard, (has) => {
     if (has) {
       isReminderOpen.value = false
@@ -1031,7 +955,6 @@
     background: #faf8f3;
   }
 
-  /* ── Navbar: перемикач груп (передається у NavBar через слот #left) ── */
   .navbar__groups {
     display: flex;
     gap: 3px;
@@ -1057,7 +980,6 @@
     color: rgba(184, 151, 58, 0.6);
   }
 
-  /* ── Layout ── */
   .feed-layout {
     display: flex;
     flex: 1;
@@ -1065,7 +987,6 @@
     overflow: hidden;
   }
 
-  /* ── Sidebar ── */
   .sidebar {
     width: 256px;
     background: #fff;
@@ -1077,8 +998,7 @@
     flex-direction: column;
     gap: 24px;
   }
-  /* .sidebar__section {
-  } */
+
   .sidebar__section-title {
     font-size: 10px;
     font-weight: 700;
@@ -1097,26 +1017,24 @@
     background: #eae8e4;
   }
 
-  /* Прокручувані списки в sidebar:
-     показуємо ~4-5 елементів, решта — за прокруткою. */
   .sidebar__scroll {
     overflow-y: auto;
     overscroll-behavior: contain;
-    /* тонкий скролбар у стилі теми (Firefox) */
+
     scrollbar-width: thin;
     scrollbar-color: #dfc876 transparent;
-    /* місце під скролбар, щоб контент не "стрибав" */
+
     padding-right: 4px;
   }
-  /* ~5 рядків учасників (рядок ≈ 46px) */
+
   .sidebar__scroll--members {
     max-height: 232px;
   }
-  /* ~2.5 картки, щоб було видно що список прокручується */
+
   .sidebar__scroll--cards {
     max-height: 270px;
   }
-  /* Кастомний скролбар (WebKit) */
+
   .sidebar__scroll::-webkit-scrollbar {
     width: 6px;
   }
@@ -1131,7 +1049,6 @@
     background: #dfc876;
   }
 
-  /* Порожні / завантажувальні стани в sidebar */
   .sidebar__empty {
     padding: 14px 10px;
     border: 1px dashed #e2ddd2;
@@ -1314,7 +1231,6 @@
     cursor: not-allowed;
   }
 
-  /* ── Feed main ── */
   .feed-main {
     flex: 1;
     padding: 24px 28px;
@@ -1355,14 +1271,13 @@
     cursor: pointer;
     transition: all 0.18s;
   }
-  /* Неактивний чіп: підсвічуємо золотим тоном на hover (а не сірим),
-     щоб перехід до активного стану читався як єдина золота гама. */
+
   .feed-filter-chip:hover:not(.feed-filter-chip--active) {
     background: #fbf7ec;
     border-color: #f2e9c8;
     color: #9b7a25;
   }
-  /* Активний чіп: золотий градієнт як у .btn-gold/бейджів — гармонійно з темою. */
+
   .feed-filter-chip--active {
     background: linear-gradient(135deg, #b8973a, #c9a84c);
     color: #fff;
@@ -1513,7 +1428,7 @@
     transition: all 0.18s;
     font-family: 'DM Sans', system-ui, sans-serif;
   }
-  /* Hover на emoji реакціях */
+
   .reaction-pill:hover {
     background: #fbf7ec;
     border-color: #f2e9c8;
@@ -1566,7 +1481,6 @@
     }
   }
 
-  /* ── Right panel ── */
   .right-panel {
     width: 280px;
     background: #fff;
@@ -1634,7 +1548,6 @@
     font-style: italic;
   }
 
-  /* ── Money request cards ── */
   .req-card {
     background: #fff;
     border: 1px solid #f2e9c8;
@@ -1800,7 +1713,6 @@
     color: #b0ada7;
   }
 
-  /* ── Shared ── */
   .avatar {
     border-radius: 50%;
     display: flex;
@@ -1855,7 +1767,6 @@
     border: 1px solid #d6d3ce;
   }
 
-  /* ── Toast ── */
   .toast {
     position: fixed;
     bottom: 28px;
@@ -1967,10 +1878,7 @@
       width: 100%;
       flex: none;
     }
-    /* Порядок на мобільному (за вимогою UX):
-       1) аналітика — донат → secret gift → notifications (це right-panel),
-       2) стрічка транзакцій (feed-main),
-       3) учасники та картки (sidebar). */
+
     .right-panel {
       order: 1;
       border-left: none;
@@ -1987,17 +1895,16 @@
       border-top: 1px solid #eae8e4;
       gap: 18px;
     }
-    /* На мобільному обмежуємо висоту списків і показуємо повзунок:
-       видно частину елементів, решта — за прокруткою. */
+
     .sidebar__scroll--members {
-      max-height: 152px; /* ~3 рядки (≈46px) + натяк на 4-й */
+      max-height: 152px;
     }
     .sidebar__scroll--cards {
-      max-height: 232px; /* ~2 картки (≈108px) + натяк на 3-тю */
+      max-height: 232px;
     }
-    /* Стрічка транзакцій: видно ~3, решта — прокруткою з повзунком */
+
     .tx-list {
-      max-height: 384px; /* ~3 картки (≈120px) */
+      max-height: 384px;
       overflow-y: auto;
       overscroll-behavior: contain;
       scrollbar-width: thin;
@@ -2017,7 +1924,6 @@
     .tx-list:hover::-webkit-scrollbar-thumb {
       background: #dfc876;
     }
-    /* Донат на всю ширину, по центру */
     .right-panel__section {
       margin-bottom: 18px;
     }
@@ -2065,7 +1971,6 @@
     .tx-card__name {
       font-size: 12px;
     }
-    /* Чіпи фільтра зручніше тапати */
     .feed-filter-chip {
       padding: 7px 16px;
     }

@@ -24,7 +24,6 @@
               }}
             </p>
 
-            <!-- ── Step indicator ── -->
             <div class="steps">
               <div class="step" :class="stepClass(1)">
                 <div class="step__circle">1</div>
@@ -37,7 +36,6 @@
               </div>
             </div>
 
-            <!-- ═══ STEP 1: Token ═══ -->
             <form v-if="currentStep === 1" class="form" novalidate @submit.prevent="handleGetCards">
               <div class="field">
                 <div class="field__header">
@@ -181,7 +179,6 @@
               </div>
             </form>
 
-            <!-- ═══ STEP 2: Card selection ═══ -->
             <form v-else class="form" novalidate @submit.prevent="handleConnect">
               <div v-if="cards.length === 0" class="empty-cards">
                 No UAH cards found on this account.
@@ -273,7 +270,6 @@
   const modalRootRef = ref(null)
   useFocusTrap(modalRootRef, () => props.isOpen)
 
-  // ─── Form state ───
   const personalToken = ref('')
   const agreedToPrivacy = ref(false)
   const showToken = ref(false)
@@ -282,11 +278,10 @@
   const serverError = ref('')
   const fieldErrors = ref({ token: '' })
 
-  // ─── Wizard state ───
   const currentStep = ref(1)
   const cards = ref([])
   const selectedAccountId = ref(null)
-  const cachedToken = ref('') // токен з яким ми робили /client-info — щоб не повторювати запит
+  const cachedToken = ref('')
 
   const inputType = computed(() => (showToken.value ? 'text' : 'password'))
 
@@ -326,7 +321,6 @@
 
   function onTokenInput() {
     serverError.value = ''
-    // Якщо токен змінили — скидаємо кеш карток, бо вони з іншого токену
     if (cards.value.length > 0 && personalToken.value.trim() !== cachedToken.value) {
       cards.value = []
       cachedToken.value = ''
@@ -334,14 +328,12 @@
     }
   }
 
-  // ─── STEP 1 → STEP 2 ───
   async function handleGetCards() {
     if (!validateToken()) return
     if (!agreedToPrivacy.value) return
 
     const token = personalToken.value.trim()
 
-    // Якщо вже маємо картки з цим токеном — переходимо без повторного API-виклику (rate limit 60s)
     if (cards.value.length > 0 && cachedToken.value === token) {
       currentStep.value = 2
       return
@@ -366,7 +358,6 @@
     }
   }
 
-  // ─── STEP 2: connect ───
   async function handleConnect() {
     if (!selectedAccountId.value) return
 
@@ -416,12 +407,8 @@
   function goBack() {
     currentStep.value = 1
     serverError.value = ''
-    // Не ресетимо cards — вони лишаються у пам'яті щоб не робити повторний /client-info
   }
 
-  /**
-   * Mapping помилок з бекенду. Працює для /client-info і /connect.
-   */
   function handleServerError(err) {
     const status = err.response?.status
     const message = err.response?.data?.message
@@ -534,7 +521,6 @@
     line-height: 1.6;
   }
 
-  /* ── Stepper ── */
   .steps {
     display: flex;
     align-items: center;
@@ -598,7 +584,6 @@
     background: #b8973a;
   }
 
-  /* ── Form ── */
   .form {
     display: flex;
     flex-direction: column;
@@ -803,7 +788,6 @@
     color: #c4402a;
   }
 
-  /* ── Card list (Step 2) ── */
   .card-list {
     display: flex;
     flex-direction: column;
@@ -894,7 +878,6 @@
     margin-left: 3px;
   }
 
-  /* ── Type badges ── */
   .type-badge {
     display: inline-flex;
     align-items: center;
@@ -950,7 +933,6 @@
     border: 1px dashed #d6d3ce;
   }
 
-  /* ── Actions ── */
   .actions {
     display: flex;
     gap: 12px;
@@ -1010,7 +992,6 @@
     }
   }
 
-  /* ── Transitions ── */
   .fade-down-enter-active,
   .fade-down-leave-active {
     transition:

@@ -32,7 +32,7 @@
 
   const props = defineProps({
     isOpen: { type: Boolean, required: true },
-    status: { type: String, default: 'ACCEPTED' }, // ACCEPTED | DECLINED
+    status: { type: String, default: 'ACCEPTED' },
     responderName: { type: String, default: 'A group member' },
     amount: { type: [Number, String], default: 0 },
   })

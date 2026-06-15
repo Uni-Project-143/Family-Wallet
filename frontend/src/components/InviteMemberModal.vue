@@ -4,7 +4,6 @@
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
         <Transition name="modal">
           <div v-if="isOpen" ref="modalRootRef" class="modal-card" role="dialog" aria-modal="true">
-            <!-- Close button -->
             <button class="modal-close" aria-label="Close" @click="close">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
@@ -16,19 +15,15 @@
               </svg>
             </button>
 
-            <!-- Header -->
-
             <h2 class="modal-title">Invite new member</h2>
             <p class="modal-sub">
               Share this link with your family member. The link is valid for
               <strong>48 hours</strong>.
             </p>
 
-            <!-- Group Invite Code section -->
             <div class="section">
               <div class="section__label">Group Invite Code</div>
 
-              <!-- Link box -->
               <div class="invite-box">
                 <div class="invite-box__url" :class="{ 'invite-box__url--loading': isGenerating }">
                   <template v-if="isGenerating">
@@ -51,7 +46,6 @@
                   </template>
                 </div>
 
-                <!-- Copy button -->
                 <button
                   v-if="inviteUrl && !isGenerating"
                   class="btn-copy"
@@ -87,7 +81,6 @@
                   {{ isCopied ? 'Copied!' : 'Copy' }}
                 </button>
 
-                <!-- Regen button -->
                 <button
                   v-if="inviteUrl && !isGenerating"
                   class="btn-regen"
@@ -126,7 +119,6 @@
                 </button>
               </div>
 
-              <!-- TTL -->
               <div v-if="inviteUrl && expiresAt" class="invite-ttl">
                 <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
                   <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" stroke-width="1.2" />
@@ -140,7 +132,6 @@
                 Valid for {{ ttlLabel }}
               </div>
 
-              <!-- Generate button (якщо посилання ще нема) -->
               <div v-if="!inviteUrl" class="generate-row">
                 <button class="btn-gold" :disabled="isGenerating" @click="generateLink(false)">
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -205,7 +196,6 @@
   })
 
   /**
-   * Генерує або перегенеровує invite-лінк.
    * @param {boolean} isRegen - true якщо перегенерація
    */
   async function generateLink(isRegen) {
@@ -221,15 +211,12 @@
     }
 
     try {
-      // isRegen → POST /api/v1/group/{groupId}/invite/regenerate
-      // !isRegen → GET  /api/v1/group/{groupId}/invite
       const fn = isRegen
         ? () => regenerateGroupInviteLink(groupId)
         : () => fetchGroupInviteLink(groupId)
 
       const data = await fn()
 
-      // Бекенд повертає invite_link та expires_at
       inviteUrl.value = data.invite_link
       expiresAt.value = data.expires_at
 
@@ -249,9 +236,6 @@
     }
   }
 
-  /**
-   * Копіює посилання через Clipboard API.
-   */
   async function copyLink() {
     if (!inviteUrl.value) return
     try {
@@ -326,7 +310,6 @@
     border-color: #0d0c0a;
   }
 
-  /* ── Header ── */
   .modal-ep-tag {
     font-size: 9px;
     letter-spacing: 2px;

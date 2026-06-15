@@ -71,12 +71,10 @@
   const groups = ref([])
 
   onMounted(() => {
-    // history.state — стандартний спосіб отримати state з router.push({ state })
     const passed = history.state?.groups
     if (Array.isArray(passed) && passed.length > 0) {
       groups.value = passed
     } else {
-      // Якщо юзер потрапив сюди прямим URL без state — підтягуємо самі
       reloadGroups()
     }
   })
@@ -295,9 +293,8 @@
     .form-title {
       font-size: 24px;
     }
-    /* Стандартні input fields fall back на 100% width */
     .i-field {
-      font-size: 16px; /* 16px+ не зум-ом на iOS */
+      font-size: 16px;
     }
   }
 

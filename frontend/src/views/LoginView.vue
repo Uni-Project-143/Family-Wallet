@@ -77,6 +77,16 @@
         <router-link to="/forgot-password" class="auth-link">Forgot password?</router-link>
         <router-link to="/register" class="auth-link auth-link--bold">Create account →</router-link>
       </div>
+
+      <p class="auth-card__legal">
+        <a href="/terms.pdf" target="_blank" rel="noopener noreferrer" class="auth-link"
+          >Terms of Service</a
+        >
+        <span aria-hidden="true">·</span>
+        <a href="/privacy.pdf" target="_blank" rel="noopener noreferrer" class="auth-link"
+          >Privacy Policy</a
+        >
+      </p>
     </div>
   </div>
 </template>
@@ -288,6 +298,15 @@
     align-items: center;
     justify-content: space-between;
     margin-top: 18px;
+  }
+
+  .auth-card__legal {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 16px;
+    font-size: 12px;
+    color: #b0ada7;
   }
 
   .auth-link {

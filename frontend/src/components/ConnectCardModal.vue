@@ -136,13 +136,11 @@
                 <input v-model="agreedToPrivacy" type="checkbox" class="checkbox" />
                 <span class="checkbox-text">
                   I agree to the
-                  <a href="/privacy" target="_blank" rel="noopener noreferrer" class="link">
+                  <a href="/privacy.pdf" target="_blank" rel="noopener noreferrer" class="link">
                     Privacy Policy
                   </a>
-                  and conditions of
-                  <a href="/gdpr" target="_blank" rel="noopener noreferrer" class="link">
-                    GDPR data processing </a
-                  >. My token will be encrypted (AES-256) before being saved.
+                  and conditions of GDPR data processing. My token will be encrypted (AES-256)
+                  before being saved.
                 </span>
               </label>
 

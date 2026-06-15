@@ -414,8 +414,10 @@
             <div class="info-box">
               Your financial data is encrypted and stored securely. Family Wallet processes your
               Monobank transactions only within your family group. See our
-              <a href="/privacy" target="_blank" class="link">Privacy Policy</a> for details. (GDPR
-              NFR-06)
+              <a href="/privacy.pdf" target="_blank" rel="noopener noreferrer" class="link"
+                >Privacy Policy</a
+              >
+              for details.
             </div>
           </div>
         </section>

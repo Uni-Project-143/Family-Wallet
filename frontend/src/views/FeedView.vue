@@ -153,9 +153,9 @@
             <TransactionCard v-for="tx in filteredTransactions" :key="tx.id" :transaction="tx" />
           </TransitionGroup>
 
-          <div ref="sentinelRef" class="tx-sentinel" aria-hidden="true" />
-
-          <div v-if="isLoadingMore" class="tx-loading-more">{{ strings.loading.more }}</div>
+          <button v-if="hasMore" class="tx-load-more" :disabled="isLoadingMore" @click="loadMore">
+            {{ isLoadingMore ? strings.loading.more : strings.common.loadMore }}
+          </button>
         </template>
       </main>
 
@@ -354,7 +354,6 @@
   import { useRouter } from 'vue-router'
   import { useAuth } from '../composables/useAuth'
   import { useFeedTransactions } from '../composables/useFeedTransactions'
-  import { useInfiniteScroll } from '../composables/useInfiniteScroll'
   import { useWebSocket } from '../composables/useWebSocket'
   import { applyServerReactions, seedReactions } from '../composables/useReactions'
   import { fetchGroupMembers } from '../services/authService'
@@ -414,6 +413,7 @@
     transactions,
     isLoading: isLoadingFeed,
     isLoadingMore,
+    hasMore,
     loadFirstPage,
     loadMore,
   } = useFeedTransactions(() => currentUser.value?.groupId)
@@ -450,9 +450,6 @@
     loadFirstPage()
     showToast('New transaction', 'info')
   }
-
-  // ─── Infinite scroll (PROJ-52 FE-01) ───
-  const { sentinelRef } = useInfiniteScroll(loadMore)
 
   const isInviteModalOpen = ref(false)
 
@@ -1902,17 +1899,28 @@
     opacity: 0;
     transform: translateY(-12px);
   }
-  .tx-sentinel {
-    height: 1px;
+  .tx-load-more {
+    display: block;
     width: 100%;
-  }
-
-  .tx-loading-more {
-    padding: 16px;
-    text-align: center;
-    font-size: 12px;
-    color: #b0ada7;
+    margin-top: 4px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #e7dcb4;
+    border-radius: 10px;
     font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: #9b7a25;
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+  .tx-load-more:hover:not(:disabled) {
+    background: #fbf7ec;
+    border-color: #dfc876;
+  }
+  .tx-load-more:disabled {
+    opacity: 0.6;
+    cursor: default;
   }
   .card-widget__owner {
     font-size: 11px;
@@ -1979,11 +1987,35 @@
       border-top: 1px solid #eae8e4;
       gap: 18px;
     }
-    /* На мобільному прибираємо вкладений скрол — списки розкриваються повністю */
-    .sidebar__scroll--members,
+    /* На мобільному обмежуємо висоту списків і показуємо повзунок:
+       видно частину елементів, решта — за прокруткою. */
+    .sidebar__scroll--members {
+      max-height: 152px; /* ~3 рядки (≈46px) + натяк на 4-й */
+    }
     .sidebar__scroll--cards {
-      max-height: none;
-      padding-right: 0;
+      max-height: 232px; /* ~2 картки (≈108px) + натяк на 3-тю */
+    }
+    /* Стрічка транзакцій: видно ~3, решта — прокруткою з повзунком */
+    .tx-list {
+      max-height: 384px; /* ~3 картки (≈120px) */
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+      scrollbar-color: #dfc876 transparent;
+      padding-right: 4px;
+    }
+    .tx-list::-webkit-scrollbar {
+      width: 6px;
+    }
+    .tx-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .tx-list::-webkit-scrollbar-thumb {
+      background: #e7dcb4;
+      border-radius: 9999px;
+    }
+    .tx-list:hover::-webkit-scrollbar-thumb {
+      background: #dfc876;
     }
     /* Донат на всю ширину, по центру */
     .right-panel__section {

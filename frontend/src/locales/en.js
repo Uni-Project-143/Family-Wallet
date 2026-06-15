@@ -5,6 +5,7 @@ export default {
     back: 'Go back',
     loading: 'Loading…',
     reload: 'Reload page',
+    loadMore: 'Load more',
   },
 
   empty: {

@@ -1,4 +1,4 @@
-import { onUnmounted, ref, watch } from 'vue'
+import { onUnmounted, ref, watch, toValue } from 'vue'
 
 /**
  * Викликає callback коли sentinel-елемент потрапляє у viewport.
@@ -31,6 +31,10 @@ export function useInfiniteScroll(callback, options = {}) {
             if (entries[0]?.isIntersecting) callback()
           },
           {
+            // Якщо контент прокручується всередині елемента (а не вікна) — root
+            // має бути цим елементом, інакше rootMargin не спрацьовує і догрузка
+            // не тригериться. Передається через options.root (ref або елемент).
+            root: toValue(options.root) || null,
             rootMargin: options.rootMargin || '200px',
             threshold: options.threshold || 0,
           },

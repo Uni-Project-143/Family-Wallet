@@ -37,7 +37,6 @@
           type="password"
           placeholder="At least 8 characters, 1 uppercase letter"
           autocomplete="new-password"
-          hint="Use uppercase letters, numbers, and special characters"
           :error-message="fieldErrors.password"
           @blur="validateField('password')"
         />
@@ -70,10 +69,13 @@
             ></span>
             <span class="checkbox-label">
               I agree to the
-              <a href="/terms" target="_blank" class="auth-link">Terms of Service</a>
+              <a href="/terms.pdf" target="_blank" rel="noopener noreferrer" class="auth-link"
+                >Terms of Service</a
+              >
               and
-              <a href="/privacy" target="_blank" class="auth-link">Privacy Policy</a>. I consent to
-              the collection and processing of my financial data.
+              <a href="/privacy.pdf" target="_blank" rel="noopener noreferrer" class="auth-link"
+                >Privacy Policy</a
+              >. I consent to the collection and processing of my financial data.
               <span class="gdpr-note">(GDPR)</span>
             </span>
           </label>

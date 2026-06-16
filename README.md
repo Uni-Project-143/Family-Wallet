@@ -26,12 +26,28 @@
 cp .env.example .env
 ```
 
-Необхідні змінні:
+Повний перелік змінних — у файлі [`.env.example`](.env.example) (джерело правди). Основні:
 
-| Змінна       | Опис                              |
-| ------------ | --------------------------------- |
-| `MONGO_URI`  | Connection string для MongoDB Atlas |
-| `SECRET_KEY` | Секретний ключ для JWT токенів    |
+**Backend:**
+
+| Змінна                    | Опис                                                        |
+| ------------------------- | ----------------------------------------------------------- |
+| `MONGO_ATLAS`             | Connection string для MongoDB Atlas                         |
+| `DB_NAME`                 | Назва бази даних (за замовчуванням `FamilyWallet`)          |
+| `JWT_SECRET`              | Секретний ключ для JWT токенів                              |
+| `MONOBANK_ENCRYPTION_KEY` | AES-256 ключ (base64) для шифрування токенів Monobank       |
+| `MONOBANK_WEBHOOK_URL`    | Публічний https URL бекенду для webhook'ів Monobank         |
+| `CORS_ORIGINS`            | Дозволені origins фронтенду через кому                      |
+| `ENV`                     | `development` / `production` (активує fail-fast для секретів) |
+
+**Frontend (Vite):**
+
+| Змінна               | Опис                                          |
+| -------------------- | --------------------------------------------- |
+| `VITE_API_BASE_URL`  | URL бекенд-API (напр. `http://localhost:8000`) |
+| `VITE_WS_BASE_URL`   | URL WebSocket-стрічки                          |
+| `VITE_WS_ENABLED`    | Увімкнення WebSocket (`true`/`false`)          |
+| `VITE_REALTIME_MODE` | Режим реального часу: `off` / `ws` / `polling` |
 
 ## Запуск через Docker Compose (рекомендовано)
 
@@ -54,6 +70,17 @@ docker-compose up --build -d
 ```bash
 docker-compose down
 ```
+
+## Тестові доступи (Credentials)
+
+Для входу в систему під час перевірки використовуйте тестовий обліковий запис:
+
+| Поле   | Значення           |
+| ------ | ------------------ |
+| Email  | `admin@gmail.com`  |
+| Пароль | `Administrator`    |
+
+Роль: **Administrator**. Обліковий запис вже створений у тестовій базі (MongoDB Atlas), додаткова реєстрація не потрібна.
 
 ## Локальний запуск без Docker
 
@@ -102,6 +129,19 @@ make lint-fix # Автовиправлення лінтерів
 make format   # Автоформатування
 ```
 
+## Тестування
+
+```bash
+cd backend
+pip install -r requirements.txt   # одноразово (включно з firebase-admin/sendgrid)
+pytest                            # усі тести
+pytest tests/unit                 # лише unit
+pytest tests/integration          # лише integration
+```
+
+Підсумок фінального тестування (статистика, середовище, known issues) — у файлі
+[`docs/TEST_SUMMARY_REPORT.md`](docs/TEST_SUMMARY_REPORT.md). Поточний статус: **89 тестів, 100% passed**.
+
 ## Архітектурна документація
 
 - [Architectural Decision Record: System Style](docs/Architectural%20Decision%20Record%20-%20System%20Style.md) — обґрунтування вибору архітектурного стилю (Modular Monolith)
@@ -138,7 +178,3 @@ Family-Wallet/
 ├── .editorconfig                  # Загальні правила форматування
 └── .env.example                   # Шаблон змінних середовища
 ```
-
-## API
-
-- `GET /health` — перевірка стану сервера

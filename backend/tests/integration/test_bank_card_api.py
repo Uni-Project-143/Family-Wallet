@@ -35,6 +35,7 @@ def _build_card(card_id: str, balance: Decimal) -> MagicMock:
     card.account_id = "acc-" + card_id[-4:]
     card.masked_pan = "**** **** **** 1234"
     card.balance = balance
+    card.virtual_balance = balance
     card.status = "ACTIVE"
     card.transaction_ids = []
     return card

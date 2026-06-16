@@ -26,10 +26,6 @@ function persistAuthSession(token, user) {
   currentUser.value = user
 }
 
-/**
- * Зберігає активну групу окремо. При перемиканні груп — оновлюємо лише цей кусочок,
- * не чіпаючи fullName/email юзера.
- */
 function setActiveGroup(group) {
   const stored = parseStoredUser() || {}
   const updated = {
@@ -106,15 +102,12 @@ export function useAuth() {
       }
       persistAuthSession(data.access_token, userInfo)
 
-      // Якщо є одна група — одразу робимо її активною (потрібно стрічці/деталям)
       if (Array.isArray(groups) && groups.length === 1) {
         setActiveGroup(groups[0])
       }
 
       initPush()
 
-      // Повернення на захищений шлях, з якого юзера відправили на логін
-      // (напр. /gift/join/:token зі secret-gift лінки)
       if (redirect) {
         router.replace(redirect)
         return { ok: true }

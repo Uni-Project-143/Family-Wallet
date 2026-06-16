@@ -18,12 +18,11 @@
     avatarUrl: { type: String, default: null },
     fullName: { type: String, default: '' },
     email: { type: String, default: '' },
-    size: { type: String, default: 'md' }, // 'sm' | 'md' | 'lg'
+    size: { type: String, default: 'md' },
   })
 
   const imageError = ref(false)
 
-  // Якщо URL змінився — скидаємо помилку
   watch(
     () => props.avatarUrl,
     () => {
@@ -51,18 +50,14 @@
 
   const sizeClass = computed(() => `avatar--${props.size}`)
 
-  /**
-   * Детермінований колір на основі імені/email — щоб у одного юзера
-   * завжди був той самий фон при initials-fallback.
-   */
   const bgColor = computed(() => {
     const palette = [
-      'linear-gradient(135deg, #f2e9c8, #dfc876)', // gold
-      'linear-gradient(135deg, #f8d4c5, #e8a890)', // peach
-      'linear-gradient(135deg, #c5e0d4, #8fbfa3)', // sage
-      'linear-gradient(135deg, #cfd9e8, #8fa9c8)', // blue
-      'linear-gradient(135deg, #e8d4e3, #c498b9)', // mauve
-      'linear-gradient(135deg, #d8ccc0, #a89486)', // taupe
+      'linear-gradient(135deg, #f2e9c8, #dfc876)',
+      'linear-gradient(135deg, #f8d4c5, #e8a890)',
+      'linear-gradient(135deg, #c5e0d4, #8fbfa3)',
+      'linear-gradient(135deg, #cfd9e8, #8fa9c8)',
+      'linear-gradient(135deg, #e8d4e3, #c498b9)',
+      'linear-gradient(135deg, #d8ccc0, #a89486)',
     ]
     const key = (props.fullName || props.email || '?').toLowerCase()
     const hash = [...key].reduce((acc, ch) => acc + ch.charCodeAt(0), 0)

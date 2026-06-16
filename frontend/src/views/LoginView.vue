@@ -38,7 +38,6 @@
             {{ blockMessage }}
           </div>
         </Transition>
-        <!-- Серверна помилка: єдине повідомлення без підказки яке поле (Negative AC) -->
         <Transition name="fade-down">
           <div v-if="authError" class="auth-form__server-error" role="alert">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -55,7 +54,6 @@
           </div>
         </Transition>
 
-        <!-- Кнопка з disabled + spinner (Interface AC) -->
         <button type="submit" class="btn-primary" :disabled="isLoading || !canSubmit">
           <span v-if="!isLoading">Log in</span>
           <span v-else aria-label="Loading...">
@@ -72,7 +70,6 @@
         </button>
       </form>
 
-      <!-- Посилання -->
       <div class="auth-card__links">
         <router-link to="/forgot-password" class="auth-link">Forgot password?</router-link>
         <router-link to="/register" class="auth-link auth-link--bold">Create account →</router-link>
@@ -92,15 +89,6 @@
 </template>
 
 <script setup>
-  // import { ref, computed } from 'vue'
-  // import BaseInput from '../components/BaseInput.vue'
-  // import { useAuth } from '../composables/useAuth'
-
-  // const { login, isLoading, authError } = useAuth()
-
-  // const email = ref('')
-  // const password = ref('')
-
   import { ref, computed, watch, onUnmounted } from 'vue'
   import { useRoute } from 'vue-router'
   import BaseInput from '../components/BaseInput.vue'
@@ -113,7 +101,6 @@
   const email = ref('')
   const password = ref('')
 
-  // ─── Rate limit (per email) ───
   const blockKey = computed(() => `login:${email.value.trim().toLowerCase()}`)
   const isFormBlocked = ref(false)
   const remainingMs = ref(0)
@@ -131,10 +118,8 @@
     return `Too many failed attempts. Try again in ${m}:${String(s).padStart(2, '0')}.`
   })
 
-  // Перевіряємо блок щоразу коли email змінюється (інший key)
   watch(blockKey, refreshBlockStatus, { immediate: true })
 
-  // Запускаємо таймер countdown коли форма заблокована
   watch(isFormBlocked, (blocked) => {
     if (blocked && !countdownInterval) {
       countdownInterval = setInterval(() => {
@@ -154,11 +139,6 @@
     if (countdownInterval) clearInterval(countdownInterval)
   })
 
-  /**
-   * Кнопка активна якщо обидва поля непорожні.
-   * Формат email і складність пароля НЕ перевіряємо на логіні —
-   * це підказки зловмиснику. Бек поверне 401 → один загальний message.
-   */
   const canSubmit = computed(() => {
     return email.value.trim().length > 0 && password.value.length > 0 && !isFormBlocked.value
   })
@@ -174,7 +154,6 @@
       typeof route.query.redirect === 'string' ? route.query.redirect : null,
     )
 
-    // Бек заблокував (429) — ставимо блок за точним Retry-After від сервера
     if (result?.status === 429) {
       applyServerBlock(blockKey.value, result.retryAfter || 15 * 60)
       refreshBlockStatus()
@@ -372,9 +351,8 @@
     .form-title {
       font-size: 24px;
     }
-    /* Стандартні input fields fall back на 100% width */
     .i-field {
-      font-size: 16px; /* 16px+ не зум-ом на iOS */
+      font-size: 16px;
     }
   }
 </style>

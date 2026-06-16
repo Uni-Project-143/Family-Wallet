@@ -25,7 +25,7 @@
             class="tx-card__virtual-badge"
             title="Внутрішній переказ"
           >
-            ↔ Переказ
+            ↔ Transfer
           </span>
 
           <div v-if="transaction.description" class="tx-card__desc">
@@ -52,7 +52,6 @@
           {{ r.emoji }} {{ r.count }}
         </button>
 
-        <!-- Кнопка-пікер реакцій (Telegram-style) -->
         <div class="reaction-picker">
           <button
             class="reaction-add"
@@ -91,7 +90,6 @@
       </div>
     </div>
 
-    <!-- Прозорий бекдроп: клік поза пікером закриває його -->
     <div v-if="isPickerOpen" class="reaction-backdrop" @click="closePicker" />
   </div>
 </template>
@@ -107,11 +105,9 @@
     transaction: { type: Object, required: true },
   })
 
-  // ─── Категорія (slug із беку → fallback на назву), спільна логіка з донатом ───
   const category = computed(() => resolveCategory(props.transaction))
   const categoryBadgeStyle = computed(() => badgeStyleFromColor(category.value.color))
 
-  // ─── Емодзі-реакції (Telegram-style) ───
   const { getMyReaction, toggleReaction } = useReactions()
   const displayReactions = useDisplayReactions(() => props.transaction)
   const myReaction = computed(() => getMyReaction(props.transaction.id))
@@ -129,12 +125,11 @@
     closePicker()
   }
   function onToggle(emoji) {
-    // Клік по наявній реакції-пілюлі також ставить/знімає її
     toggleReaction(props.transaction.id, emoji)
   }
 
   const authorDisplayName = computed(() => {
-    return props.transaction.display_name || 'Невідомий учасник'
+    return props.transaction.display_name || 'Unknown User'
   })
 
   const isIncome = computed(() => Number(props.transaction.amount) > 0)
@@ -146,24 +141,21 @@
     return `${sign}${Math.abs(num).toLocaleString('uk-UA')}`
   })
 
-  /**
-   * Відносний час: "2 хв тому", "3 год тому", "вчора", "12 кві".
-   */
   const relativeTime = computed(() => {
     const txDate = parseServerDate(props.transaction.timestamp)
     if (!txDate) return ''
     const diffMs = Date.now() - txDate.getTime()
     const minutes = Math.floor(diffMs / 60000)
 
-    if (minutes < 1) return 'щойно'
-    if (minutes < 60) return `${minutes} хв тому`
+    if (minutes < 1) return 'just now'
+    if (minutes < 60) return `${minutes} min ago`
 
     const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `${hours} год тому`
+    if (hours < 24) return `${hours} hr ago`
 
     const days = Math.floor(hours / 24)
-    if (days === 1) return 'вчора'
-    if (days < 7) return `${days} дн тому`
+    if (days === 1) return 'yesterday'
+    if (days < 7) return `${days} days ago`
 
     return txDate.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })
   })
@@ -213,8 +205,6 @@
     gap: 5px;
     padding: 2px 10px;
     border-radius: 9999px;
-    /* Кольори (фон/рамка/текст) задаються інлайн через :style — getCategoryBadgeStyle().
-       Тут лише запасні значення, якщо стиль не передано. */
     background: #fbf7ec;
     border: 1px solid #f2e9c8;
     font-size: 11px;
@@ -293,7 +283,6 @@
     border-color: #f2e9c8;
   }
 
-  /* Реакція, яку поставив поточний користувач */
   .reaction-pill--mine {
     background: #fbf7ec;
     border-color: #dfc876;
@@ -366,7 +355,6 @@
     box-shadow: inset 0 0 0 1.5px #dfc876;
   }
 
-  /* Прозорий бекдроп для закриття по кліку поза пікером */
   .reaction-backdrop {
     position: fixed;
     inset: 0;
@@ -400,8 +388,6 @@
     vertical-align: middle;
   }
 
-  /* Visual Check: бейдж переказу був у «чужому» індиго (#4f46e5) після мерджу —
-     приведено до золото-кремової теми застосунку. */
   .tx-card__virtual-badge {
     display: inline-block;
     margin-left: 6px;

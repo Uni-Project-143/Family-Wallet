@@ -37,8 +37,6 @@ export async function fetchFeed(groupId, page = 1, limit = 20) {
  * @param {string|null} payload.description
  * @param {string|null} payload.category_id
  * @returns {Promise<{transfer_id, debit_transaction_id, credit_transaction_id, amount, from_effective_balance, to_effective_balance}>}
- */
-/**
  * @param {string} transactionId
  * @param {string} emoji
  * @returns {Promise<{ status: string, total_count: number, grouped_reactions: Record<string, number> }>}

@@ -1,7 +1,6 @@
 <template>
   <div class="login-page">
     <div class="auth-card">
-      <!-- Немає токена в URL -->
       <template v-if="!token">
         <div class="auth-card__header">
           <h1 class="auth-card__title">Invalid Link</h1>
@@ -14,7 +13,6 @@
         </router-link>
       </template>
 
-      <!-- Стан 1: форма нового пароля -->
       <template v-else-if="!isDone">
         <div class="auth-card__header">
           <h1 class="auth-card__title">Set New Password</h1>
@@ -68,7 +66,6 @@
         </form>
       </template>
 
-      <!-- Стан 2: success -->
       <template v-else>
         <div class="success-state">
           <div class="success-state__icon" aria-hidden="true">✅</div>
@@ -97,7 +94,6 @@
   const route = useRoute()
   const router = useRouter()
 
-  // Токен приходить з email-лінки: /reset-password?token=...
   const token = ref(route.query.token || '')
 
   const password = ref('')
@@ -147,7 +143,6 @@
     try {
       await resetPassword({ token: token.value, new_password: password.value })
       isDone.value = true
-      // Авто-редірект на логін за кілька секунд
       setTimeout(() => router.push('/login'), 2500)
     } catch (err) {
       const status = err.response?.status
@@ -253,7 +248,6 @@
     transform: none;
   }
 
-  /* router-link, що виглядає як кнопка */
   .btn-gold--link {
     text-decoration: none;
     margin-top: 8px;

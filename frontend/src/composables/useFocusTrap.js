@@ -1,11 +1,6 @@
 import { onUnmounted, watch } from 'vue'
 
 /**
- * Focus trap для модальних вікон.
- * - Робить #app inert поки модалка відкрита (Tab не виходить з модалки)
- * - Зберігає попередній focus і відновлює його при закритті
- * - Циклить Tab всередині модалки (з останнього елемента — на перший)
- *
  * @param {Ref<HTMLElement|null>} rootRef — ref на корневий елемент модалки
  * @param {() => boolean} isActive — getter, що повертає чи відкрита модалка
  */

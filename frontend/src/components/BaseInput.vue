@@ -25,7 +25,6 @@
         @blur="handleBlur"
       />
 
-      <!-- Іконка помилки -->
       <span v-if="hasError && !isPasswordType" class="base-input__icon base-input__icon--error">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" />
@@ -34,15 +33,13 @@
         </svg>
       </span>
 
-      <!-- Кнопка показати/сховати пароль (eye icon) -->
       <button
         v-if="isPasswordType"
         type="button"
         class="base-input__eye"
-        :aria-label="isPasswordVisible ? 'Сховати пароль' : 'Показати пароль'"
+        :aria-label="isPasswordVisible ? 'Hide password' : 'Show password'"
         @click="togglePasswordVisibility"
       >
-        <!-- Eye open -->
         <svg v-if="!isPasswordVisible" width="18" height="18" viewBox="0 0 18 18" fill="none">
           <path
             d="M1 9C1 9 4 3 9 3C14 3 17 9 17 9C17 9 14 15 9 15C4 15 1 9 1 9Z"
@@ -50,7 +47,7 @@
             stroke-width="1.5"
           />
         </svg>
-        <!-- Eye closed -->
+
         <svg v-else width="18" height="18" viewBox="0 0 18 18" fill="none">
           <path d="M2 2L16 16" stroke="#B0ADA7" stroke-width="1.5" stroke-linecap="round" />
           <path
@@ -69,7 +66,6 @@
       </button>
     </div>
 
-    <!-- Inline помилка під полем (FE-03) -->
     <Transition name="fade-down">
       <p v-if="hasError" class="base-input__error" role="alert">
         {{ errorMessage }}
@@ -120,7 +116,6 @@
 
   const emit = defineEmits(['update:modelValue', 'blur'])
 
-  // Унікальний id щоб label + input були пов'язані
   const inputId = computed(
     () => `input-${props.label?.toLowerCase().replace(/\s/g, '-') || Math.random()}`,
   )
@@ -256,7 +251,6 @@
     margin: 0;
   }
 
-  /* Анімація появи помилки */
   .fade-down-enter-active,
   .fade-down-leave-active {
     transition:

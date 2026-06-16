@@ -31,15 +31,15 @@ src/
 │  ├─ UserAvatar.vue      BaseInput.vue
 │
 ├─ composables/          # логіка стану та побічні ефекти (Vue Composition API)
-│  ├─ useAuth.js          # ⭐ глобальний auth-стан (singleton)
+│  ├─ useAuth.js          # глобальний auth-стан (singleton)
 │  ├─ usePersistentState.js  # ref ↔ localStorage
-│  ├─ useReactions.js     # ⭐ глобальний стан реакцій (singleton, localStorage)
+│  ├─ useReactions.js     # глобальний стан реакцій (singleton, localStorage)
 │  ├─ usePushNotifications.js # FCM: дозвіл, токен, onMessage
 │  ├─ useFeedTransactions.js  # пагінація стрічки
 │  ├─ useInfiniteScroll.js    useWebSocket.js     useFocusTrap.js
 │
 ├─ services/             # HTTP-шар (тонкі обгортки над apiClient)
-│  ├─ apiClient.js        # ⭐ axios instance: Bearer-інтерсептор, 401-redirect, err.userMessage
+│  ├─ apiClient.js        # axios instance: Bearer-інтерсептор, 401-redirect, err.userMessage
 │  ├─ authService.js      cardService.js          transactionService.js
 │  ├─ giftEventService.js notificationService.js  firebase.js
 │

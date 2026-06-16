@@ -65,9 +65,6 @@ export function useWebSocket({ groupId, onTransaction, onReaction, onRequest } =
     }
   }
 
-  /**
-   * Exponential backoff: 1s, 2s, 4s, 8s, max 30s.
-   */
   function scheduleReconnect() {
     if (reconnectTimer) return
     const delay = Math.min(1000 * 2 ** reconnectAttempts.value, 30000)

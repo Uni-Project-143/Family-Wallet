@@ -4,7 +4,6 @@
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
         <Transition name="modal">
           <div v-if="isOpen" ref="modalRootRef" class="modal-card" role="dialog" aria-modal="true">
-            <!-- Close button -->
             <button class="modal-close" :disabled="isSubmitting" aria-label="Close" @click="close">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
@@ -16,16 +15,14 @@
               </svg>
             </button>
 
-            <!-- Header -->
-            <h2 class="modal-title">Переказ між картками</h2>
+            <h2 class="modal-title">Transfer between cards</h2>
             <p class="modal-sub">
-              Виконайте миттєвий переказ між картками учасників вашої сімейної групи.
+              Execute an instant transfer between cards of your family group members.
             </p>
 
             <form class="form" @submit.prevent="handleSubmit">
-              <!-- From card -->
               <div class="field">
-                <label class="field__label" for="from-card">Картка-відправник</label>
+                <label class="field__label" for="from-card">Sender Card</label>
                 <div class="i-field-wrap" :class="{ 'i-field-wrap--error': errors.fromCardId }">
                   <select
                     id="from-card"
@@ -35,7 +32,7 @@
                     @blur="validateFromCard"
                     @change="onFromCardChange"
                   >
-                    <option :value="''" disabled>Виберіть картку</option>
+                    <option :value="''" disabled>Choose a card</option>
                     <option v-for="card in userCards" :key="card.id" :value="card.id">
                       {{ card.masked_pan }} —
                       {{ formatBalance(card.virtual_balance ?? card.effective_balance) }} UAH
@@ -47,9 +44,8 @@
                 </Transition>
               </div>
 
-              <!-- To card -->
               <div class="field">
-                <label class="field__label" for="to-card">Картка-отримувач</label>
+                <label class="field__label" for="to-card">Recipient Card</label>
                 <div class="i-field-wrap" :class="{ 'i-field-wrap--error': errors.toCardId }">
                   <select
                     id="to-card"
@@ -58,7 +54,7 @@
                     :disabled="isSubmitting"
                     @blur="validateToCard"
                   >
-                    <option :value="''" disabled>Виберіть картку</option>
+                    <option :value="''" disabled>Choose a card</option>
                     <option v-for="card in availableToCards" :key="card.id" :value="card.id">
                       <template v-if="card.owner_full_name">
                         {{ card.owner_full_name }} — {{ card.masked_pan }}
@@ -74,9 +70,8 @@
                 </Transition>
               </div>
 
-              <!-- Amount -->
               <div class="field">
-                <label class="field__label" for="amount">Сума</label>
+                <label class="field__label" for="amount">Amount</label>
                 <div class="i-field-wrap" :class="{ 'i-field-wrap--error': errors.amount }">
                   <input
                     id="amount"
@@ -95,10 +90,9 @@
                 </Transition>
               </div>
 
-              <!-- Description -->
               <div class="field">
                 <label class="field__label" for="description">
-                  Опис <span class="field__hint">(необовʼязково)</span>
+                  Description <span class="field__hint">(optional)</span>
                 </label>
                 <div class="i-field-wrap">
                   <input
@@ -107,16 +101,15 @@
                     class="i-field"
                     type="text"
                     maxlength="500"
-                    placeholder="За що переказ?"
+                    placeholder="What is the transfer for?"
                     :disabled="isSubmitting"
                   />
                 </div>
               </div>
 
-              <!-- Category -->
               <div class="field">
                 <label class="field__label" for="category">
-                  Категорія <span class="field__hint">(необовʼязково)</span>
+                  Category <span class="field__hint">(optional)</span>
                 </label>
                 <div class="i-field-wrap">
                   <select
@@ -125,7 +118,7 @@
                     class="i-field"
                     :disabled="isSubmitting"
                   >
-                    <option :value="null">Без категорії</option>
+                    <option :value="null">No category</option>
                     <option v-for="cat in categories" :key="cat.id" :value="cat.id">
                       {{ cat.name }}
                     </option>
@@ -133,18 +126,16 @@
                 </div>
               </div>
 
-              <!-- Server error -->
               <Transition name="fade-down">
                 <p v-if="serverError" class="server-error">{{ serverError }}</p>
               </Transition>
 
-              <!-- Actions -->
               <div class="actions">
                 <button type="button" class="btn-secondary" :disabled="isSubmitting" @click="close">
-                  Скасувати
+                  Cancel
                 </button>
                 <button type="submit" class="btn-gold" :disabled="isSubmitting">
-                  <span v-if="!isSubmitting">Виконати переказ</span>
+                  <span v-if="!isSubmitting">Execute Transfer</span>
                   <svg
                     v-else
                     class="spinner"
@@ -247,7 +238,6 @@
   )
 
   function onFromCardChange() {
-    // якщо вибрана картка-отримувач збігається з відправником — скинути
     if (toCardId.value && toCardId.value === fromCardId.value) {
       toCardId.value = ''
     }
@@ -256,7 +246,7 @@
 
   function validateFromCard() {
     if (!fromCardId.value) {
-      errors.fromCardId = 'Виберіть картку для переказу'
+      errors.fromCardId = 'Choose a card to transfer from'
       return false
     }
     errors.fromCardId = ''
@@ -265,11 +255,11 @@
 
   function validateToCard() {
     if (!toCardId.value) {
-      errors.toCardId = 'Виберіть картку-отримувач'
+      errors.toCardId = 'Choose a recipient card'
       return false
     }
     if (toCardId.value === fromCardId.value) {
-      errors.toCardId = 'Картка-отримувач має відрізнятися від відправника'
+      errors.toCardId = 'Recipient card must be different from the sender'
       return false
     }
     errors.toCardId = ''
@@ -281,26 +271,25 @@
   function validateAmount() {
     const raw = amount.value
     if (raw === '' || raw === null || raw === undefined) {
-      errors.amount = 'Введіть суму переказу'
+      errors.amount = 'Enter the transfer amount'
       return false
     }
     const str = String(raw)
     if (!AMOUNT_REGEX.test(str)) {
-      errors.amount = 'Сума може містити максимум 2 знаки після коми'
+      errors.amount = 'Amount can contain a maximum of 2 decimal places'
       return false
     }
     const num = parseFloat(str)
     if (Number.isNaN(num) || num <= 0) {
-      errors.amount = 'Сума має бути більше 0'
+      errors.amount = 'Amount must be greater than 0'
       return false
     }
-    // Достатність коштів перевіряємо по актуальному (virtual) балансу,
-    // з фолбеком на effective_balance, який зараз віддає API карток.
+
     const fromBalance = fromCard.value?.virtual_balance ?? fromCard.value?.effective_balance
     if (fromBalance != null) {
       const balance = parseFloat(fromBalance)
       if (!Number.isNaN(balance) && num > balance) {
-        errors.amount = 'Недостатньо коштів на картці-відправнику'
+        errors.amount = 'Not enough funds on the sender card'
         return false
       }
     }
@@ -328,13 +317,13 @@
         description: description.value || null,
         category_id: categoryId.value || null,
       })
-      emit('toast', { message: 'Переказ успішно виконано', type: 'success' })
+      emit('toast', { message: 'Transfer completed successfully', type: 'success' })
       emit('success', result)
       close()
     } catch (err) {
       const detail =
-        err.response?.data?.message || err.response?.data?.detail || 'Не вдалося виконати переказ'
-      serverError.value = typeof detail === 'string' ? detail : 'Не вдалося виконати переказ'
+        err.response?.data?.message || err.response?.data?.detail || 'Failed to execute transfer'
+      serverError.value = typeof detail === 'string' ? detail : 'Failed to execute transfer'
       emit('toast', { message: serverError.value, type: 'error' })
     } finally {
       isSubmitting.value = false

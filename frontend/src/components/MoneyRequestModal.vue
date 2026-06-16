@@ -16,14 +16,12 @@
               </svg>
             </button>
 
-            <!-- Header -->
             <h2 class="modal-title">Request for Transfer of Money</h2>
             <p class="modal-sub">
               Sender: {{ senderName }} <span class="arrow">→</span> Recipient: {{ recipientName }}
             </p>
 
             <form class="form" @submit.prevent="handleSubmit">
-              <!-- Recipient -->
               <div class="field">
                 <label class="field__label">Recipient</label>
                 <div class="recipient-card">
@@ -43,7 +41,6 @@
                 </div>
               </div>
 
-              <!-- Description -->
               <div class="field">
                 <label class="field__label" for="mr-desc">Description</label>
                 <div class="i-field-wrap">
@@ -59,7 +56,6 @@
                 </div>
               </div>
 
-              <!-- Sum -->
               <div class="field">
                 <label class="field__label" for="mr-amount">Sum (UAH)</label>
                 <div class="i-field-wrap sum-wrap" :class="{ 'i-field-wrap--error': error }">
@@ -81,7 +77,6 @@
                 </Transition>
               </div>
 
-              <!-- Status -->
               <div class="field">
                 <label class="field__label">Status</label>
                 <div class="status-row">
@@ -90,12 +85,10 @@
                 </div>
               </div>
 
-              <!-- Group note -->
               <div class="group-note">
                 Request can only be sent between members of the same Group.
               </div>
 
-              <!-- Actions -->
               <div class="actions">
                 <button type="submit" class="btn-dark" :disabled="isSubmitting">
                   <span v-if="!isSubmitting">Send a Request</span>
@@ -136,7 +129,6 @@
   const props = defineProps({
     isOpen: { type: Boolean, required: true },
     senderName: { type: String, default: 'You' },
-    // Об'єкт учасника-отримувача: { name, initials, role, avatarVariant }
     recipient: { type: Object, default: null },
   })
 
@@ -195,7 +187,6 @@
     }
     isSubmitting.value = true
     try {
-      // POST /api/v1/requests/ — створює запит коштів (recipient має прийняти).
       const result = await createMoneyRequest({
         recipient_id: props.recipient.id,
         amount: parseFloat(amount.value),
@@ -210,7 +201,6 @@
         message: `Request for ${parseFloat(amount.value)} UAH sent to ${recipientName.value}`,
         type: 'success',
       })
-      // Закриваємо напряму (а не через close(), бо isSubmitting ще true і guard завадив би).
       isSubmitting.value = false
       emit('close')
     } catch (err) {
@@ -320,7 +310,6 @@
     margin-bottom: 8px;
   }
 
-  /* Recipient card */
   .recipient-card {
     display: flex;
     align-items: center;
@@ -345,7 +334,6 @@
     margin-top: 1px;
   }
 
-  /* Inputs */
   .i-field-wrap {
     display: flex;
     align-items: stretch;
@@ -386,7 +374,6 @@
     cursor: not-allowed;
   }
 
-  /* Sum suffix */
   .sum-suffix {
     display: flex;
     align-items: center;
@@ -406,7 +393,6 @@
     margin-top: 5px;
   }
 
-  /* Status */
   .status-row {
     display: flex;
     align-items: center;
@@ -421,7 +407,6 @@
     color: #b0ada7;
   }
 
-  /* Group note */
   .group-note {
     font-size: 12px;
     color: #9b7a25;
@@ -432,7 +417,6 @@
     border-radius: 8px;
   }
 
-  /* Badges */
   .badge {
     display: inline-flex;
     align-items: center;
@@ -460,7 +444,6 @@
     border: 1px solid #dfc876;
   }
 
-  /* Avatar */
   .avatar {
     border-radius: 50%;
     display: flex;
@@ -488,7 +471,6 @@
     color: #9b7a25;
   }
 
-  /* Actions */
   .actions {
     display: flex;
     gap: 10px;

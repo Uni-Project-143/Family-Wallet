@@ -15,8 +15,6 @@ export async function fetchGiftEventDetails(giftId) {
 }
 
 /**
- * POST /api/v1/gift/join — приєднатися до Secret Gift за invite-лінкою.
- * Бек витягує токен з лінки, валідує і повертає { gift_id, group_id, gift_name }.
  * @param {string} inviteLink — повна лінка або токен (бек бере останній сегмент)
  * @returns {Promise<{ message: string, gift_id: string, group_id: string, gift_name: string }>}
  */

@@ -10,7 +10,6 @@
         </p>
       </div>
 
-      <!-- ── Stepper ── -->
       <div class="stepper">
         <div class="step" :class="stepClass(1)">
           <div class="step__circle">1</div>
@@ -28,18 +27,15 @@
         </div>
       </div>
 
-      <!-- Loading members -->
       <section v-if="isLoadingMembers" class="stage-card">
         <p class="loading-text">Loading group members...</p>
       </section>
 
-      <!-- Error loading members -->
       <section v-else-if="membersError" class="stage-card">
         <p class="error-text">{{ membersError }}</p>
         <button class="btn-secondary" @click="loadMembers">Retry</button>
       </section>
 
-      <!-- ══ STAGE 1 — Setup ══ -->
       <section v-else-if="currentStep === 1" class="stage-card">
         <h2 class="stage-card__title">Who is the gift for?</h2>
 
@@ -132,7 +128,6 @@
         </div>
       </section>
 
-      <!-- ══ STAGE 2 — Review ══ -->
       <section v-else-if="currentStep === 2" class="stage-card">
         <h2 class="stage-card__title">Confirm your gift event</h2>
         <p class="stage-card__sub">
@@ -206,7 +201,6 @@
         </div>
       </section>
 
-      <!-- ══ STAGE 3 — blurred preview ══ -->
       <section v-else-if="currentStep === 3" class="stage-card stage-card--blurred">
         <div class="review-list" aria-hidden="true">
           <div class="review-row">
@@ -217,7 +211,6 @@
       </section>
     </main>
 
-    <!-- Success Modal — Stage 3 -->
     <Teleport to="body">
       <Transition name="overlay">
         <div v-if="currentStep === 3" class="success-overlay" role="dialog" aria-modal="true">
@@ -254,7 +247,6 @@
                 </div>
               </div>
 
-              <!-- Invite link (PROJ-57) -->
               <div v-if="inviteUrl" class="invite-section">
                 <div class="invite-section__label">SHARE WITH FAMILY</div>
                 <div class="invite-link-box">
@@ -324,7 +316,6 @@
       </Transition>
     </Teleport>
 
-    <!-- Toast -->
     <Transition name="toast">
       <div v-if="toast.isVisible" class="toast" :class="`toast--${toast.type}`" role="alert">
         {{ toast.message }}
@@ -342,7 +333,6 @@
 
   const { currentUser } = useAuth()
 
-  // ─── Group members з API ───
   const groupMembers = ref([])
   const isLoadingMembers = ref(false)
   const membersError = ref('')
@@ -384,7 +374,6 @@
     } catch (err) {
       const status = err.response?.status
       if (status === 404) {
-        // Endpoint ще не реалізований на беку — показуємо порожній список і дозволяємо рухатись
         groupMembers.value = []
         membersError.value = 'Group members endpoint not available yet. Backend WIP.'
       } else {
@@ -395,12 +384,10 @@
     }
   }
 
-  // Виключаємо себе зі списку
   const availableMembers = computed(() =>
     groupMembers.value.filter((m) => m.id !== currentUser.value?.id),
   )
 
-  // ─── Stepper ───
   const currentStep = ref(1)
   function stepClass(num) {
     return {
@@ -409,7 +396,6 @@
     }
   }
 
-  // ─── Form ───
   const form = ref({
     targetUserId: null,
     name: '',
@@ -424,8 +410,6 @@
     goalAmount: '',
   })
 
-  // ─── Динамічна валідація «на льоту» ───
-  // Щойно поле вже показало помилку — перевіряємо його наживо, поки користувач виправляє.
   watch(
     () => form.value.name,
     () => {
@@ -444,7 +428,7 @@
       if (errors.value.goalAmount) validate('goalAmount')
     },
   )
-  // Вибір отримувача одразу прибирає помилку
+
   watch(
     () => form.value.targetUserId,
     (v) => {
@@ -452,10 +436,6 @@
     },
   )
 
-  /**
-   * Мінімум для datetime-local — завтра 00:00 у локальній timezone.
-   * datetime-local не приймає UTC ISO — потрібен local string "YYYY-MM-DDTHH:mm".
-   */
   const minDateTime = computed(() => {
     const d = new Date()
     d.setDate(d.getDate() + 1)
@@ -472,10 +452,6 @@
     groupMembers.value.find((m) => m.id === form.value.targetUserId),
   )
 
-  /**
-   * Виводить unlockDate з timezone — напр. "April 15, 2025 at 6:00 PM GMT+3".
-   * Required by PROJ-56 Interface AC.
-   */
   const formatUnlockDateWithTz = computed(() => {
     if (!form.value.unlockDate) return ''
     const date = new Date(form.value.unlockDate)
@@ -553,7 +529,6 @@
     currentStep.value = 2
   }
 
-  // ─── Submit ───
   const isSubmitting = ref(false)
   const serverError = ref('')
   const createdGiftId = ref(null)
@@ -578,7 +553,6 @@
 
       createdGiftId.value = created.gift_id || created.id
 
-      // Автоматично генеруємо invite link (PROJ-57)
       try {
         const linkData = await generateGiftInviteLink(createdGiftId.value)
         inviteUrl.value = linkData.invite_url
@@ -588,8 +562,6 @@
 
       currentStep.value = 3
     } catch (err) {
-      // Показуємо конкретну причину з бекенду (self як target, минула дата тощо),
-      // або осмислений фолбек за статусом.
       serverError.value = err.userMessage || 'Something went wrong. Please try again.'
     } finally {
       isSubmitting.value = false
@@ -631,7 +603,6 @@
     currentStep.value = 1
   }
 
-  // ─── Toast ───
   const toast = ref({ isVisible: false, message: '', type: 'success' })
 
   function showToast(message, type = 'success') {
@@ -706,7 +677,6 @@
     border: 1px solid #d6d3ce;
   }
 
-  /* ── Main ── */
   .main {
     flex: 1;
     padding: 36px 48px 48px;
@@ -740,7 +710,6 @@
     line-height: 1.6;
   }
 
-  /* ── Stepper ── */
   .stepper {
     display: flex;
     align-items: center;
@@ -804,7 +773,6 @@
     background: #b8973a;
   }
 
-  /* ── Stage card ── */
   .stage-card {
     background: #ffffff;
     border-radius: 16px;
@@ -855,7 +823,6 @@
     font-size: 13px;
   }
 
-  /* ── Member carousel ── */
   .member-carousel {
     display: flex;
     gap: 12px;
@@ -905,7 +872,6 @@
     margin: 24px 0;
   }
 
-  /* ── Field ── */
   .field {
     margin-bottom: 18px;
   }
@@ -969,7 +935,6 @@
     font-style: italic;
   }
 
-  /* ── Review list ── */
   .review-list {
     background: #faf8f3;
     border: 1px solid #eae8e4;
@@ -1029,7 +994,6 @@
     margin-bottom: 16px;
   }
 
-  /* ── Actions ── */
   .actions {
     display: flex;
     gap: 12px;
@@ -1080,7 +1044,6 @@
     transform: none;
   }
 
-  /* ── Success modal ── */
   .success-overlay {
     position: fixed;
     inset: 0;
@@ -1148,7 +1111,6 @@
     font-weight: 600;
   }
 
-  /* ── Invite section у Success modal ── */
   .invite-section {
     text-align: left;
     margin-bottom: 22px;
@@ -1212,7 +1174,6 @@
     gap: 12px;
   }
 
-  /* Retry-кнопка в блоці помилки invite */
   .btn-retry {
     margin-top: 10px;
     height: 40px;
@@ -1241,7 +1202,6 @@
     }
   }
 
-  /* ── Toast ── */
   .toast {
     position: fixed;
     bottom: 28px;

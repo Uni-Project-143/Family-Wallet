@@ -50,10 +50,6 @@ export function getRemainingBlockMs(key) {
   return Math.max(0, data.blockedUntil - Date.now())
 }
 
-/**
- * Ставить блок за точним часом від беку (заголовок Retry-After, у секундах).
- * Так фронтовий відлік збігається з реальним серверним rate-limit.
- */
 export function applyServerBlock(key, retryAfterSeconds) {
   const seconds = Number(retryAfterSeconds)
   if (!Number.isFinite(seconds) || seconds <= 0) return

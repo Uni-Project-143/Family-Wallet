@@ -2,11 +2,9 @@
   <header class="navbar">
     <div class="navbar__left">
       <span class="navbar__logo">Family <span class="navbar__logo--accent">Wallet</span></span>
-      <!-- Слот для специфічного контенту зліва (напр. перемикач груп на Feed) -->
       <slot name="left" />
     </div>
 
-    <!-- Центр: три вкладки (працюють як і раніше) -->
     <nav class="navbar__center">
       <router-link to="/feed" class="navbar__tab" active-class="navbar__tab--active"
         >Feed</router-link
@@ -19,7 +17,6 @@
       >
     </nav>
 
-    <!-- Права: аватар + ім'я + badge + (опц.) logout -->
     <div class="navbar__right">
       <div class="avatar avatar--sm avatar--gold">{{ initials }}</div>
       <span class="navbar__user-name">{{ fullName }}</span>
@@ -58,7 +55,6 @@
   import { useAuth } from '../composables/useAuth'
 
   defineProps({
-    // Показувати кнопку виходу (потрібна лише на Feed)
     showLogout: { type: Boolean, default: false },
   })
 
@@ -178,7 +174,6 @@
     cursor: not-allowed;
   }
 
-  /* Аватар та badge — локальні для навбару */
   .avatar {
     border-radius: 50%;
     display: flex;
@@ -220,7 +215,6 @@
     border: 1px solid #d6d3ce;
   }
 
-  /* ── Responsive ── */
   @media (max-width: 768px) {
     .navbar {
       grid-template-columns: 1fr auto;

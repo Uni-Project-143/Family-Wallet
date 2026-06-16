@@ -55,7 +55,6 @@ function hashString(str) {
 }
 
 /**
- * Основний колір категорії за її назвою.
  * @param {string} name
  * @returns {string} hex-колір
  */
@@ -83,7 +82,6 @@ export function badgeStyleFromColor(color) {
 }
 
 /**
- * Готовий набір стилів для бейджа категорії за НАЗВОЮ.
  * @param {string} name
  */
 export function getCategoryBadgeStyle(name) {

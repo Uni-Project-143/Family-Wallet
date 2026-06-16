@@ -4,11 +4,7 @@ import { fetchFeed } from '../services/transactionService'
 const PAGE_SIZE = 20
 
 /**
- * Composable для стрічки транзакцій групи (PROJ-52).
- *
  * @param {string | (() => string|null|undefined)} groupIdSource
- *   ID групи або getter, який повертає ID. Getter дозволяє ліниво
- *   обчислювати ID, якщо він приходить з реактивного джерела.
  */
 export function useFeedTransactions(groupIdSource) {
   const transactions = ref([])
@@ -24,9 +20,6 @@ export function useFeedTransactions(groupIdSource) {
     return typeof groupIdSource === 'function' ? groupIdSource() : groupIdSource
   }
 
-  /**
-   * Перше завантаження (replace).
-   */
   async function loadFirstPage() {
     const gid = resolveGroupId()
 
@@ -55,9 +48,6 @@ export function useFeedTransactions(groupIdSource) {
     }
   }
 
-  /**
-   * Наступна сторінка (append) — для infinite scroll.
-   */
   async function loadMore() {
     if (!hasMore.value || isLoadingMore.value) return
 
@@ -79,10 +69,6 @@ export function useFeedTransactions(groupIdSource) {
     }
   }
 
-  /**
-   * Додати транзакцію на початок стрічки (для WebSocket push).
-   * Захист від дублікатів — якщо webhook прийшов після API запиту.
-   */
   function prependTransaction(tx) {
     if (!tx?.id) return
     if (transactions.value.some((t) => t.id === tx.id)) return

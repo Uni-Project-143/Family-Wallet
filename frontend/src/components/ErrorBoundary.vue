@@ -30,20 +30,10 @@
   import { ref, onErrorCaptured } from 'vue'
   import strings from '../locales/en'
 
-  /**
-   * Перехоплює помилки рендеру/lifecycle у дочірніх компонентах і показує
-   * fallback-UI замість того, щоб покласти весь застосунок.
-   *
-   * Використання:
-   *  - глобально навколо <RouterView/> (App.vue) з :key=route.fullPath, щоб
-   *    boundary автоматично скидався при переході на інший маршрут;
-   *  - локально навколо «ризикованих» секцій усередині будь-якої сторінки.
-   */
   const hasError = ref(false)
 
   onErrorCaptured(() => {
     hasError.value = true
-    // false — зупиняємо подальше поширення помилки вгору по дереву
     return false
   })
 

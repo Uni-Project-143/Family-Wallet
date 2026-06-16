@@ -3,19 +3,16 @@
     <NavBar />
 
     <main class="main">
-      <!-- Loading -->
       <div v-if="isLoading" class="state-card">
         <p class="state-card__text">Loading event...</p>
       </div>
 
-      <!-- Error -->
       <div v-else-if="error" class="state-card state-card--error">
         <h2 class="state-card__title">{{ errorTitle }}</h2>
         <p class="state-card__text">{{ error }}</p>
         <button class="btn-secondary" @click="$router.push('/feed')">Back to Feed</button>
       </div>
 
-      <!-- WOW EXPERIENCE — target user after unlock -->
       <div v-else-if="isWowMode && gift" class="wow-card">
         <canvas ref="confettiCanvas" class="wow-canvas" aria-hidden="true"></canvas>
 
@@ -64,7 +61,6 @@
         </div>
       </div>
 
-      <!-- ORGANIZER / DONOR VIEW — before unlock or when I'm not target -->
       <div v-else-if="gift" class="detail-card">
         <div class="detail-card__header">
           <h1 class="detail-card__title">{{ gift.name }}</h1>
@@ -88,7 +84,6 @@
           </div>
         </div>
 
-        <!-- Progress -->
         <div class="progress-section">
           <div class="progress-section__top">
             <span class="progress-section__label">Collected</span>
@@ -103,7 +98,6 @@
           <div class="progress-section__percent">{{ progressPercent }}%</div>
         </div>
 
-        <!-- Invite link — для organizer -->
         <div v-if="isOrganizer" class="invite-section">
           <div class="invite-section__label">SHARE WITH FAMILY</div>
           <div v-if="inviteUrl" class="invite-link-box">
@@ -129,7 +123,6 @@
           </button>
         </div>
 
-        <!-- Внесок до збору (contribute) -->
         <div v-if="canContribute" class="contribute-section">
           <div class="contribute-section__label">MAKE A CONTRIBUTION</div>
 
@@ -169,7 +162,6 @@
           </template>
         </div>
 
-        <!-- Donors list -->
         <div v-if="gift.donors?.length" class="donors-section">
           <div class="donors-section__title">Contributors</div>
           <div class="donors-list">
@@ -178,7 +170,6 @@
                 {{ getInitials(donor.name) }}
               </div>
               <span class="donor-row__name">{{ donor.name }}</span>
-              <!-- Backend наразі не повертає суму по кожному донору -->
               <span v-if="donor.amount" class="donor-row__amount">
                 {{ formatAmount(donor.amount) }} UAH
               </span>
@@ -190,7 +181,6 @@
       </div>
     </main>
 
-    <!-- Toast -->
     <Transition name="toast">
       <div v-if="toast.isVisible" class="toast" :class="`toast--${toast.type}`" role="alert">
         {{ toast.message }}
@@ -249,13 +239,11 @@
       const data = await fetchGiftEventDetails(giftId.value)
       gift.value = data
 
-      // wow-екран → запускаємо конфеті після рендеру
       if (isWowMode.value) {
         await nextTick()
         triggerConfetti()
       }
 
-      // Якщо можна донатити — підвантажуємо власні картки для форми внеску
       if (canContribute.value) {
         loadMyCards()
       }
@@ -342,7 +330,6 @@
     return variants[idx]
   }
 
-  // ─── Invite link (PROJ-57) ───
   const inviteUrl = ref('')
   const isGeneratingLink = ref(false)
   const isLinkCopied = ref(false)
@@ -351,7 +338,6 @@
     isGeneratingLink.value = true
     try {
       const data = await generateGiftInviteLink(giftId.value)
-      // Бек повертає поле invite_link (так само, як group-invite — на family-wallet.com).
       inviteUrl.value = data.invite_link || data.invite_url || ''
       showToast(
         inviteUrl.value ? 'Invite link ready' : 'Failed to generate link',
@@ -378,8 +364,6 @@
     }
   }
 
-  // ─── Внесок до збору (contribute) ───
-  // Дозволено всім учасникам групи, крім іменинника, поки збір ACTIVE і не минув.
   const canContribute = computed(
     () => !isTarget.value && gift.value?.status === 'ACTIVE' && !isUnlocked.value,
   )
@@ -428,10 +412,8 @@
         amount,
         card_id: selectedCardId.value,
       })
-      // Оновлюємо деталі, щоб одразу побачити нову суму + себе у списку донорів
       if (gift.value) gift.value.collected_amount = res.new_collected_amount
       await loadDetails()
-      // Бек реально списав кошти з картки — перетягуємо картки, щоб баланс був актуальним.
       await loadMyCards()
       contributeAmount.value = null
       showToast('Thank you for your contribution!', 'success')
@@ -442,7 +424,6 @@
     }
   }
 
-  // ─── Toast ───
   const toast = ref({ isVisible: false, message: '', type: 'success' })
 
   function showToast(message, type = 'success') {
@@ -490,7 +471,6 @@
     color: #9b7a25;
   }
 
-  /* Main */
   .main {
     flex: 1;
     padding: 36px 48px 48px;
@@ -504,7 +484,6 @@
     }
   }
 
-  /* State cards (loading / error) */
   .state-card {
     background: #fff;
     border-radius: 16px;
@@ -529,7 +508,6 @@
     line-height: 1.6;
   }
 
-  /* WOW card */
   .wow-card {
     background: linear-gradient(135deg, #fbf7ec 0%, #ffffff 50%, #f4f1e9 100%);
     border-radius: 24px;
@@ -625,7 +603,6 @@
     z-index: 1;
   }
 
-  /* Detail card (organizer/donor view) */
   .detail-card {
     background: #fff;
     border-radius: 16px;
@@ -707,7 +684,6 @@
     font-weight: 500;
   }
 
-  /* Progress */
   .progress-section {
     margin-bottom: 28px;
   }
@@ -753,7 +729,6 @@
     text-align: right;
   }
 
-  /* Invite section */
   .invite-section {
     margin-bottom: 28px;
   }
@@ -828,7 +803,6 @@
     cursor: not-allowed;
   }
 
-  /* Contribute */
   .contribute-section {
     margin-bottom: 28px;
     padding: 18px;
@@ -892,7 +866,6 @@
     font-style: italic;
   }
 
-  /* Donors */
   .donors-section {
     margin-top: 24px;
     position: relative;
@@ -945,7 +918,6 @@
     font-size: 13px;
   }
 
-  /* Buttons */
   .btn-secondary {
     padding: 0 24px;
     height: 44px;
@@ -986,7 +958,6 @@
     transform: translateY(-1px);
   }
 
-  /* Toast */
   .toast {
     position: fixed;
     bottom: 28px;

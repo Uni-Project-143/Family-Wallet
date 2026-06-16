@@ -1,9 +1,6 @@
 import { ref, watch } from 'vue'
 
 /**
- * Реактивне значення, синхронізоване з localStorage.
- * При F5 — значення відновлюється. При зміні — записується у LS.
- *
  * @param {string} key — ключ у localStorage
  * @param {*} defaultValue — fallback якщо нічого не збережено
  * @returns {import('vue').Ref}

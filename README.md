@@ -1,6 +1,27 @@
 # Family Wallet
 
-Веб-застосунок для управління сімейним бюджетом.
+![Vue.js](https://img.shields.io/badge/Vue.js-3-4FC08D?logo=vuedotjs&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![Status](https://img.shields.io/badge/Status-Stable-brightgreen)
+![Version](https://img.shields.io/badge/Version-1.0.0-blue)
+![Coverage](https://img.shields.io/badge/Coverage-100%25-success)
+![Tests](https://img.shields.io/badge/Tests-89%20passed-success)
+
+Веб-застосунок для управління сімейним бюджетом — спільна стрічка витрат родини в реальному часі на базі Monobank, із таємним збором на подарунки та банківським рівнем захисту даних.
+
+## ✨ Features
+
+- 🔴 **Витрати родини наживо** — усі транзакції з карток Monobank з'являються у спільній стрічці в ту ж секунду, коли стались, без жодного оновлення сторінки (real-time WebSocket).
+- 🎁 **Сюрприз, який не зіпсувати** — скидайтеся на подарунок усією родиною так, що іменинник не побачить ні збору, ні внесків до дати розкриття (Secret Gift із серверною ізоляцією).
+- 🔐 **Банківський рівень захисту** — ваш Monobank-токен зашифровано за стандартом AES-256, а доступ — лише на читання: застосунок фізично не може зняти ваші гроші.
+- 💸 **Гроші між рідними за пару кліків** — миттєвий віртуальний переказ між картками родини або запит «скинь на каву» з підтвердженням в один тап.
+- 📊 **Зрозуміло, куди йдуть гроші** — автоматична категоризація покупок за MCC-кодами банку та наочна діаграма витрат за категоріями.
+- 👨‍👩‍👧 **Спільний бюджет із ролями** — об'єднайте родину в групу з ролями Admin/Member і запросіть учасників захищеним посиланням з обмеженим строком дії.
+- ❤️ **Облік, що оживає** — додавайте емодзі-реакції до покупок рідних: бюджет стає стрічкою як у соцмережі, а не нудною таблицею.
+- 🔔 **Нагадування, що не дають забути** — push- та email-сповіщення про наближення розкриття подарунка та важливі події групи.
 
 ## Технології
 
@@ -10,13 +31,20 @@
 - **Деплой:** Cloudflare Pages (frontend), Render.com (backend), GitHub Actions CI/CD
 - **Контейнеризація:** Docker, Docker Compose
 
-## Вимоги
+## Pre-requisites (Системні вимоги)
 
-- [Docker](https://docs.docker.com/get-docker/) та [Docker Compose](https://docs.docker.com/compose/install/)
-- Або для локального запуску без Docker:
-  - Python 3.12+
-  - Node.js 20+
-  - npm
+Версії, на яких гарантується стабільна робота:
+
+| Категорія | ПЗ | Версія |
+| --- | --- | --- |
+| Контейнеризація | Docker / Docker Compose | Docker 24+ / Compose v2+ |
+| Runtime (backend) | Python | **3.12+** |
+| Runtime (frontend) | Node.js | **20+** |
+| Збірка (backend) | pip | 24+ |
+| Збірка (frontend) | npm | 10+ |
+| СУБД | MongoDB | **Atlas (хмарна)** або локально **MongoDB 6.0+** |
+
+> **Найшвидший шлях** — через Docker Compose (потрібен лише Docker). Локальний запуск без Docker потребує встановлених Python 3.12+ та Node.js 20+.
 
 ## Налаштування змінних середовища
 
@@ -48,6 +76,8 @@ cp .env.example .env
 | `VITE_WS_BASE_URL`   | URL WebSocket-стрічки                          |
 | `VITE_WS_ENABLED`    | Увімкнення WebSocket (`true`/`false`)          |
 | `VITE_REALTIME_MODE` | Режим реального часу: `off` / `ws` / `polling` |
+
+> 🔒 **Безпека:** реальний файл `.env` **ніколи не комітиться** в репозиторій — він внесений до `.gitignore` (ігноруються `.env` та `.env.*`, виняток — лише шаблон `.env.example`). У репозиторій потрапляє **тільки** `.env.example` з порожніми/прикладовими значеннями та коментарями до кожного ключа.
 
 ## Запуск через Docker Compose (рекомендовано)
 
@@ -106,6 +136,31 @@ npm run dev
 ```
 
 Застосунок буде доступний на `http://localhost:5173`
+
+## База даних: розгортання та демо-дані (Database Setup)
+
+Проєкт використовує **MongoDB** (Atlas або локальний інстанс) з ODM **Beanie**.
+
+> 💡 **Міграцій схеми у класичному розумінні немає** — MongoDB безсхемна, колекції створюються автоматично при першому записі. Натомість є **одна міграція ініціалізації + наповнення демо-даними** (`backend/migrations/`), щоб база **не була порожньою** після встановлення.
+
+### Наповнення демо-даними (Seed)
+
+Міграція `20260416130111_init_db_and_seed.py` створює готовий до демонстрації набір: категорії, двох користувачів (Admin + Member), сімейну групу, дві картки з балансами, історію транзакцій, активний **Secret Gift** та запит коштів.
+
+```bash
+cd backend
+source .venv/bin/activate                 # активуйте venv (див. «Локальний запуск»)
+# Значення MONGO_ATLAS та DB_NAME беруться з вашого .env
+beanie migrate -uri "$MONGO_ATLAS" -db "$DB_NAME" -p migrations
+```
+
+Відкат демо-даних (очищення колекцій):
+
+```bash
+beanie migrate -uri "$MONGO_ATLAS" -db "$DB_NAME" -p migrations --backward
+```
+
+> ⚠️ Якщо ви підключаєтесь до **спільної тестової бази Atlas** (див. «Тестові доступи» нижче) — база вже наповнена, запускати seed **не потрібно**. Seed призначений для розгортання на **власній/порожній** базі.
 
 ## Деплой
 

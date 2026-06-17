@@ -5,9 +5,7 @@ from fastapi.responses import JSONResponse
 
 logger = logging.getLogger("FamilyWallet")
 
-# --- ДОМЕННІ ПОМИЛКИ (Для Service Layer) ---
 class DomainException(HTTPException):
-    """Базовий клас для всіх бізнес-помилок."""
     def __init__(self, status_code: int, detail: str):
         super().__init__(status_code=status_code, detail=detail)
 
@@ -35,7 +33,6 @@ class InvalidInviteError(DomainException):
     def __init__(self, detail: str = "Invalid or forged invite token"):
         super().__init__(status_code=400, detail=detail)
 
-# --- ГЛОБАЛЬНІ ХЕНДЛЕРИ ---
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"INTERNAL ERROR: {repr(exc)}", exc_info=True)
     return JSONResponse(

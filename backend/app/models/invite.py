@@ -1,10 +1,7 @@
 from beanie import Document, PydanticObjectId
 from pydantic import Field
 from datetime import datetime, timedelta
-from typing import Optional
 import uuid
-
-# Не забуваємо ці імпорти для індексів
 from pymongo import IndexModel, ASCENDING
 
 def get_expiration_date():
@@ -19,10 +16,6 @@ class InviteToken(Document):
 
     class Settings:
         name = "invite_tokens"
-        # ДОДАЄМО TTL ІНДЕКС сюди:
         indexes = [
-            IndexModel(
-                [("expires_at", ASCENDING)],
-                expireAfterSeconds=0  # Документ видалиться автоматично, коли настане expires_at
-            )
+            IndexModel([("expires_at", ASCENDING)], expireAfterSeconds=0)
         ]

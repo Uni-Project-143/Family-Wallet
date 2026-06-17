@@ -1,30 +1,31 @@
 from beanie import Document, free_fall_migration
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import List, Optional
 from pydantic import Field
 import uuid
-import pymongo
-
-# ==========================================
-# --- Оновлені Snapshot Models ---
-# ==========================================
 
 class User(Document):
     full_name: str
     email: str
-    password_hash: str
-    # role - ВИДАЛЕНО
-    bankcard_ids: List[str] = []
+    hashed_password: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    avatar_url: Optional[str] = None
+    fcm_token: Optional[str] = None
+
     class Settings:
         name = "users"
+
 
 class Category(Document):
     name: str
     icon: str
     color: str
+    mcc_list: List[int] = []
+
     class Settings:
         name = "categories"
+
 
 class BankCard(Document):
     user_id: str
@@ -33,8 +34,10 @@ class BankCard(Document):
     account_id: str
     masked_pan: str
     balance: Decimal
+    virtual_balance: Decimal = Decimal("0.00")
     status: str = "ACTIVE"
     transaction_ids: List[str] = []
+
     class Settings:
         name = "bank_cards"
 
@@ -42,59 +45,67 @@ class BankCard(Document):
 class Transaction(Document):
     card_id: str
     group_id: str
+    amount: Decimal
+    currency: str = "UAH"
+    category_id: Optional[str] = None
+    description: Optional[str] = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    reactions: List[dict] = []
     is_secret_gift: bool = False
     target_user_id: Optional[str] = None
-    amount: Decimal
-    currency: str
-    category_id: str
-    description: str
-    timestamp: datetime
-    reactions: List[dict] = []
+    gift_id: Optional[str] = None
+    is_virtual: bool = False
+    transfer_id: Optional[str] = None
 
     class Settings:
         name = "transactions"
-        indexes = [
-            [
-                ("group_id", pymongo.ASCENDING),
-                ("timestamp", pymongo.DESCENDING)
-            ]
-        ]
+
 
 class Group(Document):
     name: str
-    created_by: str  # ДОДАНО
-    gift_event_ids: List[str] = []
-    # member_ids та invite_link - ВИДАЛЕНО
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
     class Settings:
         name = "groups"
 
-# --- ДОДАНО НОВІ МОДЕЛІ ---
+
 class GroupMembership(Document):
     user_id: str
     group_id: str
     role: str
-    joined_at: datetime = Field(default_factory=datetime.utcnow)
+    joined_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
     class Settings:
         name = "group_memberships"
+
 
 class InviteToken(Document):
     group_id: str
     token: str = Field(default_factory=lambda: uuid.uuid4().hex)
     created_by: str
-    expires_at: datetime = Field(default_factory=lambda: datetime.utcnow() + timedelta(hours=48))
+    expires_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc) + timedelta(hours=48))
     used_at: Optional[datetime] = None
+
     class Settings:
         name = "invite_tokens"
-# ---------------------------
+
 
 class GiftEvent(Document):
+    name: str
     organizer_id: str
     target_user_id: str
-    name: str
+    group_id: str
+    goal_amount: float
     unlock_date: datetime
-    status: str
+    status: str = "ACTIVE"
+    secret_mode: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
     class Settings:
         name = "gift_events"
+
 
 class MoneyRequest(Document):
     requester_id: str
@@ -102,86 +113,62 @@ class MoneyRequest(Document):
     group_id: str
     amount: Decimal
     description: str
-    status: str
-    created_at: datetime
-    resolved_at: Optional[datetime] = None
+    status: str = "PENDING"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
     class Settings:
         name = "money_requests"
 
-class VirtualTransfer(Document):
-    money_request_id: str
-    sender_id: str
-    recipient_id: str
-    group_id: str
-    amount: Decimal
-    currency: str
-    created_at: datetime
-    class Settings:
-        name = "virtual_transfers"
 
-# Збираємо всі моделі в один список для декораторів
 ALL_MODELS = [
     User, Category, BankCard, Transaction, Group, GroupMembership,
-    InviteToken, GiftEvent, MoneyRequest, VirtualTransfer
+    InviteToken, GiftEvent, MoneyRequest
 ]
-
-# ==========================================
-# --- Логіка Міграції ---
-# ==========================================
 
 class Forward:
     @free_fall_migration(document_models=ALL_MODELS)
     async def create_and_seed(self, session):
-        # 1. Categories (Baseline)
-        cat_food = Category(name="Продукти", icon="🛒", color="#FF5733", mcc_list=[5411, 5499])
+        now = datetime.now(timezone.utc)
 
-        # 5812 - Ресторани, 5814 - Фастфуд
+        cat_food = Category(name="Продукти", icon="🛒", color="#FF5733", mcc_list=[5411, 5499])
         cat_cafe = Category(name="Кафе та ресторани", icon="🍔", color="#FFC300",
                             mcc_list=[5812, 5814, 5811])
-
-        # 4111 - Метро/Трамвай, 4121 - Таксі, 4131 - Автобуси
         cat_transport = Category(name="Транспорт", icon="🚗", color="#33FF57",
                                  mcc_list=[4111, 4121, 4131, 4789])
-
-        # 7832 - Кіно, 7922 - Квитки
         cat_entertainment = Category(name="Розваги", icon="🎬", color="#3357FF",
                                      mcc_list=[7832, 7922, 7999])
-
-        # 5947 - Магазини подарунків
         cat_gifts = Category(name="Подарунки", icon="🎁", color="#FF33A1", mcc_list=[5947])
-
         cat_transfers = Category(name="Перекази", icon="💸", color="#808080", mcc_list=[4829])
 
         await Category.insert_many(
-            [cat_food, cat_cafe, cat_transport, cat_entertainment, cat_gifts, cat_transfers], session=session)
+            [cat_food, cat_cafe, cat_transport, cat_entertainment, cat_gifts, cat_transfers],
+            session=session
+        )
 
+        hashed_pw = "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjIQ68YbaS"
 
-        # 2. Users (Seed Data)
-        user_main = User(
-            full_name="Олександр Віталійович",
-            email="oleksandr@familywallet.app",
-            password_hash="argon2_hashed_password_here"
+        user_admin = User(
+            full_name="Олександр (Адмін)",
+            email="admin@familywallet.com",
+            hashed_password=hashed_pw
         )
         user_member = User(
-            full_name="Володимир Тестовий",
-            email="volodymyr@familywallet.app",
-            password_hash="argon2_hashed_password_here"
+            full_name="Володимир (Учасник)",
+            email="member@familywallet.com",
+            hashed_password=hashed_pw
         )
 
-
-        await user_main.insert(session=session)
+        await user_admin.insert(session=session)
         await user_member.insert(session=session)
 
-        # 3. Group
         group = Group(
-            name="Family Budget",
-            created_by=str(user_main.id)
+            name="Сімейний Бюджет",
+            created_by=str(user_admin.id)
         )
         await group.insert(session=session)
 
-        # 4. Memberships
         admin_membership = GroupMembership(
-            user_id=str(user_main.id),
+            user_id=str(user_admin.id),
             group_id=str(group.id),
             role="ADMIN"
         )
@@ -190,101 +177,109 @@ class Forward:
             group_id=str(group.id),
             role="MEMBER"
         )
-        # Для membership .insert_many() безпечно, бо ми не використовуємо їхні id далі
         await GroupMembership.insert_many([admin_membership, member_membership], session=session)
 
-        # 5. InviteToken
-        invite = InviteToken(
+        card_admin = BankCard(
+            user_id=str(user_admin.id),
             group_id=str(group.id),
-            created_by=str(user_main.id)
+            encrypted_token="encrypted_dummy_token_1",
+            account_id="mono_account_admin_123",
+            masked_pan="•••• 4321",
+            balance=Decimal("25400.00"),
+            virtual_balance=Decimal("25400.00"),
         )
-        await invite.insert(session=session)
-
-        # 6. BankCard
-        card = BankCard(
-            user_id=str(user_main.id),
+        card_member = BankCard(
+            user_id=str(user_member.id),
             group_id=str(group.id),
-            encrypted_token="encrypted_dummy_token",
-            account_id="dummy_mono_account_123",
-            masked_pan="•••• 1111",
-            balance=Decimal("25400.50"),
-            status="ACTIVE"
+            encrypted_token="encrypted_dummy_token_2",
+            account_id="mono_account_member_456",
+            masked_pan="•••• 8765",
+            balance=Decimal("5000.00"),
+            virtual_balance=Decimal("5000.00"),
         )
-        await card.insert(session=session)
+        await BankCard.insert_many([card_admin, card_member], session=session)
 
-        # 7. Transaction
-        now = datetime.utcnow()
         yesterday = now - timedelta(days=1)
         last_week = now - timedelta(days=7)
 
         t1 = Transaction(
-            card_id=str(card.id),
-            group_id=str(group.id),  # <--- ДОДАНО
-            amount=Decimal("-450.00"),
-            currency="UAH",
+            card_id=str(card_admin.id),
+            group_id=str(group.id),
+            amount=Decimal("-850.00"),
             category_id=str(cat_food.id),
-            description="Сільпо",
+            description="Сільпо (Закупівля на тиждень)",
             timestamp=now,
-            reactions=[{"user_id": str(user_member.id), "emoji_code": "👍"}]
+            reactions=[{"user_id": str(user_member.id), "emoji": "👍", "created_at": now}]
         )
 
         t2 = Transaction(
-            card_id=str(card.id),
-            group_id=str(group.id),  # <--- ДОДАНО
-            amount=Decimal("15000.00"),
-            currency="UAH",
-            category_id=str(cat_gifts.id),
-            description="Зарплата або переказ",
+            card_id=str(card_member.id),
+            group_id=str(group.id),
+            amount=Decimal("-350.00"),
+            category_id=str(cat_cafe.id),
+            description="McDonalds",
             timestamp=yesterday,
         )
 
-        t3 = Transaction(
-            card_id=str(card.id),
-            group_id=str(group.id),  # <--- ДОДАНО
-            amount=Decimal("-35.00"),
-            currency="UAH",
-            category_id=str(cat_transport.id),
-            description="Київський Метрополітен",
+        transfer_id = str(uuid.uuid4())
+        vt_debit = Transaction(
+            card_id=str(card_admin.id),
+            group_id=str(group.id),
+            amount=Decimal("-500.00"),
+            category_id=str(cat_transfers.id),
+            description="Скинув на кишенькові",
             timestamp=last_week,
+            is_virtual=True,
+            transfer_id=transfer_id
+        )
+        vt_credit = Transaction(
+            card_id=str(card_member.id),
+            group_id=str(group.id),
+            amount=Decimal("500.00"),
+            category_id=str(cat_transfers.id),
+            description="Отримано кишенькові",
+            timestamp=last_week,
+            is_virtual=True,
+            transfer_id=transfer_id
         )
 
-        t4 = Transaction(
-            card_id=str(card.id),
-            group_id=str(group.id),  # <--- ДОДАНО
-            is_secret_gift=True,  # <--- ДОДАНО ДЛЯ ТЕСТУ (Secret Gift)
-            target_user_id=str(user_main.id),  # <--- ДОДАНО ДЛЯ ТЕСТУ
-            amount=Decimal("-1200.00"),
-            currency="UAH",
+        await Transaction.insert_many([t1, t2, vt_debit, vt_credit], session=session)
+
+        gift = GiftEvent(
+            name="Новий ноутбук для Володимира",
+            organizer_id=str(user_admin.id),
+            target_user_id=str(user_member.id),
+            group_id=str(group.id),
+            goal_amount=30000.0,
+            unlock_date=now + timedelta(days=5),
+            status="ACTIVE"
+        )
+        await gift.insert(session=session)
+
+        gift_tx = Transaction(
+            card_id=str(card_admin.id),
+            group_id=str(group.id),
+            amount=Decimal("-2000.00"),
             category_id=str(cat_gifts.id),
-            description="Сюрприз на День Народження",
-            timestamp=last_week - timedelta(days=2),
+            description=f"Внесок до Secret Gift: {gift.name}",
+            timestamp=now,
+            is_secret_gift=True,
+            target_user_id=str(user_member.id),
+            gift_id=str(gift.id),
+            is_virtual=True
         )
+        await gift_tx.insert(session=session)
 
-        await Transaction.insert_many([t1, t2, t3, t4], session=session)
-
-        # 8. MoneyRequest & VirtualTransfer
         request = MoneyRequest(
             requester_id=str(user_member.id),
-            recipient_id=str(user_main.id),
+            recipient_id=str(user_admin.id),
             group_id=str(group.id),
             amount=Decimal("200.00"),
-            description="На каву",
-            status="Accepted",
-            created_at=datetime.utcnow(),
-            resolved_at=datetime.utcnow()
+            description="На каву ☕",
+            status="PENDING",
+            created_at=now
         )
         await request.insert(session=session)
-
-        transfer = VirtualTransfer(
-            money_request_id=str(request.id),
-            sender_id=str(user_main.id),
-            recipient_id=str(user_member.id),
-            group_id=str(group.id),
-            amount=Decimal("200.00"),
-            currency="UAH",
-            created_at=datetime.utcnow()
-        )
-        await transfer.insert(session=session)
 
 
 class Backward:

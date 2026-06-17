@@ -19,13 +19,11 @@ async def get_cards_by_group(
     """
     Отримання всіх карток групи. Доступно будь-якому учаснику цієї групи.
     """
-    # Валідація ID групи
     try:
         group_oid = PydanticObjectId(group_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Некоректний формат ID групи")
 
-    # 1. Перевірка доступу: чи є поточний користувач у цій групі
     is_member = await GroupMembership.find_one({
         "user_id": current_user.id,
         "group_id": group_oid
@@ -37,20 +35,15 @@ async def get_cards_by_group(
             detail="Доступ заборонено: ви не є учасником цієї групи"
         )
 
-    # 2. Отримання ВСІХ карток групи
     cards = await BankCard.find({"group_id": group_id}).to_list()
-
-    # 2.1 Підрахунок дельти віртуальних транзакцій для effective_balance (UC-2)
     card_ids = [str(c.id) for c in cards]
     deltas = await BankCardRepository.get_virtual_deltas_by_card_ids(card_ids)
 
-    # 3. Мапінг даних у безпечну схему із завантаженням імені власника (JOIN)
     response_cards = []
     for card in cards:
         owner = None
         if card.user_id:
             try:
-                # Шукаємо юзера-власника картки в базі даних
                 owner = await User.get(PydanticObjectId(card.user_id))
             except Exception:
                 pass
@@ -58,7 +51,6 @@ async def get_cards_by_group(
         delta = deltas.get(str(card.id), Decimal("0"))
         effective_balance = card.balance + delta
 
-        # Формуємо відповідь, додаючи ім'я для фронтенду
         response_cards.append(
             BankCardResponse(
                 id=str(card.id),
@@ -71,7 +63,7 @@ async def get_cards_by_group(
                 virtual_balance=card.virtual_balance,
                 status=card.status,
                 transaction_ids=[str(tid) for tid in card.transaction_ids],
-                owner_full_name=owner.full_name if owner else "Невідомий власник"  # <--- НАША ЗМІНА
+                owner_full_name=owner.full_name if owner else "Невідомий власник"
             )
         )
 

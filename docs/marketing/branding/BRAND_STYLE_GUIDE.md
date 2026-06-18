@@ -87,21 +87,13 @@
 
 | Призначення           | Шрифт                | Fallback                 | Використання                  |
 | --------------------- | -------------------- | ------------------------ | ----------------------------- |
-| **Заголовки**         | `Cormorant Garamond` | Georgia, serif           | h1/h2, назви карток, логотип  |
+| **Заголовки**         | `Cormorant Garamond` | Georgia, serif           | h1/h2, назви карток           |
 | **Інтерфейс / текст** | `DM Sans`            | system-ui, sans-serif    | кнопки, форми, основний текст |
 | **Числа / код / PAN** | `DM Mono`            | 'Courier New', monospace | суми, маски карток, токени    |
 
 **Базові розміри:** body 14px / line-height 1.5; заголовки 18–28px; дрібний текст 12–13px; мітки/uppercase 10–11px з letter-spacing.
 
-> ⚠️ **Важливо:** ці Google-шрифти зараз **не підключені** (немає `<link>` / `@import`), тож браузер показує системні fallback-и (system-ui / Georgia). Щоб дизайн виглядав із фірмовими шрифтами — додати у `frontend/index.html`:
->
-> ```html
-> <link rel="preconnect" href="https://fonts.googleapis.com" />
-> <link
->   href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap"
->   rel="stylesheet"
-> />
-> ```
+```
 
 ---
 
@@ -132,3 +124,4 @@
 ## 6. Tone of voice (мікрокопірайтинг)
 
 Коротко, тепло, по-людськи. Помилки — без технічного жаргону («Invalid email or password», а не код 401). Порожні стани — підказують наступну дію («No transactions yet…»).
+```

@@ -4,18 +4,6 @@
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
         <Transition name="modal">
           <div v-if="isOpen" ref="modalRootRef" class="modal-card" role="dialog" aria-modal="true">
-            <!-- Close -->
-            <button class="modal-close" :disabled="isSubmitting" aria-label="Close" @click="close">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path
-                  d="M1 1L13 13M13 1L1 13"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  stroke-linecap="round"
-                />
-              </svg>
-            </button>
-
             <h2 class="modal-title">Request for Transfer of Money</h2>
             <p class="modal-sub">
               Sender: {{ senderName }} <span class="arrow">→</span> Recipient: {{ recipientName }}
@@ -245,32 +233,6 @@
     max-width: 460px;
     position: relative;
     border-top: 3px solid #b8973a;
-  }
-
-  .modal-close {
-    position: absolute;
-    top: 14px;
-    right: 16px;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    border: 1px solid #eae8e4;
-    background: #f4f1e9;
-    color: #6b6860;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.18s;
-  }
-  .modal-close:hover:not(:disabled) {
-    background: #0d0c0a;
-    color: #ffffff;
-    border-color: #0d0c0a;
-  }
-  .modal-close:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
   }
 
   .modal-title {
@@ -562,6 +524,19 @@
     transform: translateY(-4px);
   }
 
+  @media (max-width: 768px) {
+    .actions {
+      flex-direction: column-reverse;
+      gap: 10px;
+    }
+    .actions .btn-dark,
+    .actions .btn-outline {
+      width: 100%;
+      height: 120px;
+      font-size: 16px;
+    }
+  }
+
   @media (max-width: 520px) {
     .modal-overlay {
       padding: 0;
@@ -573,9 +548,6 @@
       padding: 26px 20px 24px;
       max-height: 94vh;
       overflow-y: auto;
-    }
-    .actions {
-      flex-direction: column-reverse;
     }
   }
 </style>

@@ -246,8 +246,8 @@
       font-size: 15px;
     }
     .navbar__tab {
-      padding: 6px 14px;
-      font-size: 12px;
+      padding: 11px 22px;
+      font-size: 13px;
     }
     .navbar__user-name {
       display: none;
@@ -259,8 +259,8 @@
       padding: 8px 12px;
     }
     .navbar__tab {
-      padding: 5px 12px;
-      font-size: 11px;
+      padding: 10px 20px;
+      font-size: 12px;
     }
   }
 </style>

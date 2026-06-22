@@ -4,17 +4,6 @@
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
         <Transition name="modal">
           <div v-if="isOpen" ref="modalRootRef" class="modal-card" role="dialog" aria-modal="true">
-            <button class="modal-close" aria-label="Close" @click="close">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path
-                  d="M1 1L13 13M13 1L1 13"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  stroke-linecap="round"
-                />
-              </svg>
-            </button>
-
             <h2 class="modal-title">Card Details</h2>
             <p class="modal-sub">Full information about this connected card.</p>
 
@@ -139,28 +128,6 @@
     max-width: 440px;
     position: relative;
     border-top: 3px solid #b8973a;
-  }
-
-  .modal-close {
-    position: absolute;
-    top: 14px;
-    right: 16px;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    border: 1px solid #eae8e4;
-    background: #f4f1e9;
-    color: #6b6860;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.18s;
-  }
-  .modal-close:hover {
-    background: #0d0c0a;
-    color: #ffffff;
-    border-color: #0d0c0a;
   }
 
   .modal-title {
@@ -318,10 +285,6 @@
     }
     .modal-title {
       font-size: 20px;
-    }
-    .modal-close {
-      top: 10px;
-      right: 12px;
     }
   }
 

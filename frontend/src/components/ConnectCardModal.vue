@@ -4,7 +4,7 @@
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
         <Transition name="modal">
           <div v-if="isOpen" ref="modalRootRef" class="modal-card" role="dialog" aria-modal="true">
-            <button class="modal-close" @click="close" aria-label="Close">
+            <button class="modal-close" aria-label="Close" @click="close">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d="M1 1L13 13M13 1L1 13"
@@ -24,7 +24,6 @@
               }}
             </p>
 
-            <!-- ── Step indicator ── -->
             <div class="steps">
               <div class="step" :class="stepClass(1)">
                 <div class="step__circle">1</div>
@@ -37,7 +36,6 @@
               </div>
             </div>
 
-            <!-- ═══ STEP 1: Token ═══ -->
             <form v-if="currentStep === 1" class="form" novalidate @submit.prevent="handleGetCards">
               <div class="field">
                 <div class="field__header">
@@ -136,13 +134,11 @@
                 <input v-model="agreedToPrivacy" type="checkbox" class="checkbox" />
                 <span class="checkbox-text">
                   I agree to the
-                  <a href="/privacy" target="_blank" rel="noopener noreferrer" class="link">
+                  <a href="/privacy.pdf" target="_blank" rel="noopener noreferrer" class="link">
                     Privacy Policy
                   </a>
-                  and conditions of
-                  <a href="/gdpr" target="_blank" rel="noopener noreferrer" class="link">
-                    GDPR data processing </a
-                  >. My token will be encrypted (AES-256) before being saved.
+                  and conditions of GDPR data processing. My token will be encrypted (AES-256)
+                  before being saved.
                 </span>
               </label>
 
@@ -183,7 +179,6 @@
               </div>
             </form>
 
-            <!-- ═══ STEP 2: Card selection ═══ -->
             <form v-else class="form" novalidate @submit.prevent="handleConnect">
               <div v-if="cards.length === 0" class="empty-cards">
                 No UAH cards found on this account.
@@ -275,7 +270,6 @@
   const modalRootRef = ref(null)
   useFocusTrap(modalRootRef, () => props.isOpen)
 
-  // ─── Form state ───
   const personalToken = ref('')
   const agreedToPrivacy = ref(false)
   const showToken = ref(false)
@@ -284,11 +278,10 @@
   const serverError = ref('')
   const fieldErrors = ref({ token: '' })
 
-  // ─── Wizard state ───
   const currentStep = ref(1)
   const cards = ref([])
   const selectedAccountId = ref(null)
-  const cachedToken = ref('') // токен з яким ми робили /client-info — щоб не повторювати запит
+  const cachedToken = ref('')
 
   const inputType = computed(() => (showToken.value ? 'text' : 'password'))
 
@@ -328,7 +321,6 @@
 
   function onTokenInput() {
     serverError.value = ''
-    // Якщо токен змінили — скидаємо кеш карток, бо вони з іншого токену
     if (cards.value.length > 0 && personalToken.value.trim() !== cachedToken.value) {
       cards.value = []
       cachedToken.value = ''
@@ -336,14 +328,12 @@
     }
   }
 
-  // ─── STEP 1 → STEP 2 ───
   async function handleGetCards() {
     if (!validateToken()) return
     if (!agreedToPrivacy.value) return
 
     const token = personalToken.value.trim()
 
-    // Якщо вже маємо картки з цим токеном — переходимо без повторного API-виклику (rate limit 60s)
     if (cards.value.length > 0 && cachedToken.value === token) {
       currentStep.value = 2
       return
@@ -368,7 +358,6 @@
     }
   }
 
-  // ─── STEP 2: connect ───
   async function handleConnect() {
     if (!selectedAccountId.value) return
 
@@ -418,12 +407,8 @@
   function goBack() {
     currentStep.value = 1
     serverError.value = ''
-    // Не ресетимо cards — вони лишаються у пам'яті щоб не робити повторний /client-info
   }
 
-  /**
-   * Mapping помилок з бекенду. Працює для /client-info і /connect.
-   */
   function handleServerError(err) {
     const status = err.response?.status
     const message = err.response?.data?.message
@@ -443,17 +428,8 @@
     } else if (status === 422) {
       serverError.value = detail?.[0]?.msg || 'Please check the form fields'
     } else {
-      serverError.value = message || 'Something went wrong. Please try again.'
+      serverError.value = err.userMessage || 'Something went wrong. Please try again.'
     }
-  }
-
-  function formatBalance(balance) {
-    const num = Number(balance)
-    if (isNaN(num)) return balance
-    return new Intl.NumberFormat('uk-UA', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(num)
   }
 
   function resetForm() {
@@ -545,7 +521,6 @@
     line-height: 1.6;
   }
 
-  /* ── Stepper ── */
   .steps {
     display: flex;
     align-items: center;
@@ -609,7 +584,6 @@
     background: #b8973a;
   }
 
-  /* ── Form ── */
   .form {
     display: flex;
     flex-direction: column;
@@ -814,7 +788,6 @@
     color: #c4402a;
   }
 
-  /* ── Card list (Step 2) ── */
   .card-list {
     display: flex;
     flex-direction: column;
@@ -905,7 +878,6 @@
     margin-left: 3px;
   }
 
-  /* ── Type badges ── */
   .type-badge {
     display: inline-flex;
     align-items: center;
@@ -961,7 +933,6 @@
     border: 1px dashed #d6d3ce;
   }
 
-  /* ── Actions ── */
   .actions {
     display: flex;
     gap: 12px;
@@ -1021,7 +992,6 @@
     }
   }
 
-  /* ── Transitions ── */
   .fade-down-enter-active,
   .fade-down-leave-active {
     transition:
@@ -1051,5 +1021,40 @@
   .modal-leave-to {
     opacity: 0;
     transform: scale(0.96) translateY(8px);
+  }
+
+  @media (max-width: 560px) {
+    .modal-overlay {
+      padding: 0;
+      align-items: flex-end;
+    }
+    .modal-card {
+      max-width: 100%;
+      width: 100%;
+      border-radius: 20px 20px 0 0;
+      padding: 24px 20px 28px;
+      max-height: 92vh;
+      overflow-y: auto;
+      border-top: 3px solid #b8973a;
+    }
+    .modal-title {
+      font-size: 20px;
+    }
+    .modal-close {
+      top: 10px;
+      right: 12px;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .step-indicator {
+      gap: 8px;
+    }
+    .card-row {
+      padding: 12px;
+    }
+    .card-row__pan {
+      font-size: 12px;
+    }
   }
 </style>

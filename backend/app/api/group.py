@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 from typing import List
 
-# Твій імпорт для авторизації (переконайся, що він правильний)
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.group import GroupResponse

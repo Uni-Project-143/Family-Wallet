@@ -1,13 +1,3 @@
-/**
- * Локальний rate-limit для login/register форм.
- *
- * УВАГА: це UX-надбудова, не безпека. Атакуючий обходить через curl/Postman
- * за 5 секунд. Реальний rate-limit має бути на беку (slowapi з лічником
- * тільки невдалих спроб per-email).
- *
- * Правила: 5 невдалих спроб у вікні 5 хв → блок на 15 хв.
- */
-
 const MAX_ATTEMPTS = 5
 const WINDOW_MS = 5 * 60 * 1000
 const BLOCK_MS = 15 * 60 * 1000
@@ -27,9 +17,6 @@ function save(key, data) {
   localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(data))
 }
 
-/**
- * Записує невдалу спробу. Якщо у вікні WINDOW_MS накопичилось MAX_ATTEMPTS — ставимо блок.
- */
 export function recordFailedAttempt(key) {
   const now = Date.now()
   const data = load(key)
@@ -61,6 +48,15 @@ export function getRemainingBlockMs(key) {
   const data = load(key)
   if (!data.blockedUntil) return 0
   return Math.max(0, data.blockedUntil - Date.now())
+}
+
+export function applyServerBlock(key, retryAfterSeconds) {
+  const seconds = Number(retryAfterSeconds)
+  if (!Number.isFinite(seconds) || seconds <= 0) return
+  const data = load(key)
+  data.attempts = []
+  data.blockedUntil = Date.now() + seconds * 1000
+  save(key, data)
 }
 
 export function resetAttempts(key) {

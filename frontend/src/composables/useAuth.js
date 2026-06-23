@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { loginUser, registerUser, fetchMyGroups, logoutUser } from '../services/authService'
 import { scheduleAfterRegistration } from '../utils/cardReminder'
+import { usePushNotifications } from './usePushNotifications'
 
 const STORAGE_TOKEN_KEY = 'accessToken'
 const STORAGE_USER_KEY = 'currentUser'
@@ -25,10 +26,6 @@ function persistAuthSession(token, user) {
   currentUser.value = user
 }
 
-/**
- * Зберігає активну групу окремо. При перемиканні груп — оновлюємо лише цей кусочок,
- * не чіпаючи fullName/email юзера.
- */
 function setActiveGroup(group) {
   const stored = parseStoredUser() || {}
   const updated = {
@@ -43,6 +40,7 @@ function setActiveGroup(group) {
 
 export function useAuth() {
   const router = useRouter()
+  const { initPush } = usePushNotifications()
 
   const isAuthenticated = computed(
     () => !!currentUser.value && !!localStorage.getItem(STORAGE_TOKEN_KEY),
@@ -65,45 +63,38 @@ export function useAuth() {
       }
 
       persistAuthSession(data.access_token, userInfo)
-      persistAuthSession(data.access_token, userInfo)
-      scheduleAfterRegistration() // запланувати reminder через 5 хв
+      initPush()
+      scheduleAfterRegistration()
 
       router.push('/group-setup')
     } catch (err) {
-      const status = err.response?.status
-      if (status === 409) {
-        authError.value = 'User with this email already exists'
-      } else if (status === 422) {
-        authError.value = err.response?.data?.detail?.[0]?.msg || 'Check the fields'
-      } else {
-        authError.value = 'Something went wrong. Please try again'
-      }
+      authError.value =
+        err.response?.status === 409
+          ? 'User with this email already exists'
+          : err.userMessage || 'Something went wrong. Please try again'
     } finally {
       isLoading.value = false
     }
   }
 
-  async function login(credentials) {
+  async function login(credentials, redirect = null) {
     isLoading.value = true
     authError.value = null
 
     try {
-      // Крок 1: токен + дані юзера з бекенду
       const data = await loginUser(credentials)
       localStorage.setItem(STORAGE_TOKEN_KEY, data.access_token)
 
-      // Крок 2: тягнемо групи
       let groups = []
       try {
         groups = await fetchMyGroups()
-      } catch (err) {
-        console.warn('fetchMyGroups failed:', err)
+      } catch {
+        // групи необов'язкові — продовжуємо без них
       }
 
-      // Крок 3: зберігаємо БАЗОВУ інформацію юзера БЕЗ конкретної групи
       const userInfo = {
         id: data.user?.id || null,
-        fullName: data.user?.fullName || data.user?.full_name || '', // ← підтримує обидва формати
+        fullName: data.user?.fullName || data.user?.full_name || '',
         email: data.user?.email || credentials.email,
         role: null,
         groupId: null,
@@ -111,52 +102,48 @@ export function useAuth() {
       }
       persistAuthSession(data.access_token, userInfo)
 
-      // Крок 4: маршрутизація залежно від кількості груп
+      if (Array.isArray(groups) && groups.length === 1) {
+        setActiveGroup(groups[0])
+      }
+
+      initPush()
+
+      if (redirect) {
+        router.replace(redirect)
+        return { ok: true }
+      }
+
       if (!Array.isArray(groups) || groups.length === 0) {
-        // Немає груп — на створення/приєднання
         router.push('/group-setup')
       } else if (groups.length === 1) {
-        // Одна група — авто-вибір, на feed
-        setActiveGroup(groups[0])
         router.push('/feed')
       } else {
-        // Кілька груп — юзер сам обирає
-        // Передаємо список груп через router state (не зберігаємо в БД, бо це тимчасово)
         router.push({
           name: 'SelectGroup',
           state: { groups },
         })
       }
+      return { ok: true }
     } catch (err) {
       localStorage.removeItem(STORAGE_TOKEN_KEY)
       const status = err.response?.status
       if (status === 429) {
-        authError.value = 'Too many attempts. Please try again in 15 minutes'
-      } else {
-        // 401 і інші — однакове повідомлення (захист від user enumeration)
-        authError.value = 'Invalid email or password'
+        const retryAfter = Number(err.response?.headers?.['retry-after']) || null
+        return { ok: false, status, retryAfter }
       }
+      authError.value = 'Invalid email or password'
+      return { ok: false, status }
     } finally {
       isLoading.value = false
     }
   }
 
-  /**
-   * Logout — повний flow:
-   * 1. Викликаємо POST /auth/logout — бек додає токен у blacklist
-   * 2. Чистимо локальний стан незалежно від результату беку
-   * 3. Редирект на /login
-   *
-   * Якщо бек впав (network error, 5xx) — все одно вилогінюємо локально.
-   * Інакше юзер застрягне у "залогіненому" стані з невалідним токеном.
-   */
   async function logout() {
     isLoading.value = true
     try {
       await logoutUser()
-    } catch (err) {
-      // Логуємо, але не блокуємо логаут
-      console.warn('Logout API failed:', err)
+    } catch {
+      // вихід локально в будь-якому разі
     } finally {
       localStorage.removeItem(STORAGE_TOKEN_KEY)
       currentUser.value = null

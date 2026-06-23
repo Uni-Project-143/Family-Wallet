@@ -4,17 +4,6 @@
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
         <Transition name="modal">
           <div v-if="isOpen" ref="modalRootRef" class="modal-card" role="dialog" aria-modal="true">
-            <button class="modal-close" @click="close" aria-label="Close">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path
-                  d="M1 1L13 13M13 1L1 13"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  stroke-linecap="round"
-                />
-              </svg>
-            </button>
-
             <h2 class="modal-title">Card Details</h2>
             <p class="modal-sub">Full information about this connected card.</p>
 
@@ -41,7 +30,9 @@
               <div v-if="isOwnCard" class="details-row">
                 <span class="details-row__label">Balance</span>
                 <span class="details-row__value details-row__value--accent">
-                  {{ formatBalance(card.balance) }}
+                  {{
+                    formatBalance(card.virtual_balance ?? card.effective_balance ?? card.balance)
+                  }}
                   <span class="details-row__currency">UAH</span>
                 </span>
               </div>
@@ -137,28 +128,6 @@
     max-width: 440px;
     position: relative;
     border-top: 3px solid #b8973a;
-  }
-
-  .modal-close {
-    position: absolute;
-    top: 14px;
-    right: 16px;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    border: 1px solid #eae8e4;
-    background: #f4f1e9;
-    color: #6b6860;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.18s;
-  }
-  .modal-close:hover {
-    background: #0d0c0a;
-    color: #ffffff;
-    border-color: #0d0c0a;
   }
 
   .modal-title {
@@ -298,5 +267,33 @@
   .modal-leave-to {
     opacity: 0;
     transform: scale(0.96) translateY(8px);
+  }
+
+  @media (max-width: 560px) {
+    .modal-overlay {
+      padding: 0;
+      align-items: flex-end;
+    }
+    .modal-card {
+      max-width: 100%;
+      width: 100%;
+      border-radius: 20px 20px 0 0;
+      padding: 24px 20px 28px;
+      max-height: 92vh;
+      overflow-y: auto;
+      border-top: 3px solid #b8973a;
+    }
+    .modal-title {
+      font-size: 20px;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .details-row {
+      padding: 10px 12px;
+    }
+    .details-row__value--accent {
+      font-size: 18px;
+    }
   }
 </style>

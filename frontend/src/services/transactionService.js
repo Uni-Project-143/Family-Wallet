@@ -1,12 +1,6 @@
 import apiClient from './apiClient'
 
 /**
- * Список транзакцій групи з фільтрами і сортуванням.
- * GET /api/v1/transactions/group/{group_id}?...filters
- *
- * Призначений для сторінки детального перегляду транзакцій
- * з фільтрацією за категорією, типом, сумою, датами.
- *
  * @param {string} groupId
  * @param {object} filters
  * @returns {Promise<{items, total, page, size, pages}>}
@@ -32,5 +26,39 @@ export async function fetchGroupTransactions(groupId, filters = {}) {
 export async function fetchFeed(groupId, page = 1, limit = 20) {
   const params = new URLSearchParams({ page, limit })
   const response = await apiClient.get(`/api/v1/feed/${groupId}?${params.toString()}`)
+  return response.data
+}
+
+/**
+ * @param {object} payload
+ * @param {string} payload.from_card_id
+ * @param {string} payload.to_card_id
+ * @param {string|number} payload.amount
+ * @param {string|null} payload.description
+ * @param {string|null} payload.category_id
+ * @returns {Promise<{transfer_id, debit_transaction_id, credit_transaction_id, amount, from_effective_balance, to_effective_balance}>}
+ * @param {string} transactionId
+ * @param {string} emoji
+ * @returns {Promise<{ status: string, total_count: number, grouped_reactions: Record<string, number> }>}
+ */
+export async function reactToTransaction(transactionId, emoji) {
+  const response = await apiClient.post(`/api/v1/transactions/${transactionId}/react`, { emoji })
+  return response.data
+}
+
+export async function createTransfer({
+  from_card_id,
+  to_card_id,
+  amount,
+  description = null,
+  category_id = null,
+}) {
+  const response = await apiClient.post('/api/v1/transactions/transfer', {
+    from_card_id,
+    to_card_id,
+    amount: String(amount),
+    description,
+    category_id,
+  })
   return response.data
 }

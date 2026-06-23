@@ -1,16 +1,21 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from datetime import datetime, timezone
 from beanie import PydanticObjectId
 from decimal import Decimal
+from pydantic import BaseModel
+import uuid
 
+from beanie.odm.operators.update.general import Inc
 from app.api.auth import get_current_user
 from app.models.user import User
 from app.models.group_membership import GroupMembership
 from app.models.transaction import Transaction
 from app.models.bank_card import BankCard
 from app.models.gift_event import GiftEvent, GiftStatus
-from app.schemas.gift import CreateGiftRequest, CreateGiftResponse
-
+from app.schemas.gift import CreateGiftRequest, CreateGiftResponse, JoinGiftRequest
+from app.models.gift_invite import GiftInvite
+from app.core.websockets import ws_manager
 
 router = APIRouter(prefix="/api/v1/gift", tags=["Secret Gift"])
 
@@ -26,11 +31,9 @@ async def create_gift_event(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid ID format")
 
-    # 1. Організатор намагається обрати себе як Target User -> 400
     if str(current_user.id) == request.target_user_id:
         raise HTTPException(status_code=400, detail="You cannot be the recipient of a gift.")
 
-    # 2. Безпека: Перевіряємо, чи сам організатор є в цій групі
     organizer_membership = await GroupMembership.find_one({
         "user_id": current_user_oid,
         "group_id": group_oid
@@ -38,7 +41,6 @@ async def create_gift_event(
     if not organizer_membership:
         raise HTTPException(status_code=403, detail="You are not a member of this group.")
 
-    # 3. Перевірка, чи Target User є учасником групи
     target_membership = await GroupMembership.find_one({
         "user_id": target_oid,
         "group_id": group_oid
@@ -46,7 +48,6 @@ async def create_gift_event(
     if not target_membership:
         raise HTTPException(status_code=400, detail="The recipient is not a member of this group.")
 
-    # 4. Створення події
     new_gift = GiftEvent(
         name=request.name,
         organizer_id=str(current_user.id),
@@ -60,7 +61,6 @@ async def create_gift_event(
 
     return CreateGiftResponse(status="success", gift_id=str(new_gift.id))
 
-
 @router.get("/{gift_id}/details", status_code=status.HTTP_200_OK)
 async def get_gift_details(gift_id: str, current_user: User = Depends(get_current_user)):
     try:
@@ -70,11 +70,9 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
 
     gift = await GiftEvent.get(gift_oid)
 
-    # 1. Negative AC: 404 для cancelled або неіснуючих
     if not gift or gift.status == GiftStatus.CANCELLED:
-        raise HTTPException(status_code=404, detail="Подарунок не значено")
+        raise HTTPException(status_code=404, detail="Подарунок не знайдено")
 
-    # 2. PROJ-58: ІЗОЛЯЦІЯ TARGET USER
     is_target_user = gift.target_user_id == str(current_user.id)
     now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     gift_unlock_date = gift.unlock_date.replace(tzinfo=None)
@@ -84,7 +82,6 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
     if is_target_user and is_locked:
         raise HTTPException(status_code=403, detail="Сюрприз! Ви поки не можете бачити цю сторінку.")
 
-    # 3. БОЙОВА ЛОГІКА: Підрахунок грошей та донорів
     gift_transactions = await Transaction.find(Transaction.gift_id == str(gift.id)).to_list()
 
     collected_amount = Decimal("0.0")
@@ -113,10 +110,6 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
         except Exception:
             continue
 
-    # ==========================================
-    # КРИТИЧНО: Цей блок стоїть ЖОРСТКО НА ОДНОМУ РІВНІ з циклами for!
-    # Навіть якщо донорів немає, Python обов'язково виконає цей код.
-    # ==========================================
     target_user = await User.get(PydanticObjectId(gift.target_user_id))
     organizer = await User.get(PydanticObjectId(gift.organizer_id))
 
@@ -136,3 +129,217 @@ async def get_gift_details(gift_id: str, current_user: User = Depends(get_curren
         "collected_amount": float(collected_amount),
         "donors": donors_list
     }
+
+@router.post("/{gift_id}/invite", status_code=status.HTTP_200_OK)
+async def generate_gift_invite(gift_id: str, current_user: User = Depends(get_current_user)):
+    try:
+        gift_oid = PydanticObjectId(gift_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Невалідний формат ID")
+
+    gift = await GiftEvent.get(gift_oid)
+    if not gift or gift.status == GiftStatus.CANCELLED:
+        raise HTTPException(status_code=404, detail="Подарунок не знайдено")
+
+    if gift.organizer_id != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Тільки організатор може генерувати запрошення")
+
+    now_utc = datetime.now(timezone.utc)
+    existing_invite = await GiftInvite.find_one({
+        "gift_id": str(gift.id),
+        "expires_at": {"$gt": now_utc}
+    })
+
+    if existing_invite:
+        token = existing_invite.token
+    else:
+        token = str(uuid.uuid4())
+        new_invite = GiftInvite(
+            gift_id=str(gift.id),
+            organizer_id=str(current_user.id),
+            token=token
+        )
+        await new_invite.insert()
+
+    # Базовий URL фронтенду беремо з env (як у reset-password), а не хардкодимо.
+    # Локально → http://localhost:5173, у проді → задається FRONTEND_URL.
+    frontend_base = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+    invite_link = f"{frontend_base}/gift/join/{token}"
+
+    return {
+        "invite_link": invite_link,
+        "token": token
+    }
+
+@router.post("/join", status_code=status.HTTP_200_OK)
+async def join_gift_by_invite(request: JoinGiftRequest, current_user: User = Depends(get_current_user)):
+    """
+    Ендпоінт для переходу за запрошенням на Secret Gift.
+    Витягує токен з лінки, валідує його та ізолює іменинника.
+    """
+    token = request.invite_link.strip("/").split("/")[-1]
+
+    now_utc = datetime.now(timezone.utc)
+    invite = await GiftInvite.find_one({
+        "token": token,
+        "expires_at": {"$gt": now_utc}
+    })
+
+    if not invite:
+        raise HTTPException(
+            status_code=404,
+            detail="Запрошення не знайдено або його термін дії минув"
+        )
+
+    try:
+        gift_oid = PydanticObjectId(invite.gift_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Пошкоджений ID подарунка в токені")
+
+    gift = await GiftEvent.get(gift_oid)
+    if not gift or gift.status == GiftStatus.CANCELLED:
+        raise HTTPException(status_code=404, detail="Подарунок не знайдено або збір скасовано")
+
+    if str(current_user.id) == gift.target_user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Сюрприз! Ви не можете підглядати за власним подарунком 🎁"
+        )
+
+    membership = await GroupMembership.find_one({
+        "user_id": PydanticObjectId(str(current_user.id)),
+        "group_id": PydanticObjectId(gift.group_id)
+    })
+
+    if not membership:
+        raise HTTPException(
+            status_code=403,
+            detail="Тільки учасники цієї групи можуть долучитися до подарунка"
+        )
+
+    return {
+        "message": "Успішно звадільовано",
+        "gift_id": str(gift.id),
+        "group_id": gift.group_id,
+        "gift_name": gift.name
+    }
+
+@router.get("/group/{group_id}", status_code=status.HTTP_200_OK)
+async def get_group_gifts(group_id: str, current_user: User = Depends(get_current_user)):
+    try:
+        group_oid = PydanticObjectId(group_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Невалідний формат ID")
+
+    membership = await GroupMembership.find_one({"user_id": PydanticObjectId(str(current_user.id)), "group_id": group_oid})
+    if not membership:
+        raise HTTPException(status_code=403, detail="Ви не є учасником цієї групи")
+
+    gifts = await GiftEvent.find({
+        "group_id": group_id,
+        "status": {"$in": [GiftStatus.ACTIVE.value, GiftStatus.REVEALED.value]}
+    }).to_list()
+
+    response_data = []
+
+    for gift in gifts:
+        if gift.status == GiftStatus.ACTIVE and gift.target_user_id == str(current_user.id):
+            continue
+
+        target_user = await User.get(PydanticObjectId(gift.target_user_id))
+        target_name = target_user.full_name or getattr(target_user, 'email', None) or "Без імені" if target_user else "Невідомий"
+
+        gift_txs = await Transaction.find(Transaction.gift_id == str(gift.id)).to_list()
+        collected_amount = sum(abs(tx.amount) for tx in gift_txs)
+
+        response_data.append({
+            "id": str(gift.id),
+            "name": gift.name,
+            "target_user_id": gift.target_user_id,
+            "target_user_name": target_name,
+            "unlock_date": gift.unlock_date,
+            "goal_amount": getattr(gift, 'goal_amount', 0),
+            "collected_amount": float(collected_amount),
+            "status": gift.status
+        })
+
+    return response_data
+
+class ContributeRequest(BaseModel):
+    amount: float
+    card_id: str
+
+@router.post("/{gift_id}/contribute", status_code=status.HTTP_200_OK)
+async def contribute_to_gift(
+    gift_id: str,
+    request: ContributeRequest,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        gift_oid = PydanticObjectId(gift_id)
+        card_oid = PydanticObjectId(request.card_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Невалідний формат ID")
+
+    gift = await GiftEvent.get(gift_oid)
+    if not gift:
+        raise HTTPException(status_code=404, detail="Подарунок не знайдено")
+
+    if gift.status != GiftStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="Збір вже закрито")
+
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    if now_utc >= gift.unlock_date.replace(tzinfo=None):
+        raise HTTPException(status_code=400, detail="Час збору вже минув")
+
+    if str(current_user.id) == gift.target_user_id:
+        raise HTTPException(status_code=400, detail="Ви не можете донатити на свій же сюрприз")
+
+    if request.amount <= 0 or request.amount > 100000:
+        raise HTTPException(status_code=400, detail="Невалідна сума внеску")
+
+    membership = await GroupMembership.find_one({
+        "user_id": PydanticObjectId(str(current_user.id)),
+        "group_id": PydanticObjectId(gift.group_id)
+    })
+    if not membership:
+        raise HTTPException(status_code=403, detail="Ви не у цій групі")
+
+    card = await BankCard.get(card_oid)
+    if not card or card.user_id != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Картка вам не належить")
+
+    tx = Transaction(
+        card_id=request.card_id,
+        amount=Decimal(str(-request.amount)),
+        group_id=gift.group_id,
+        category_id="gift_contribution",
+        description=f"Внесок до Secret Gift: {gift.name}",
+        is_secret_gift=True,
+        target_user_id=gift.target_user_id,
+        gift_id=str(gift.id)
+    )
+    await tx.insert()
+
+    await card.update(Inc({BankCard.virtual_balance: -float(request.amount)}))
+
+    gift_txs = await Transaction.find(Transaction.gift_id == str(gift.id)).to_list()
+    new_collected = sum(abs(t.amount) for t in gift_txs)
+
+    # Real-time push у стрічку групи — внесок зʼявляється у всіх учасників без
+    # перезавантаження (фронт робить рефетч /feed). Іменинник його все одно не
+    # побачить — його стрічка фільтрує секретні транзакції (PROJ-58 ізоляція).
+    await ws_manager.broadcast_to_group(
+        str(gift.group_id),
+        {
+            "event": "new_transaction",
+            "data": {
+                "transaction_id": str(tx.id),
+                "gift_id": str(gift.id),
+                "group_id": str(gift.group_id),
+                "is_secret_gift": True,
+            },
+        },
+    )
+
+    return {"success": True, "new_collected_amount": float(new_collected)}

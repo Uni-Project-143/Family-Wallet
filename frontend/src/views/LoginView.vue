@@ -38,7 +38,6 @@
             {{ blockMessage }}
           </div>
         </Transition>
-        <!-- Серверна помилка: єдине повідомлення без підказки яке поле (Negative AC) -->
         <Transition name="fade-down">
           <div v-if="authError" class="auth-form__server-error" role="alert">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -55,7 +54,6 @@
           </div>
         </Transition>
 
-        <!-- Кнопка з disabled + spinner (Interface AC) -->
         <button type="submit" class="btn-primary" :disabled="isLoading || !canSubmit">
           <span v-if="!isLoading">Log in</span>
           <span v-else aria-label="Loading...">
@@ -72,36 +70,37 @@
         </button>
       </form>
 
-      <!-- Посилання -->
       <div class="auth-card__links">
         <router-link to="/forgot-password" class="auth-link">Forgot password?</router-link>
         <router-link to="/register" class="auth-link auth-link--bold">Create account →</router-link>
       </div>
+
+      <p class="auth-card__legal">
+        <a href="/terms.pdf" target="_blank" rel="noopener noreferrer" class="auth-link"
+          >Terms of Service</a
+        >
+        <span aria-hidden="true">·</span>
+        <a href="/privacy.pdf" target="_blank" rel="noopener noreferrer" class="auth-link"
+          >Privacy Policy</a
+        >
+      </p>
     </div>
   </div>
 </template>
 
 <script setup>
-  // import { ref, computed } from 'vue'
-  // import BaseInput from '../components/BaseInput.vue'
-  // import { useAuth } from '../composables/useAuth'
-
-  // const { login, isLoading, authError } = useAuth()
-
-  // const email = ref('')
-  // const password = ref('')
-
   import { ref, computed, watch, onUnmounted } from 'vue'
+  import { useRoute } from 'vue-router'
   import BaseInput from '../components/BaseInput.vue'
   import { useAuth } from '../composables/useAuth'
-  import { recordFailedAttempt, isBlocked, getRemainingBlockMs } from '../utils/authRateLimit'
+  import { applyServerBlock, isBlocked, getRemainingBlockMs } from '../utils/authRateLimit'
 
+  const route = useRoute()
   const { login, isLoading, authError } = useAuth()
 
   const email = ref('')
   const password = ref('')
 
-  // ─── Rate limit (per email) ───
   const blockKey = computed(() => `login:${email.value.trim().toLowerCase()}`)
   const isFormBlocked = ref(false)
   const remainingMs = ref(0)
@@ -119,10 +118,8 @@
     return `Too many failed attempts. Try again in ${m}:${String(s).padStart(2, '0')}.`
   })
 
-  // Перевіряємо блок щоразу коли email змінюється (інший key)
   watch(blockKey, refreshBlockStatus, { immediate: true })
 
-  // Запускаємо таймер countdown коли форма заблокована
   watch(isFormBlocked, (blocked) => {
     if (blocked && !countdownInterval) {
       countdownInterval = setInterval(() => {
@@ -142,11 +139,6 @@
     if (countdownInterval) clearInterval(countdownInterval)
   })
 
-  /**
-   * Кнопка активна якщо обидва поля непорожні.
-   * Формат email і складність пароля НЕ перевіряємо на логіні —
-   * це підказки зловмиснику. Бек поверне 401 → один загальний message.
-   */
   const canSubmit = computed(() => {
     return email.value.trim().length > 0 && password.value.length > 0 && !isFormBlocked.value
   })
@@ -154,14 +146,16 @@
   async function handleSubmit() {
     if (!canSubmit.value) return
 
-    await login({
-      email: email.value.trim().toLowerCase(),
-      password: password.value,
-    })
+    const result = await login(
+      {
+        email: email.value.trim().toLowerCase(),
+        password: password.value,
+      },
+      typeof route.query.redirect === 'string' ? route.query.redirect : null,
+    )
 
-    // Бек повернув помилку — фіксуємо невдалу спробу
-    if (authError.value) {
-      recordFailedAttempt(blockKey.value)
+    if (result?.status === 429) {
+      applyServerBlock(blockKey.value, result.retryAfter || 15 * 60)
       refreshBlockStatus()
     }
   }
@@ -285,6 +279,15 @@
     margin-top: 18px;
   }
 
+  .auth-card__legal {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 16px;
+    font-size: 12px;
+    color: #b0ada7;
+  }
+
   .auth-link {
     font-size: 13px;
     color: #6b6860;
@@ -333,5 +336,23 @@
     border-radius: 8px;
     font-size: 13px;
     color: #b97f1a;
+  }
+
+  @media (max-width: 560px) {
+    .auth-card,
+    .login-card,
+    .register-card,
+    .select-group-card {
+      max-width: 100%;
+      width: calc(100% - 32px);
+      padding: 28px 22px;
+    }
+    .auth-title,
+    .form-title {
+      font-size: 24px;
+    }
+    .i-field {
+      font-size: 16px;
+    }
   }
 </style>

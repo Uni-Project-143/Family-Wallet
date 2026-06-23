@@ -1,32 +1,8 @@
 <template>
   <div class="page">
-    <!-- Той самий navbar що на Feed/Settings -->
-    <header class="navbar">
-      <div class="navbar__left">
-        <span class="navbar__logo">Family <span class="navbar__logo--accent">Wallet</span></span>
-      </div>
-      <nav class="navbar__center">
-        <router-link to="/feed" class="navbar__tab" active-class="navbar__tab--active"
-          >Feed</router-link
-        >
-        <router-link to="/gift-events" class="navbar__tab" active-class="navbar__tab--active"
-          >Gift Events</router-link
-        >
-        <router-link to="/settings" class="navbar__tab" active-class="navbar__tab--active"
-          >Settings</router-link
-        >
-      </nav>
-      <div class="navbar__right">
-        <div class="avatar avatar--sm avatar--gold">{{ initials }}</div>
-        <span class="navbar__user-name">{{ fullName }}</span>
-        <span class="badge" :class="isAdmin ? 'badge--admin' : 'badge--member'">
-          {{ isAdmin ? 'Admin' : 'Member' }}
-        </span>
-      </div>
-    </header>
+    <NavBar />
 
     <main class="main">
-      <!-- Заголовок -->
       <div class="header-row">
         <h1 class="title">Create Secret Gift Event</h1>
         <p class="subtitle">
@@ -34,7 +10,6 @@
         </p>
       </div>
 
-      <!-- ── Stepper "повзунок" ── -->
       <div class="stepper">
         <div class="step" :class="stepClass(1)">
           <div class="step__circle">1</div>
@@ -52,12 +27,23 @@
         </div>
       </div>
 
-      <!-- ══ STAGE 1 — Setup ══ -->
-      <section v-if="currentStep === 1" class="stage-card">
+      <section v-if="isLoadingMembers" class="stage-card">
+        <p class="loading-text">Loading group members...</p>
+      </section>
+
+      <section v-else-if="membersError" class="stage-card">
+        <p class="error-text">{{ membersError }}</p>
+        <button class="btn-secondary" @click="loadMembers">Retry</button>
+      </section>
+
+      <section v-else-if="currentStep === 1" class="stage-card">
         <h2 class="stage-card__title">Who is the gift for?</h2>
 
-        <!-- Target picker — карусель -->
-        <div class="member-carousel">
+        <div v-if="availableMembers.length === 0" class="empty-members">
+          You need at least one other group member to create a gift event.
+        </div>
+
+        <div v-else class="member-carousel">
           <button
             v-for="member in availableMembers"
             :key="member.id"
@@ -70,20 +56,17 @@
               {{ member.initials }}
             </div>
             <div class="member-pick__name">{{ member.name }}</div>
-            <div v-if="member.id === currentUserId" class="member-pick__you">
-              (you — can't pick)
-            </div>
           </button>
         </div>
         <p v-if="errors.targetUserId" class="error-text">{{ errors.targetUserId }}</p>
 
         <div class="divider"></div>
 
-        <!-- Event details -->
         <div class="field">
-          <label class="field__label">EVENT NAME</label>
+          <label class="field__label" for="event-name">EVENT NAME</label>
           <div class="i-field-wrap" :class="{ 'i-field-wrap--error': errors.name }">
             <input
+              id="event-name"
               v-model="form.name"
               type="text"
               class="i-field"
@@ -97,23 +80,28 @@
 
         <div class="field-row">
           <div class="field">
-            <label class="field__label">UNLOCK DATE</label>
+            <label class="field__label" for="unlock-date">UNLOCK DATE & TIME</label>
             <div class="i-field-wrap" :class="{ 'i-field-wrap--error': errors.unlockDate }">
               <input
+                id="unlock-date"
                 v-model="form.unlockDate"
-                type="date"
+                type="datetime-local"
                 class="i-field"
-                :min="tomorrowIso"
+                :min="minDateTime"
                 @blur="validate('unlockDate')"
               />
             </div>
             <p v-if="errors.unlockDate" class="error-text">{{ errors.unlockDate }}</p>
+            <p v-if="form.unlockDate && !errors.unlockDate" class="hint-text">
+              {{ formatUnlockDateWithTz }}
+            </p>
           </div>
 
           <div class="field">
-            <label class="field__label">GOAL AMOUNT (UAH)</label>
+            <label class="field__label" for="goal-amount">GOAL AMOUNT (UAH)</label>
             <div class="i-field-wrap" :class="{ 'i-field-wrap--error': errors.goalAmount }">
               <input
+                id="goal-amount"
                 v-model.number="form.goalAmount"
                 type="number"
                 class="i-field"
@@ -135,12 +123,11 @@
             :disabled="!canProceedToReview"
             @click="goToReview"
           >
-            Continue →
+            Continue
           </button>
         </div>
       </section>
 
-      <!-- ══ STAGE 2 — Review ══ -->
       <section v-else-if="currentStep === 2" class="stage-card">
         <h2 class="stage-card__title">Confirm your gift event</h2>
         <p class="stage-card__sub">
@@ -163,7 +150,7 @@
           </div>
           <div class="review-row">
             <span class="review-row__label">Unlock Date</span>
-            <span class="review-row__value">{{ formatUnlockDate }}</span>
+            <span class="review-row__value">{{ formatUnlockDateWithTz }}</span>
           </div>
           <div class="review-row">
             <span class="review-row__label">Goal</span>
@@ -181,9 +168,8 @@
           </svg>
           <div>
             <strong>{{ selectedMember?.name }}</strong> won't see this event in their feed until
-            <strong>{{ formatUnlockDate }}</strong
-            >. All transactions linked to this event will appear as "Secret Gift Transaction —
-            hidden" in their view.
+            <strong>{{ formatUnlockDateWithTz }}</strong
+            >. All transactions linked to this event will be hidden in their view.
           </div>
         </div>
 
@@ -198,7 +184,7 @@
             :disabled="isSubmitting"
             @click="currentStep = 1"
           >
-            ← Back
+            Back
           </button>
           <button type="button" class="btn-gold" :disabled="isSubmitting" @click="handleConfirm">
             <span v-if="!isSubmitting">Create Gift Event</span>
@@ -215,22 +201,16 @@
         </div>
       </section>
 
-      <!-- ══ STAGE 3 — Success modal на blurred background ══ -->
       <section v-else-if="currentStep === 3" class="stage-card stage-card--blurred">
         <div class="review-list" aria-hidden="true">
           <div class="review-row">
             <span class="review-row__label">Recipient</span>
             <span class="review-row__value">{{ selectedMember?.name }}</span>
           </div>
-          <div class="review-row">
-            <span class="review-row__label">Event Name</span>
-            <span class="review-row__value">{{ form.name }}</span>
-          </div>
         </div>
       </section>
     </main>
 
-    <!-- Success Modal — Stage 3 -->
     <Teleport to="body">
       <Transition name="overlay">
         <div v-if="currentStep === 3" class="success-overlay" role="dialog" aria-modal="true">
@@ -252,7 +232,7 @@
               <h2 class="success-title">Gift event created!</h2>
               <p class="success-text">
                 <strong>{{ form.name }}</strong> is now active. Family members can contribute until
-                <strong>{{ formatUnlockDate }}</strong
+                <strong>{{ formatUnlockDateWithTz }}</strong
                 >.
               </p>
 
@@ -267,12 +247,67 @@
                 </div>
               </div>
 
+              <div v-if="inviteUrl" class="invite-section">
+                <div class="invite-section__label">SHARE WITH FAMILY</div>
+                <div class="invite-link-box">
+                  <div class="invite-link-box__url">{{ inviteUrl }}</div>
+                  <button
+                    class="btn-copy"
+                    :class="{ 'btn-copy--copied': isLinkCopied }"
+                    @click="copyInviteLink"
+                  >
+                    <svg
+                      v-if="!isLinkCopied"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                    >
+                      <rect
+                        x="4"
+                        y="4"
+                        width="8"
+                        height="8"
+                        rx="1.5"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                      />
+                      <path
+                        d="M2 10V3C2 2.44772 2.44772 2 3 2H10"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                    <svg v-else width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path
+                        d="M2.5 7L5.5 10L11.5 4"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    {{ isLinkCopied ? 'Copied!' : 'Copy' }}
+                  </button>
+                </div>
+              </div>
+
+              <div v-else-if="inviteError" class="invite-section">
+                <p class="error-text">Couldn't generate invite link. {{ inviteError }}</p>
+                <button class="btn-retry" @click="retryInvite">Retry</button>
+              </div>
+
               <div class="success-actions">
                 <button type="button" class="btn-secondary" @click="resetWizard">
                   Create Another
                 </button>
-                <button type="button" class="btn-gold" @click="$router.push('/feed')">
-                  View in Feed
+                <button
+                  type="button"
+                  class="btn-gold"
+                  @click="$router.push(`/gift-events/${createdGiftId}`)"
+                >
+                  Open Event
                 </button>
               </div>
             </div>
@@ -280,43 +315,79 @@
         </div>
       </Transition>
     </Teleport>
+
+    <Transition name="toast">
+      <div v-if="toast.isVisible" class="toast" :class="`toast--${toast.type}`" role="alert">
+        {{ toast.message }}
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-  import { ref, computed } from 'vue'
-  import { useRouter } from 'vue-router'
+  import { ref, computed, onMounted, watch } from 'vue'
   import { useAuth } from '../composables/useAuth'
+  import { fetchGroupMembers } from '../services/authService'
+  import { createGiftEvent, generateGiftInviteLink } from '../services/giftEventService'
+  import NavBar from '../components/NavBar.vue'
 
-  const router = useRouter()
-  const { currentUser, isAdmin } = useAuth()
+  const { currentUser } = useAuth()
 
-  const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-  const fullName = computed(() => storedUser.fullName || currentUser.value?.fullName || '')
-  const initials = computed(() => {
-    const name = fullName.value
-    if (!name) return '?'
-    return name
+  const groupMembers = ref([])
+  const isLoadingMembers = ref(false)
+  const membersError = ref('')
+
+  function mapMemberFromApi(apiMember) {
+    const fullName = apiMember.name || 'User'
+    const initials = fullName
       .split(' ')
       .map((w) => w[0])
       .join('')
       .toUpperCase()
       .slice(0, 2)
-  })
 
-  // Тимчасові учасники — TODO: GET /api/v1/group/{groupId}/members
-  const groupMembers = ref([
-    { id: 1, name: 'Olena K.', initials: 'OK', avatarVariant: 'gold' },
-    { id: 2, name: 'Mykola K.', initials: 'MK', avatarVariant: 'dark' },
-    { id: 3, name: 'Sofia K.', initials: 'SK', avatarVariant: 'light' },
-  ])
+    const variants = ['gold', 'dark', 'light']
+    const variantIdx = (initials.charCodeAt(0) || 0) % variants.length
 
-  const currentUserId = 1 // TODO: підставити справжній з бекенду
+    return {
+      id: apiMember.id,
+      name: fullName,
+      initials,
+      avatarVariant: variants[variantIdx],
+      avatar: apiMember.avatar || null,
+    }
+  }
 
-  // Виключаємо себе зі списку — не можна збирати подарунок собі
-  const availableMembers = computed(() => groupMembers.value.filter((m) => m.id !== currentUserId))
+  async function loadMembers() {
+    if (!currentUser.value?.groupId) {
+      membersError.value = 'Active group not found. Please sign in again.'
+      return
+    }
 
-  // ─── Stepper ───
+    isLoadingMembers.value = true
+    membersError.value = ''
+
+    try {
+      const data = await fetchGroupMembers(currentUser.value.groupId)
+      const members = Array.isArray(data) ? data : data.members || []
+      groupMembers.value = members.map(mapMemberFromApi)
+    } catch (err) {
+      const status = err.response?.status
+      if (status === 404) {
+        groupMembers.value = []
+        membersError.value = 'Group members endpoint not available yet. Backend WIP.'
+      } else {
+        membersError.value = 'Failed to load group members. Try again.'
+      }
+    } finally {
+      isLoadingMembers.value = false
+    }
+  }
+
+  const availableMembers = computed(() =>
+    groupMembers.value.filter((m) => m.id !== currentUser.value?.id),
+  )
+
   const currentStep = ref(1)
   function stepClass(num) {
     return {
@@ -325,7 +396,6 @@
     }
   }
 
-  // ─── Form ───
   const form = ref({
     targetUserId: null,
     name: '',
@@ -340,27 +410,62 @@
     goalAmount: '',
   })
 
-  const tomorrowIso = computed(() => {
-    const d = new Date(Date.now() + 86400000)
-    return d.toISOString().slice(0, 10)
+  watch(
+    () => form.value.name,
+    () => {
+      if (errors.value.name) validate('name')
+    },
+  )
+  watch(
+    () => form.value.unlockDate,
+    () => {
+      if (errors.value.unlockDate) validate('unlockDate')
+    },
+  )
+  watch(
+    () => form.value.goalAmount,
+    () => {
+      if (errors.value.goalAmount) validate('goalAmount')
+    },
+  )
+
+  watch(
+    () => form.value.targetUserId,
+    (v) => {
+      if (v) errors.value.targetUserId = ''
+    },
+  )
+
+  const minDateTime = computed(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    d.setHours(0, 0, 0, 0)
+    return formatLocalDateTime(d)
   })
+
+  function formatLocalDateTime(date) {
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  }
 
   const selectedMember = computed(() =>
     groupMembers.value.find((m) => m.id === form.value.targetUserId),
   )
 
-  const formatUnlockDate = computed(() => {
+  const formatUnlockDateWithTz = computed(() => {
     if (!form.value.unlockDate) return ''
-    return new Date(form.value.unlockDate).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
+    const date = new Date(form.value.unlockDate)
+    if (isNaN(date.getTime())) return ''
+    return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
-    })
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    }).format(date)
   })
 
-  /**
-   * Валідує конкретне поле.
-   */
   function validate(field) {
     errors.value[field] = ''
 
@@ -380,7 +485,12 @@
         errors.value.unlockDate = 'Unlock date is required'
         return false
       }
-      if (new Date(form.value.unlockDate) <= new Date()) {
+      const selected = new Date(form.value.unlockDate)
+      if (isNaN(selected.getTime())) {
+        errors.value.unlockDate = 'Invalid date format'
+        return false
+      }
+      if (selected.getTime() <= Date.now()) {
         errors.value.unlockDate = 'Date must be in the future'
         return false
       }
@@ -401,6 +511,7 @@
       form.value.targetUserId !== null &&
       form.value.name.trim().length >= 3 &&
       form.value.unlockDate &&
+      new Date(form.value.unlockDate).getTime() > Date.now() &&
       form.value.goalAmount >= 100
     )
   })
@@ -418,31 +529,67 @@
     currentStep.value = 2
   }
 
-  // ─── Submit ───
   const isSubmitting = ref(false)
   const serverError = ref('')
+  const createdGiftId = ref(null)
+  const inviteUrl = ref('')
+  const inviteError = ref('')
+  const isLinkCopied = ref(false)
 
-  /**
-   * POST /api/v1/groups/{id}/gift-events
-   * TODO: підключити коли бекенд буде готовий
-   */
   async function handleConfirm() {
     isSubmitting.value = true
     serverError.value = ''
+    inviteUrl.value = ''
+    inviteError.value = ''
 
     try {
-      // const data = await createGiftEvent(storedUser.groupId, {
-      //   targetUserId: form.value.targetUserId,
-      //   name: form.value.name.trim(),
-      //   unlockDate: form.value.unlockDate,
-      //   goalAmount: form.value.goalAmount,
-      // })
+      const created = await createGiftEvent({
+        name: form.value.name.trim(),
+        target_user_id: form.value.targetUserId,
+        unlock_date: new Date(form.value.unlockDate).toISOString(), // → UTC ISO 8601
+        goal_amount: form.value.goalAmount,
+        group_id: currentUser.value.groupId,
+      })
+
+      createdGiftId.value = created.gift_id || created.id
+
+      try {
+        const linkData = await generateGiftInviteLink(createdGiftId.value)
+        inviteUrl.value = linkData.invite_url
+      } catch (linkErr) {
+        inviteError.value = linkErr.userMessage || 'You can generate it later from the event page.'
+      }
 
       currentStep.value = 3
     } catch (err) {
-      serverError.value = err.response?.data?.message || 'Something went wrong. Try again.'
+      serverError.value = err.userMessage || 'Something went wrong. Please try again.'
     } finally {
       isSubmitting.value = false
+    }
+  }
+
+  async function retryInvite() {
+    if (!createdGiftId.value) return
+    inviteError.value = ''
+    try {
+      const linkData = await generateGiftInviteLink(createdGiftId.value)
+      inviteUrl.value = linkData.invite_url
+    } catch (err) {
+      inviteError.value = err.userMessage || 'Failed to generate link.'
+    }
+  }
+
+  async function copyInviteLink() {
+    if (!inviteUrl.value) return
+    try {
+      await navigator.clipboard.writeText(inviteUrl.value)
+      isLinkCopied.value = true
+      showToast('Link copied!', 'success')
+      setTimeout(() => {
+        isLinkCopied.value = false
+      }, 2500)
+    } catch {
+      showToast('Failed to copy. Please copy manually.', 'error')
     }
   }
 
@@ -450,8 +597,22 @@
     form.value = { targetUserId: null, name: '', unlockDate: '', goalAmount: 2000 }
     errors.value = { targetUserId: '', name: '', unlockDate: '', goalAmount: '' }
     serverError.value = ''
+    inviteUrl.value = ''
+    inviteError.value = ''
+    createdGiftId.value = null
     currentStep.value = 1
   }
+
+  const toast = ref({ isVisible: false, message: '', type: 'success' })
+
+  function showToast(message, type = 'success') {
+    toast.value = { isVisible: true, message, type }
+    setTimeout(() => {
+      toast.value.isVisible = false
+    }, 3000)
+  }
+
+  onMounted(loadMembers)
 </script>
 
 <style scoped>
@@ -460,75 +621,6 @@
     display: flex;
     flex-direction: column;
     background: #faf8f3;
-  }
-
-  /* ── Navbar (повторюється з FeedView) ── */
-  .navbar {
-    height: 60px;
-    background: #0d0c0a;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    padding: 0 28px;
-    flex-shrink: 0;
-    border-bottom: 1px solid rgba(184, 151, 58, 0.18);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-  .navbar__left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .navbar__logo {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: 18px;
-    font-weight: 600;
-    color: #fff;
-  }
-  .navbar__logo--accent {
-    color: #b8973a;
-  }
-  .navbar__center {
-    display: flex;
-    gap: 2px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 4px;
-    justify-self: center;
-  }
-  .navbar__tab {
-    padding: 7px 20px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.5);
-    text-decoration: none;
-    transition: all 0.18s;
-    white-space: nowrap;
-    border: 1px solid transparent;
-  }
-  .navbar__tab:hover {
-    color: rgba(255, 255, 255, 0.85);
-  }
-  .navbar__tab--active {
-    background: rgba(184, 151, 58, 0.18);
-    color: #ead9a0;
-    font-weight: 600;
-    border-color: rgba(184, 151, 58, 0.25);
-  }
-  .navbar__right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    justify-self: end;
-  }
-  .navbar__user-name {
-    font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.85);
   }
 
   .avatar {
@@ -585,7 +677,6 @@
     border: 1px solid #d6d3ce;
   }
 
-  /* ── Main ── */
   .main {
     flex: 1;
     padding: 36px 48px 48px;
@@ -619,7 +710,6 @@
     line-height: 1.6;
   }
 
-  /* ── Stepper "повзунок" ── */
   .stepper {
     display: flex;
     align-items: center;
@@ -671,7 +761,6 @@
   .step--done .step__label {
     color: #9b7a25;
   }
-
   .step__line {
     width: 80px;
     height: 2px;
@@ -684,7 +773,6 @@
     background: #b8973a;
   }
 
-  /* ── Stage card ── */
   .stage-card {
     background: #ffffff;
     border-radius: 16px;
@@ -694,19 +782,16 @@
       0 0 0 1px rgba(184, 151, 58, 0.08);
     border-top: 3px solid #b8973a;
   }
-
   @media (max-width: 560px) {
     .stage-card {
       padding: 24px 20px;
     }
   }
-
   .stage-card--blurred {
     filter: blur(3px);
     pointer-events: none;
     user-select: none;
   }
-
   .stage-card__title {
     font-family: 'Cormorant Garamond', Georgia, serif;
     font-size: 22px;
@@ -721,7 +806,23 @@
     line-height: 1.6;
   }
 
-  /* ── Member carousel ── */
+  .loading-text {
+    text-align: center;
+    color: #b0ada7;
+    font-size: 14px;
+    padding: 32px 0;
+  }
+
+  .empty-members {
+    text-align: center;
+    padding: 32px 20px;
+    background: #faf8f3;
+    border: 1px dashed #d6d3ce;
+    border-radius: 10px;
+    color: #b0ada7;
+    font-size: 13px;
+  }
+
   .member-carousel {
     display: flex;
     gap: 12px;
@@ -730,7 +831,6 @@
     margin-bottom: 8px;
     scroll-snap-type: x mandatory;
   }
-
   .member-pick {
     flex-shrink: 0;
     width: 112px;
@@ -747,18 +847,15 @@
     font-family: 'DM Sans', system-ui, sans-serif;
     scroll-snap-align: start;
   }
-
   .member-pick:hover {
     border-color: #dfc876;
     background: #fbf7ec;
   }
-
   .member-pick--active {
     border-color: #b8973a;
     background: linear-gradient(135deg, #fbf7ec, #faf8f3);
     box-shadow: 0 4px 16px rgba(184, 151, 58, 0.18);
   }
-
   .member-pick__name {
     font-size: 13px;
     font-weight: 600;
@@ -769,20 +866,12 @@
     color: #9b7a25;
   }
 
-  .member-pick__you {
-    font-size: 10px;
-    color: #b0ada7;
-    text-align: center;
-  }
-
-  /* ── Divider ── */
   .divider {
     height: 1px;
     background: #eae8e4;
     margin: 24px 0;
   }
 
-  /* ── Field ── */
   .field {
     margin-bottom: 18px;
   }
@@ -795,7 +884,6 @@
     margin-bottom: 6px;
     display: block;
   }
-
   .field-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -806,7 +894,6 @@
       grid-template-columns: 1fr;
     }
   }
-
   .i-field-wrap {
     border: 1.5px solid #eae8e4;
     border-radius: 8px;
@@ -822,7 +909,6 @@
   .i-field-wrap--error {
     border-color: #c4402a;
   }
-
   .i-field {
     width: 100%;
     height: 46px;
@@ -837,14 +923,18 @@
   .i-field:focus {
     background: #ffffff;
   }
-
   .error-text {
     font-size: 12px;
     color: #c4402a;
     margin: 5px 0 0;
   }
+  .hint-text {
+    font-size: 12px;
+    color: #9b7a25;
+    margin: 5px 0 0;
+    font-style: italic;
+  }
 
-  /* ── Review list ── */
   .review-list {
     background: #faf8f3;
     border: 1px solid #eae8e4;
@@ -862,7 +952,6 @@
   .review-row:last-child {
     border-bottom: none;
   }
-
   .review-row__label {
     font-size: 11px;
     font-weight: 600;
@@ -905,13 +994,11 @@
     margin-bottom: 16px;
   }
 
-  /* ── Actions ── */
   .actions {
     display: flex;
     gap: 12px;
     margin-top: 8px;
   }
-
   .btn-secondary {
     flex: 1;
     height: 48px;
@@ -929,7 +1016,6 @@
     background: #f4f1e9;
     border-color: #b0ada7;
   }
-
   .btn-gold {
     flex: 1.5;
     height: 48px;
@@ -958,7 +1044,6 @@
     transform: none;
   }
 
-  /* ── Success modal Stage 3 ── */
   .success-overlay {
     position: fixed;
     inset: 0;
@@ -970,20 +1055,18 @@
     z-index: 200;
     padding: 20px;
   }
-
   .success-card {
     background: #ffffff;
     border-radius: 20px;
     padding: 40px 36px 32px;
     width: 100%;
-    max-width: 460px;
+    max-width: 480px;
     text-align: center;
     box-shadow:
       0 24px 64px rgba(13, 12, 10, 0.2),
       0 0 0 1px rgba(184, 151, 58, 0.12);
     border-top: 3px solid #b8973a;
   }
-
   .success-icon {
     width: 80px;
     height: 80px;
@@ -995,7 +1078,6 @@
     margin: 0 auto 18px;
     border: 2px solid #f2e9c8;
   }
-
   .success-title {
     font-family: 'Cormorant Garamond', Georgia, serif;
     font-size: 26px;
@@ -1003,20 +1085,18 @@
     color: #0d0c0a;
     margin: 0 0 10px;
   }
-
   .success-text {
     font-size: 14px;
     color: #6b6860;
     margin: 0 0 22px;
     line-height: 1.6;
   }
-
   .success-summary {
     background: #faf8f3;
     border: 1px solid #eae8e4;
     border-radius: 8px;
     padding: 14px 18px;
-    margin-bottom: 24px;
+    margin-bottom: 18px;
     text-align: left;
   }
   .success-summary__row {
@@ -1031,9 +1111,86 @@
     font-weight: 600;
   }
 
+  .invite-section {
+    text-align: left;
+    margin-bottom: 22px;
+  }
+  .invite-section__label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #6b6860;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .invite-link-box {
+    display: flex;
+    align-items: stretch;
+    border: 1.5px solid #dfc876;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(184, 151, 58, 0.1);
+  }
+  .invite-link-box__url {
+    flex: 1;
+    padding: 0 14px;
+    font-size: 12px;
+    color: #6b6860;
+    font-family: 'DM Mono', 'Courier New', monospace;
+    display: flex;
+    align-items: center;
+    background: #fbf7ec;
+    border-right: 1px solid #f2e9c8;
+    min-height: 44px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .btn-copy {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px;
+    background: #fff;
+    border: none;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: #9b7a25;
+    cursor: pointer;
+    transition: all 0.18s;
+    flex-shrink: 0;
+  }
+  .btn-copy:hover {
+    background: #fbf7ec;
+  }
+  .btn-copy--copied {
+    color: #2a6b2a;
+  }
+
   .success-actions {
     display: flex;
     gap: 12px;
+  }
+
+  .btn-retry {
+    margin-top: 10px;
+    height: 40px;
+    padding: 0 22px;
+    background: #fff;
+    color: #9b7a25;
+    border: 1.5px solid #dfc876;
+    border-radius: 8px;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+  .btn-retry:hover {
+    background: #fbf7ec;
+    border-color: #b8973a;
   }
 
   .spinner {
@@ -1043,6 +1200,37 @@
     to {
       transform: rotate(360deg);
     }
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    padding: 14px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 999;
+    box-shadow: 0 8px 24px rgba(13, 12, 10, 0.14);
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+  .toast--success {
+    background: #0d0c0a;
+    color: #fff;
+  }
+  .toast--error {
+    background: #fef0ed;
+    color: #c4402a;
+    border: 1px solid #e8897a;
+  }
+  .toast-enter-active,
+  .toast-leave-active {
+    transition: all 0.25s ease;
+  }
+  .toast-enter-from,
+  .toast-leave-to {
+    opacity: 0;
+    transform: translateY(12px);
   }
 
   .fade-down-enter-active,
@@ -1056,7 +1244,6 @@
     opacity: 0;
     transform: translateY(-4px);
   }
-
   .overlay-enter-active,
   .overlay-leave-active {
     transition: opacity 0.25s ease;
@@ -1065,7 +1252,6 @@
   .overlay-leave-to {
     opacity: 0;
   }
-
   .modal-enter-active,
   .modal-leave-active {
     transition:
@@ -1076,5 +1262,52 @@
   .modal-leave-to {
     opacity: 0;
     transform: scale(0.94) translateY(12px);
+  }
+
+  @media (max-width: 480px) {
+    .title {
+      font-size: 26px;
+    }
+    .stepper {
+      margin-bottom: 24px;
+    }
+    .step__line {
+      width: 40px;
+    }
+    .step__circle {
+      width: 32px;
+      height: 32px;
+      font-size: 13px;
+    }
+    .step__label {
+      font-size: 10px;
+    }
+    .success-card {
+      padding: 32px 24px 24px;
+    }
+    .success-title {
+      font-size: 22px;
+    }
+    .invite-link-box {
+      flex-direction: column;
+    }
+    .invite-link-box__url {
+      border-right: none;
+      border-bottom: 1px solid #f2e9c8;
+      font-size: 11px;
+    }
+    .btn-copy {
+      width: 100%;
+      padding: 12px;
+      justify-content: center;
+    }
+    .actions {
+      flex-direction: column-reverse;
+    }
+    .btn-secondary,
+    .btn-gold {
+      flex: none;
+      width: 100%;
+    }
   }
 </style>

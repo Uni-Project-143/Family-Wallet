@@ -12,7 +12,6 @@ from app.repositories.invite_repository import InviteRepository
 from app.exceptions import ForbiddenAccessError, InvalidInviteError, InviteExpiredError
 from app.schemas.group import GroupResponse
 from app.models.user import User
-
 from app.config.database import db_client
 
 class GroupService:
@@ -20,7 +19,6 @@ class GroupService:
 
     @staticmethod
     def _extract_token(invite_link: str) -> str:
-        """Витягує токен з лінки."""
         try:
             parsed = urlparse(invite_link.strip())
             parts = [p for p in parsed.path.split("/") if p]
@@ -32,7 +30,6 @@ class GroupService:
 
     @staticmethod
     async def _check_admin_access(group_id: ObjectId, user_id: ObjectId):
-        """Перевіряє, чи є користувач адміном групи."""
         membership = await GroupRepository.get_membership(user_id, group_id)
         if not membership:
             raise ForbiddenAccessError("You are not a member of this group")
@@ -41,7 +38,6 @@ class GroupService:
 
     @classmethod
     async def create_group(cls, name: str, user_id: ObjectId) -> dict:
-        # 2. ДОДАНО: Транзакція БД для атомарного створення групи та адміна
         async with await db_client.start_session() as session:
             async with session.start_transaction():
                 new_group = Group(name=name, created_by=user_id)
@@ -93,10 +89,8 @@ class GroupService:
         await cls._check_admin_access(group_id, user_id)
         now = datetime.utcnow()
 
-        # Інвалідуємо старі токени
         await InviteRepository.invalidate_all_for_group(group_id, now)
 
-        # Створюємо новий
         new_invite = InviteToken(group_id=group_id, created_by=user_id)
         await InviteRepository.create(new_invite)
 
@@ -121,7 +115,6 @@ class GroupService:
         if existing_member:
             raise InvalidInviteError("You are already a member of this group")
 
-        # 3. ДОДАНО: Транзакція БД для атомарного приєднання та оновлення інвайту
         async with await db_client.start_session() as session:
             async with session.start_transaction():
                 new_membership = GroupMembership(user_id=user_id, group_id=invite.group_id, role="MEMBER")
@@ -134,20 +127,15 @@ class GroupService:
 
     @staticmethod
     async def get_user_groups(user_id: ObjectId) -> list[GroupResponse]:
-        # 1. Знаходимо всі "зв'язки" юзера з групами
         memberships = await GroupRepository.get_user_memberships(user_id)
 
         if not memberships:
-            return []  # Якщо груп немає — повертаємо пустий список (Фронт покаже Empty State)
+            return []
 
-        # 2. Збираємо всі ID груп і робимо словник (мапу) ролей,
         group_ids = [m.group_id for m in memberships]
         role_map = {str(m.group_id): m.role for m in memberships}
-
-        # 3. Дістаємо самі групи з бази (за один запит!)
         groups = await GroupRepository.get_groups_by_ids(group_ids)
 
-        # 4. Формуємо красиву відповідь для фронтенда
         result = []
         for group in groups:
             result.append(
@@ -167,7 +155,6 @@ class GroupService:
         except Exception:
             raise HTTPException(status_code=400, detail="Невалідний формат ID групи")
 
-        # 1. Безпека: перевіряємо, чи юзер, який робить запит, взагалі є в цій групі
         is_member = await GroupMembership.find_one({
             "user_id": user_oid,
             "group_id": group_oid
@@ -175,10 +162,9 @@ class GroupService:
         if not is_member:
             raise HTTPException(status_code=403, detail="Доступ заборонено: ви не у цій групі")
 
-        # 2. Дістаємо всіх учасників групи
         memberships = await GroupMembership.find({"group_id": group_oid}).to_list()
-
         users_data = []
+
         for m in memberships:
             user = await User.get(PydanticObjectId(str(m.user_id)))
             if user:
@@ -186,6 +172,9 @@ class GroupService:
                 users_data.append({
                     "id": str(user.id),
                     "name": display_name,
+                    "email": getattr(user, 'email', None),
+                    "role": getattr(m, 'role', "MEMBER"),
+                    "joined_at": getattr(m, 'created_at', None),
                     "avatar": getattr(user, 'avatar_url', None)
                 })
 

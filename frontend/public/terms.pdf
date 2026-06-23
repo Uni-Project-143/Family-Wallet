@@ -1,0 +1,116 @@
+%PDF-1.4
+%ту╧╙
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [6 0 R 8 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Length 3714 >>
+stream
+BT
+/F2 18 Tf 1 0 0 1 56 792.0 Tm (Family Wallet Ч Terms of Service) Tj
+/F1 9 Tf 1 0 0 1 56 762.0 Tm (Last updated: June 12, 2026) Tj
+/F2 12.5 Tf 1 0 0 1 56 729.0 Tm (1. Acceptance of Terms) Tj
+/F1 10.5 Tf 1 0 0 1 56 706.0 Tm (By creating an account or using Family Wallet \("the Service", "we", "us"\), you agree to) Tj
+/F1 10.5 Tf 1 0 0 1 56 691.5 Tm (these Terms of Service. If you do not agree, please do not use the Service. Family Wallet is) Tj
+/F1 10.5 Tf 1 0 0 1 56 677.0 Tm (a non-commercial student / educational MVP provided for demonstration and learning purposes.) Tj
+/F2 12.5 Tf 1 0 0 1 56 642.5 Tm (2. Description of the Service) Tj
+/F1 10.5 Tf 1 0 0 1 56 619.5 Tm (Family Wallet is a shared family finance hub that:) Tj
+/F1 10.5 Tf 1 0 0 1 56 603.0 Tm (Х) Tj
+/F1 10.5 Tf 1 0 0 1 70 603.0 Tm (automatically synchronizes Monobank transactions into a single family feed;) Tj
+/F1 10.5 Tf 1 0 0 1 56 586.5 Tm (Х) Tj
+/F1 10.5 Tf 1 0 0 1 70 586.5 Tm (lets you create isolated groups for shared expenses \(e.g. "Family", "Neighbours"\);) Tj
+/F1 10.5 Tf 1 0 0 1 56 570.0 Tm (Х) Tj
+/F1 10.5 Tf 1 0 0 1 70 570.0 Tm (provides "Secret Gift Mode" for organizing surprise gift collections;) Tj
+/F1 10.5 Tf 1 0 0 1 56 553.5 Tm (Х) Tj
+/F1 10.5 Tf 1 0 0 1 70 553.5 Tm (supports emoji reactions on transactions and money requests between group members.) Tj
+/F2 12.5 Tf 1 0 0 1 56 519.0 Tm (3. Eligibility and Accounts) Tj
+/F1 10.5 Tf 1 0 0 1 56 496.0 Tm (You must provide a valid email address and accurate registration information. You are) Tj
+/F1 10.5 Tf 1 0 0 1 56 481.5 Tm (responsible for keeping your credentials confidential and for all activity under your) Tj
+/F1 10.5 Tf 1 0 0 1 56 467.0 Tm (account. One person may hold one account.) Tj
+/F2 12.5 Tf 1 0 0 1 56 432.5 Tm (4. Roles and Permissions) Tj
+/F1 10.5 Tf 1 0 0 1 56 409.5 Tm (Each group has an Administrator and Members. Only the Administrator may connect bank cards) Tj
+/F1 10.5 Tf 1 0 0 1 56 395.0 Tm (and invite new members to the group. Any member may organize a specific Secret Gift Event.) Tj
+/F1 10.5 Tf 1 0 0 1 56 380.5 Tm (Money requests may be sent only between members of the same group, and never to yourself.) Tj
+/F2 12.5 Tf 1 0 0 1 56 346.0 Tm (5. Connecting a Bank Card) Tj
+/F1 10.5 Tf 1 0 0 1 56 323.0 Tm (To synchronize transactions you provide a Monobank personal API token. You confirm that the) Tj
+/F1 10.5 Tf 1 0 0 1 56 308.5 Tm (card belongs to you and that you are authorized to connect it, and you permit us to receive) Tj
+/F1 10.5 Tf 1 0 0 1 56 294.0 Tm (transaction data through the Monobank API. You may disconnect a card at any time.) Tj
+/F2 12.5 Tf 1 0 0 1 56 259.5 Tm (6. Secret Gift Mode) Tj
+/F1 10.5 Tf 1 0 0 1 56 236.5 Tm (Organizers may collect contributions toward a surprise gift while the recipient \("Target) Tj
+/F1 10.5 Tf 1 0 0 1 56 222.0 Tm (User"\) is automatically excluded from seeing the collection details and total amount until) Tj
+/F1 10.5 Tf 1 0 0 1 56 207.5 Tm (the unlock date. You agree to use this feature in good faith. Family Wallet is not) Tj
+/F1 10.5 Tf 1 0 0 1 56 193.0 Tm (responsible for the real-world fulfilment of any gift.) Tj
+/F2 12.5 Tf 1 0 0 1 56 158.5 Tm (7. In-app Balances, Transfers and Requests) Tj
+/F1 10.5 Tf 1 0 0 1 56 135.5 Tm (Transfers and money requests inside the Service operate on in-app \(effective\) balances used) Tj
+/F1 10.5 Tf 1 0 0 1 56 121.0 Tm (for tracking and coordination. Family Wallet is not a bank, payment service, or money) Tj
+/F1 10.5 Tf 1 0 0 1 56 106.5 Tm (transmitter and does not move, hold, or settle real funds. Any actual movement of money) Tj
+/F1 10.5 Tf 1 0 0 1 56 92.0 Tm (happens outside the Service, directly between the participants.) Tj
+ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 2725 >>
+stream
+BT
+/F2 12.5 Tf 1 0 0 1 56 792.0 Tm (8. Acceptable Use) Tj
+/F1 10.5 Tf 1 0 0 1 56 769.0 Tm (You agree not to misuse the Service, attempt unauthorized access, upload unlawful content,) Tj
+/F1 10.5 Tf 1 0 0 1 56 754.5 Tm (spam other users, or interfere with the Service or with other users' data.) Tj
+/F2 12.5 Tf 1 0 0 1 56 720.0 Tm (9. Intellectual Property) Tj
+/F1 10.5 Tf 1 0 0 1 56 697.0 Tm (The Service, including its design and content, belongs to the Family Wallet team. You retain) Tj
+/F1 10.5 Tf 1 0 0 1 56 682.5 Tm (ownership of the data you submit and grant us the rights needed to operate the Service for) Tj
+/F1 10.5 Tf 1 0 0 1 56 668.0 Tm (you.) Tj
+/F2 12.5 Tf 1 0 0 1 56 633.5 Tm (10. Disclaimers) Tj
+/F1 10.5 Tf 1 0 0 1 56 610.5 Tm (The Service is a non-commercial educational MVP provided "as is" and "as available", without) Tj
+/F1 10.5 Tf 1 0 0 1 56 596.0 Tm (warranties of any kind. It runs on free-tier third-party infrastructure; we do not guarantee) Tj
+/F1 10.5 Tf 1 0 0 1 56 581.5 Tm (uninterrupted availability, accuracy of bank data, or freedom from errors. Nothing in the) Tj
+/F1 10.5 Tf 1 0 0 1 56 567.0 Tm (Service constitutes financial advice.) Tj
+/F2 12.5 Tf 1 0 0 1 56 532.5 Tm (11. Limitation of Liability) Tj
+/F1 10.5 Tf 1 0 0 1 56 509.5 Tm (To the maximum extent permitted by law, the Family Wallet team is not liable for any) Tj
+/F1 10.5 Tf 1 0 0 1 56 495.0 Tm (indirect, incidental, or consequential damages, or for any loss of data, profits, or funds) Tj
+/F1 10.5 Tf 1 0 0 1 56 480.5 Tm (arising from your use of the Service.) Tj
+/F2 12.5 Tf 1 0 0 1 56 446.0 Tm (12. Termination and Account Deletion) Tj
+/F1 10.5 Tf 1 0 0 1 56 423.0 Tm (You may stop using the Service and request deletion of your account at any time \(see the) Tj
+/F1 10.5 Tf 1 0 0 1 56 408.5 Tm (Privacy Policy\). We may suspend or terminate access if you violate these Terms.) Tj
+/F2 12.5 Tf 1 0 0 1 56 374.0 Tm (13. Changes to the Terms) Tj
+/F1 10.5 Tf 1 0 0 1 56 351.0 Tm (We may update these Terms from time to time. Material changes are reflected by the "Last) Tj
+/F1 10.5 Tf 1 0 0 1 56 336.5 Tm (updated" date above. Continued use of the Service after changes means you accept the updated) Tj
+/F1 10.5 Tf 1 0 0 1 56 322.0 Tm (Terms.) Tj
+/F2 12.5 Tf 1 0 0 1 56 287.5 Tm (14. Governing Law) Tj
+/F1 10.5 Tf 1 0 0 1 56 264.5 Tm (These Terms are governed by the laws of Ukraine. The processing of personal data also) Tj
+/F1 10.5 Tf 1 0 0 1 56 250.0 Tm (complies with the EU General Data Protection Regulation \(GDPR\) where applicable.) Tj
+/F2 12.5 Tf 1 0 0 1 56 215.5 Tm (15. Contact) Tj
+/F1 10.5 Tf 1 0 0 1 56 192.5 Tm (For questions about these Terms, contact the Family Wallet team \(the project maintainers\).) Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 7 0 R >>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000127 00000 n 
+0000000224 00000 n 
+0000000326 00000 n 
+0000004092 00000 n 
+0000004228 00000 n 
+0000007005 00000 n 
+trailer
+<< /Size 9 /Root 1 0 R >>
+startxref
+7141
+%%EOF

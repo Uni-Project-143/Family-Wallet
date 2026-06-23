@@ -1,15 +1,12 @@
 <template>
   <div class="register-page">
     <div class="auth-card">
-      <!-- Заголовок -->
       <div class="auth-card__header">
         <h1 class="auth-card__title">Create Account</h1>
         <p class="auth-card__subtitle">Join Family Wallet — it's free!</p>
       </div>
 
-      <!-- Форма (FE-01) -->
       <form class="auth-form" novalidate @submit.prevent="handleSubmit">
-        <!-- Повне ім'я -->
         <BaseInput
           v-model="fullName"
           label="FULL NAME"
@@ -19,7 +16,6 @@
           @blur="validateField('fullName')"
         />
 
-        <!-- Email -->
         <BaseInput
           v-model="email"
           label="EMAIL ADDRESS"
@@ -30,19 +26,16 @@
           @blur="validateField('email')"
         />
 
-        <!-- Пароль з eye icon (Interface AC) -->
         <BaseInput
           v-model="password"
           label="PASSWORD"
           type="password"
           placeholder="At least 8 characters, 1 uppercase letter"
           autocomplete="new-password"
-          hint="Use uppercase letters, numbers, and special characters"
           :error-message="fieldErrors.password"
           @blur="validateField('password')"
         />
 
-        <!-- Підтвердження паролю -->
         <BaseInput
           v-model="confirmPassword"
           label="CONFIRM PASSWORD"
@@ -53,7 +46,6 @@
           @blur="validateField('confirmPassword')"
         />
 
-        <!-- GDPR чекбокс -->
         <div
           class="auth-form__checkbox"
           :class="{ 'auth-form__checkbox--error': fieldErrors.gdpr }"
@@ -70,10 +62,13 @@
             ></span>
             <span class="checkbox-label">
               I agree to the
-              <a href="/terms" target="_blank" class="auth-link">Terms of Service</a>
+              <a href="/terms.pdf" target="_blank" rel="noopener noreferrer" class="auth-link"
+                >Terms of Service</a
+              >
               and
-              <a href="/privacy" target="_blank" class="auth-link">Privacy Policy</a>. I consent to
-              the collection and processing of my financial data.
+              <a href="/privacy.pdf" target="_blank" rel="noopener noreferrer" class="auth-link"
+                >Privacy Policy</a
+              >. I consent to the collection and processing of my financial data.
               <span class="gdpr-note">(GDPR)</span>
             </span>
           </label>
@@ -93,7 +88,6 @@
             {{ blockMessage }}
           </div>
         </Transition>
-        <!-- Серверна помилка (наприклад, 409 Conflict) -->
         <Transition name="fade-down">
           <div v-if="authError" class="auth-form__server-error" role="alert">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -110,7 +104,6 @@
           </div>
         </Transition>
 
-        <!-- Кнопка — disabled + spinner під час запиту (FE-03) -->
         <button
           type="submit"
           class="btn-primary"
@@ -132,7 +125,6 @@
         </button>
       </form>
 
-      <!-- Посилання на логін -->
       <p class="auth-card__footer">
         Already have an account?
         <router-link to="/login" class="auth-link auth-link--bold">Log in →</router-link>
@@ -142,12 +134,6 @@
 </template>
 
 <script setup>
-  // import BaseInput from '../components/BaseInput.vue'
-  // import { useAuth } from '../composables/useAuth'
-  // import { ref, computed, watch } from 'vue'
-
-  // const { register, isLoading, authError } = useAuth()
-
   import BaseInput from '../components/BaseInput.vue'
   import { useAuth } from '../composables/useAuth'
   import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
@@ -155,7 +141,6 @@
 
   const { register, isLoading, authError } = useAuth()
 
-  // ─── Rate limit (global for register process) ───
   const BLOCK_KEY = 'register'
   const isFormBlocked = ref(false)
   const remainingMs = ref(0)
@@ -194,14 +179,12 @@
     if (countdownInterval) clearInterval(countdownInterval)
   })
 
-  // Поля форми — зберігаються навіть при навігації (FE збереження стану через composable)
   const fullName = ref('')
   const email = ref('')
   const password = ref('')
   const confirmPassword = ref('')
   const hasGdprConsent = ref(false)
 
-  // Замість touchedFields + onFieldInput
   const touchedFields = ref({
     fullName: false,
     email: false,
@@ -225,7 +208,6 @@
     if (touchedFields.value.confirmPassword) validateField('confirmPassword')
   })
 
-  // Об'єкт помилок для кожного поля (FE-03 inline errors)
   const fieldErrors = ref({
     fullName: '',
     email: '',
@@ -234,11 +216,10 @@
     gdpr: '',
   })
 
-  const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@gmail\.com$/
+  const EMAIL_REGEX = /^[a-z0-9._%+-]+@gmail\.com$/
   const FULL_NAME_REGEX = /^[А-ЯІЇЄA-Z][а-яіїєa-z']+\s[А-ЯІЇЄA-Z][а-яіїєa-z']+$/
 
   /**
-   * Валідація одного поля при blur або перед відправкою.
    * @param {'fullName'|'email'|'password'|'confirmPassword'} fieldName
    * @returns {boolean} true якщо поле валідне
    */
@@ -261,6 +242,10 @@
     if (fieldName === 'email') {
       if (!email.value.trim()) {
         fieldErrors.value.email = 'Email is required'
+        return false
+      }
+      if (/[A-Z]/.test(email.value)) {
+        fieldErrors.value.email = 'Email must be lowercase — capital letters are not allowed'
         return false
       }
       if (!EMAIL_REGEX.test(email.value)) {
@@ -299,7 +284,6 @@
   }
 
   /**
-   * Валідація всіх полів перед відправкою.
    * @returns {boolean}
    */
   function validateAllFields() {
@@ -315,7 +299,6 @@
     return allValid
   }
 
-  // Кнопка активна лише якщо всі поля заповнені (UI responsiveness) (FE-03)
   const canSubmit = computed(() => {
     return (
       FULL_NAME_REGEX.test(fullName.value.trim()) &&
@@ -327,9 +310,7 @@
       !isFormBlocked.value
     )
   })
-  /**
-   * Відправка форми реєстрації.
-   */
+
   async function handleSubmit() {
     if (!validateAllFields()) return
 
@@ -340,7 +321,6 @@
       confirmPassword: confirmPassword.value,
     })
 
-    // Бек повернув помилку (409, 422 тощо) — фіксуємо невдалу спробу
     if (authError.value) {
       recordFailedAttempt(BLOCK_KEY)
       refreshBlockStatus()
@@ -371,7 +351,6 @@
     border-top: 3px solid #b8973a;
   }
 
-  /* Мобільна адаптація (Interface AC: min-width 375px) */
   @media (max-width: 520px) {
     .auth-card {
       padding: 32px 24px;
@@ -404,7 +383,6 @@
     gap: 18px;
   }
 
-  /* GDPR чекбокс */
   .auth-form__checkbox {
     display: flex;
     flex-direction: column;
@@ -480,7 +458,6 @@
     margin: 0;
   }
 
-  /* Серверна помилка */
   .auth-form__server-error {
     display: flex;
     align-items: center;
@@ -493,7 +470,6 @@
     color: #c4402a;
   }
 
-  /* Кнопка сабміту */
   .btn-primary {
     width: 100%;
     height: 50px;
@@ -525,7 +501,6 @@
     box-shadow: none;
   }
 
-  /* Spinner */
   .spinner-icon {
     animation: spin 0.8s linear infinite;
   }
@@ -543,7 +518,6 @@
     color: #6b6860;
   }
 
-  /* Анімація серверної помилки */
   .fade-down-enter-active,
   .fade-down-leave-active {
     transition:
@@ -567,5 +541,34 @@
     border-radius: 8px;
     font-size: 13px;
     color: #b97f1a;
+  }
+
+  @media (max-width: 560px) {
+    .auth-card,
+    .login-card,
+    .register-card,
+    .select-group-card {
+      max-width: 100%;
+      width: calc(100% - 32px);
+      padding: 28px 22px;
+    }
+    .auth-title,
+    .form-title {
+      font-size: 24px;
+    }
+
+    .i-field {
+      font-size: 16px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .consent-row {
+      align-items: flex-start;
+    }
+    .consent-row__text {
+      font-size: 12px;
+      line-height: 1.5;
+    }
   }
 </style>

@@ -5,19 +5,13 @@ const LoginView = () => import('../views/LoginView.vue')
 const ForgotPasswordView = () => import('../views/ForgotPasswordView.vue')
 const FeedView = () => import('../views/FeedView.vue')
 
-// function hasValidToken() {
-//   return !!localStorage.getItem('accessToken')
-// }
-
 function hasValidToken() {
   const token = localStorage.getItem('accessToken')
   if (!token) return false
 
   try {
-    // JWT складається з трьох частин через крапку
-    // payload — друга частина, закодована у base64
     const payload = JSON.parse(atob(token.split('.')[1]))
-    // exp у JWT — це Unix timestamp у секундах
+
     const isExpired = payload.exp * 1000 < Date.now()
     if (isExpired) {
       localStorage.removeItem('accessToken')
@@ -26,7 +20,6 @@ function hasValidToken() {
     }
     return true
   } catch {
-    // Якщо токен зіпсований — чистимо і повертаємо false
     localStorage.removeItem('accessToken')
     localStorage.removeItem('currentUser')
     return false
@@ -59,6 +52,12 @@ const routes = [
     meta: { requiresGuest: true },
   },
   {
+    path: '/reset-password',
+    name: 'ResetPassword',
+    component: () => import('../views/ResetPasswordView.vue'),
+    meta: { requiresGuest: true },
+  },
+  {
     path: '/feed',
     name: 'Feed',
     component: FeedView,
@@ -88,6 +87,24 @@ const routes = [
     component: () => import('../views/SelectGroupView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/gift-events/:id',
+    name: 'GiftEventDetails',
+    component: () => import('../views/GiftEventDetailsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/gift/join/:token',
+    name: 'GiftJoin',
+    component: () => import('../views/GiftJoinView.vue'),
+    meta: { requiresAuth: true },
+  },
+
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('../views/NotFoundView.vue'),
+  },
 ]
 
 const router = createRouter({
@@ -102,7 +119,7 @@ router.beforeEach((to) => {
   const isAuthenticated = hasValidToken()
 
   if (to.meta.requiresAuth && !isAuthenticated) {
-    return { name: 'Login' }
+    return { name: 'Login', query: { redirect: to.fullPath } }
   }
 
   if (to.meta.requiresGuest && isAuthenticated) {

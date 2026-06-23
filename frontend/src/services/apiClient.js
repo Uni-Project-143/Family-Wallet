@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getApiErrorMessage } from '../utils/apiError'
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
@@ -6,7 +7,6 @@ const apiClient = axios.create({
   timeout: 10000,
 })
 
-// Додає Bearer token до кожного запиту
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken')
   if (token) {
@@ -15,19 +15,20 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
-// Обробляє 401 глобально — чистить сесію і кидає на логін
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    const isAuthEndpoint =
-      error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register')
+    error.userMessage = getApiErrorMessage(error)
 
-    // 401 на auth ендпоінтах — НЕ редіректимо
-    // 401 на захищених ендпоінтах — редіректимо на /login
+    const url = error.config?.url || ''
+    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/register')
+
     if (error.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('accessToken')
       localStorage.removeItem('currentUser')
-      window.location.href = '/login'
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
     }
 
     return Promise.reject(error)

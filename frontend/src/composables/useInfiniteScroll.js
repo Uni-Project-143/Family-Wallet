@@ -1,15 +1,6 @@
-import { onUnmounted, ref, watch } from 'vue'
+import { onUnmounted, ref, watch, toValue } from 'vue'
 
 /**
- * Викликає callback коли sentinel-елемент потрапляє у viewport.
- * Використовується для infinite scroll на дні списку.
- *
- * Повертає sentinelRef — присвой його через ref="sentinelRef" на елемент,
- * який має бути спостережений (зазвичай div у кінці списку).
- *
- * IntersectionObserver створюється лише коли sentinel реально присутній
- * у DOM — це важливо при condition rendering (skeleton -> список).
- *
  * @param {Function} callback
  * @param {{ rootMargin?: string, threshold?: number }} [options]
  * @returns {{ sentinelRef: import('vue').Ref<HTMLElement|null> }}
@@ -31,6 +22,7 @@ export function useInfiniteScroll(callback, options = {}) {
             if (entries[0]?.isIntersecting) callback()
           },
           {
+            root: toValue(options.root) || null,
             rootMargin: options.rootMargin || '200px',
             threshold: options.threshold || 0,
           },

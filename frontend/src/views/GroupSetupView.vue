@@ -1,9 +1,7 @@
 <template>
   <div class="setup-page">
     <div class="setup-bg">
-      <!-- Auth-style card -->
       <div class="setup-card">
-        <!-- Header -->
         <div class="setup-card__header">
           <div class="setup-card__logo">
             Family <span class="setup-card__logo--accent">Wallet</span>
@@ -14,7 +12,6 @@
           </p>
         </div>
 
-        <!-- Mode selector — два варіанти -->
         <div class="mode-selector">
           <button
             class="mode-btn"
@@ -37,7 +34,6 @@
           </button>
         </div>
 
-        <!-- Role hint -->
         <Transition name="fade">
           <div v-if="selectedMode" class="role-hint" :class="`role-hint--${selectedMode}`">
             <template v-if="selectedMode === 'create'">
@@ -57,7 +53,6 @@
           </div>
         </Transition>
 
-        <!-- Input field — змінюється залежно від режиму -->
         <Transition name="fade">
           <div v-if="selectedMode" class="setup-field">
             <div class="i-label">
@@ -91,7 +86,6 @@
           </div>
         </Transition>
 
-        <!-- Server error -->
         <Transition name="fade-down">
           <div v-if="serverError" class="server-error" role="alert">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -108,7 +102,6 @@
           </div>
         </Transition>
 
-        <!-- Submit button -->
         <button class="btn-primary" :disabled="!canSubmit || isLoading" @click="handleSubmit">
           <span v-if="!isLoading">
             {{ selectedMode === 'create' ? 'Create Group' : 'Join Group' }}
@@ -136,7 +129,6 @@
 
   const router = useRouter()
   const { currentUser, setActiveGroup } = useAuth()
-  // const { currentUser } = useAuth()
 
   const currentUserName = computed(() => currentUser.value?.fullName || 'User')
 
@@ -150,7 +142,6 @@
   const INVITE_URL_REGEX = /^https?:\/\/.+\/join\/.+/
 
   /**
-   * Перемикає режим create / join та скидає поле.
    * @param {'create'|'join'} mode
    */
   function selectMode(mode) {
@@ -162,7 +153,6 @@
   }
 
   /**
-   * Валідує поточне поле залежно від режиму.
    * @returns {boolean}
    */
   function validateField() {
@@ -196,11 +186,6 @@
     return selectedMode.value !== null && fieldValue.value.trim().length > 0
   })
 
-  /**
-   * Обробляє створення або приєднання до групи.
-   * Create → POST /api/v1/group/ → role = ADMIN
-   * Join   → POST /api/v1/group/join → role = MEMBER
-   */
   async function handleSubmit() {
     if (!validateField()) return
 
@@ -211,8 +196,6 @@
       if (selectedMode.value === 'create') {
         const result = await createGroup(fieldValue.value)
 
-        // Використовуємо setActiveGroup замість прямого запису в localStorage —
-        // він синхронно оновлює і localStorage, і currentUser.value у всіх Views
         setActiveGroup({
           id: result.group_id,
           name: fieldValue.value.trim(),
@@ -221,24 +204,22 @@
       } else {
         await joinGroup(fieldValue.value)
 
-        // Тягнемо реальну назву щойно приєднаної групи з беку
         const groups = await fetchMyGroups()
         const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
         const joinedGroup =
           groups.find((g) => g.id !== storedUser.groupId) || groups[groups.length - 1]
 
         if (joinedGroup) {
-          setActiveGroup(joinedGroup) // role='MEMBER' прийде з беку у groupResponse
+          setActiveGroup(joinedGroup)
         }
       }
 
       router.push('/feed')
     } catch (err) {
       const status = err.response?.status
-      const message = err.response?.data?.message
+      const message = err.response?.data?.detail || err.response?.data?.message
 
       if (status === 400 && message === 'You are already a member of this group') {
-        // Якщо юзер уже учасник — теж оновлюємо стан і йдемо на feed
         const groups = await fetchMyGroups()
         const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
         const existingGroup = groups.find((g) => g.id !== storedUser.groupId) || groups[0]
@@ -253,7 +234,7 @@
       else if (status === 400) serverError.value = message || 'Invalid invite link'
       else if (status === 404)
         serverError.value = 'Invite link not found. Check the link and try again.'
-      else serverError.value = message || 'Something went wrong. Please try again.'
+      else serverError.value = err.userMessage || 'Something went wrong. Please try again.'
     } finally {
       isLoading.value = false
     }
@@ -261,7 +242,6 @@
 </script>
 
 <style scoped>
-  /* ── Page ── */
   .setup-page {
     min-height: 100vh;
     display: flex;
@@ -290,7 +270,6 @@
     pointer-events: none;
   }
 
-  /* ── Card ── */
   .setup-card {
     background: #ffffff;
     border-radius: 20px;
@@ -310,7 +289,6 @@
     }
   }
 
-  /* ── Header ── */
   .setup-card__header {
     margin-bottom: 32px;
   }
@@ -335,7 +313,6 @@
     line-height: 1.6;
   }
 
-  /* ── Mode selector ── */
   .mode-selector {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -388,7 +365,6 @@
     color: #b0ada7;
   }
 
-  /* ── Role hint ── */
   .role-hint {
     display: flex;
     align-items: flex-start;
@@ -420,7 +396,6 @@
     flex: 1;
   }
 
-  /* ── Input field ── */
   .setup-field {
     margin-bottom: 20px;
   }
@@ -495,7 +470,6 @@
     margin-top: 5px;
   }
 
-  /* ── Server error ── */
   .server-error {
     display: flex;
     align-items: center;
@@ -509,7 +483,6 @@
     margin-bottom: 20px;
   }
 
-  /* ── Buttons ── */
   .btn-primary {
     width: 100%;
     height: 50px;
@@ -552,7 +525,6 @@
     font-family: 'DM Sans', system-ui, sans-serif;
   }
 
-  /* ── Badges ── */
   .badge {
     display: inline-flex;
     align-items: center;
@@ -577,7 +549,6 @@
     border: 1px solid #d6d3ce;
   }
 
-  /* ── Footer ── */
   .setup-card__footer {
     text-align: center;
     font-size: 13px;
@@ -585,7 +556,6 @@
     margin: 0;
   }
 
-  /* ── Spinner ── */
   .spinner {
     animation: spin 0.8s linear infinite;
   }
@@ -595,7 +565,6 @@
     }
   }
 
-  /* ── Transitions ── */
   .fade-enter-active,
   .fade-leave-active {
     transition: opacity 0.2s ease;

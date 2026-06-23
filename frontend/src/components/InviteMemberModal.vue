@@ -4,8 +4,7 @@
       <div v-if="isOpen" class="modal-overlay" @click.self="close">
         <Transition name="modal">
           <div v-if="isOpen" ref="modalRootRef" class="modal-card" role="dialog" aria-modal="true">
-            <!-- Close button -->
-            <button class="modal-close" @click="close" aria-label="Close">
+            <button class="modal-close" aria-label="Close" @click="close">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path
                   d="M1 1L13 13M13 1L1 13"
@@ -16,19 +15,15 @@
               </svg>
             </button>
 
-            <!-- Header -->
-
             <h2 class="modal-title">Invite new member</h2>
             <p class="modal-sub">
               Share this link with your family member. The link is valid for
               <strong>48 hours</strong>.
             </p>
 
-            <!-- Group Invite Code section -->
             <div class="section">
               <div class="section__label">Group Invite Code</div>
 
-              <!-- Link box -->
               <div class="invite-box">
                 <div class="invite-box__url" :class="{ 'invite-box__url--loading': isGenerating }">
                   <template v-if="isGenerating">
@@ -51,7 +46,6 @@
                   </template>
                 </div>
 
-                <!-- Copy button -->
                 <button
                   v-if="inviteUrl && !isGenerating"
                   class="btn-copy"
@@ -87,7 +81,6 @@
                   {{ isCopied ? 'Copied!' : 'Copy' }}
                 </button>
 
-                <!-- Regen button -->
                 <button
                   v-if="inviteUrl && !isGenerating"
                   class="btn-regen"
@@ -126,7 +119,6 @@
                 </button>
               </div>
 
-              <!-- TTL -->
               <div v-if="inviteUrl && expiresAt" class="invite-ttl">
                 <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
                   <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" stroke-width="1.2" />
@@ -140,7 +132,6 @@
                 Valid for {{ ttlLabel }}
               </div>
 
-              <!-- Generate button (якщо посилання ще нема) -->
               <div v-if="!inviteUrl" class="generate-row">
                 <button class="btn-gold" :disabled="isGenerating" @click="generateLink(false)">
                   <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -166,53 +157,6 @@
                 </svg>
                 Only Admin can generate invite links. Members receive forbidden access.
               </div>
-            </div>
-
-            <div class="section-divider"></div>
-
-            <!-- Direct email invite section -->
-            <div class="section">
-              <div class="section__label">Or send invite directly by email</div>
-              <div class="email-row">
-                <div class="i-field-wrap" :class="{ 'i-field-wrap--error': emailError }">
-                  <input
-                    v-model="directEmail"
-                    class="i-field"
-                    type="email"
-                    placeholder="member@example.com"
-                    :disabled="isSending"
-                    @blur="validateEmail"
-                    @input="onEmailInput"
-                    @keydown.enter="sendInvite"
-                  />
-                </div>
-                <button
-                  class="btn-send"
-                  :disabled="!directEmail.trim() || isSending"
-                  @click="sendInvite"
-                >
-                  <span v-if="!isSending">Send Invite</span>
-                  <svg
-                    v-else
-                    class="spinner"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                  >
-                    <circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,.3)" stroke-width="2" />
-                    <path
-                      d="M8 2A6 6 0 0 1 14 8"
-                      stroke="white"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-              <Transition name="fade-down">
-                <p v-if="emailError" class="i-error">{{ emailError }}</p>
-              </Transition>
             </div>
           </div>
         </Transition>
@@ -252,7 +196,6 @@
   })
 
   /**
-   * Генерує або перегенеровує invite-лінк.
    * @param {boolean} isRegen - true якщо перегенерація
    */
   async function generateLink(isRegen) {
@@ -268,15 +211,12 @@
     }
 
     try {
-      // isRegen → POST /api/v1/group/{groupId}/invite/regenerate
-      // !isRegen → GET  /api/v1/group/{groupId}/invite
       const fn = isRegen
         ? () => regenerateGroupInviteLink(groupId)
         : () => fetchGroupInviteLink(groupId)
 
       const data = await fn()
 
-      // Бекенд повертає invite_link та expires_at
       inviteUrl.value = data.invite_link
       expiresAt.value = data.expires_at
 
@@ -296,9 +236,6 @@
     }
   }
 
-  /**
-   * Копіює посилання через Clipboard API.
-   */
   async function copyLink() {
     if (!inviteUrl.value) return
     try {
@@ -310,55 +247,6 @@
       }, 2500)
     } catch {
       emit('toast', { message: 'Failed to copy. Please copy manually.', type: 'error' })
-    }
-  }
-
-  const directEmail = ref('')
-  const emailError = ref('')
-  const emailTouched = ref(false)
-  const isSending = ref(false)
-
-  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-  /**
-   * Валідація поля email.
-   * @returns {boolean}
-   */
-  function validateEmail() {
-    emailTouched.value = true
-    emailError.value = ''
-    if (!directEmail.value.trim()) return true
-    if (!EMAIL_REGEX.test(directEmail.value)) {
-      emailError.value = 'Enter a valid email'
-      return false
-    }
-    return true
-  }
-
-  function onEmailInput() {
-    if (emailTouched.value) validateEmail()
-  }
-
-  /**
-   * Відправляє запрошення на email.
-   * TODO: підключити POST /api/v1/group/{groupId}/invite/send коли з'явиться endpoint
-   */
-  async function sendInvite() {
-    if (!validateEmail()) return
-    if (!directEmail.value.trim()) return
-
-    isSending.value = true
-    try {
-      // TODO: реальний запит після появи endpoint
-      // const storedUser = JSON.parse(localStorage.getItem('currentUser') || '{}')
-      // await apiClient.post(`/api/v1/group/${storedUser.groupId}/invite/send`, { email: directEmail.value })
-      emit('toast', { message: `Invite sent to ${directEmail.value}`, type: 'success' })
-      directEmail.value = ''
-      emailTouched.value = false
-    } catch {
-      emit('toast', { message: 'Failed to send invite. Try again.', type: 'error' })
-    } finally {
-      isSending.value = false
     }
   }
 
@@ -422,7 +310,6 @@
     border-color: #0d0c0a;
   }
 
-  /* ── Header ── */
   .modal-ep-tag {
     font-size: 9px;
     letter-spacing: 2px;
@@ -468,12 +355,6 @@
     letter-spacing: 0;
     text-transform: none;
     margin-left: 4px;
-  }
-
-  .section-divider {
-    height: 1px;
-    background: #eae8e4;
-    margin: 20px 0;
   }
 
   .invite-box {
@@ -572,12 +453,6 @@
     border-radius: 6px;
   }
 
-  .email-row {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-  }
-
   .i-field-wrap {
     flex: 1;
     border: 1.5px solid #eae8e4;
@@ -654,32 +529,6 @@
     transform: none;
   }
 
-  .btn-send {
-    height: 44px;
-    padding: 0 20px;
-    background: #0d0c0a;
-    color: #ffffff;
-    border: none;
-    border-radius: 8px;
-    font-family: 'DM Sans', system-ui, sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.18s;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-
-  .btn-send:hover:not(:disabled) {
-    background: #2d2b27;
-  }
-  .btn-send:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
   .spinner {
     animation: spin 0.8s linear infinite;
   }
@@ -720,5 +569,28 @@
   .fade-down-leave-to {
     opacity: 0;
     transform: translateY(-4px);
+  }
+
+  @media (max-width: 560px) {
+    .modal-overlay {
+      padding: 0;
+      align-items: flex-end;
+    }
+    .modal-card {
+      max-width: 100%;
+      width: 100%;
+      border-radius: 20px 20px 0 0;
+      padding: 24px 20px 28px;
+      max-height: 92vh;
+      overflow-y: auto;
+      border-top: 3px solid #b8973a;
+    }
+    .modal-title {
+      font-size: 20px;
+    }
+    .modal-close {
+      top: 10px;
+      right: 12px;
+    }
   }
 </style>

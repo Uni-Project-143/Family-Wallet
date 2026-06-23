@@ -1,7 +1,6 @@
 <template>
   <div class="login-page">
     <div class="auth-card">
-      <!-- Стан 1: форма -->
       <template v-if="!isEmailSent">
         <div class="auth-card__header">
           <h1 class="auth-card__title">Password Reset</h1>
@@ -44,7 +43,6 @@
         </form>
       </template>
 
-      <!-- Стан 2: success -->
       <template v-else>
         <div class="success-state">
           <div class="success-state__icon" aria-hidden="true">✉️</div>
@@ -60,7 +58,6 @@
         </div>
       </template>
 
-      <!-- Посилання назад -->
       <div class="auth-card__back">
         <router-link to="/login" class="auth-link">← Back to Login</router-link>
       </div>
@@ -82,7 +79,6 @@
   const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
   /**
-   * Валідація поля email.
    * @returns {boolean}
    */
   function validateEmail() {
@@ -98,9 +94,6 @@
     return true
   }
 
-  /**
-   * Відправка запиту на скидання паролю.
-   */
   async function handleSubmit() {
     if (!validateEmail()) return
 
@@ -110,8 +103,8 @@
     try {
       await requestPasswordReset({ email: email.value.trim().toLowerCase() })
       isEmailSent.value = true
-    } catch {
-      serverError.value = 'Something went wrong. Please try again'
+    } catch (err) {
+      serverError.value = err.userMessage || 'Something went wrong. Please try again'
     } finally {
       isLoading.value = false
     }
@@ -219,7 +212,6 @@
     }
   }
 
-  /* Success state */
   .success-state {
     text-align: center;
     padding: 8px 0;

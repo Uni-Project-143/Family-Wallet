@@ -71,12 +71,10 @@
   const groups = ref([])
 
   onMounted(() => {
-    // history.state — стандартний спосіб отримати state з router.push({ state })
     const passed = history.state?.groups
     if (Array.isArray(passed) && passed.length > 0) {
       groups.value = passed
     } else {
-      // Якщо юзер потрапив сюди прямим URL без state — підтягуємо самі
       reloadGroups()
     }
   })
@@ -84,8 +82,8 @@
   async function reloadGroups() {
     try {
       groups.value = await fetchMyGroups()
-    } catch (err) {
-      console.warn('fetchMyGroups failed:', err)
+    } catch {
+      // Не вдалося оновити список груп — залишаємо попередній стан
     }
   }
 
@@ -280,5 +278,35 @@
 
   .link-cta:hover {
     color: #9b7a25;
+  }
+
+  @media (max-width: 560px) {
+    .auth-card,
+    .login-card,
+    .register-card,
+    .select-group-card {
+      max-width: 100%;
+      width: calc(100% - 32px);
+      padding: 28px 22px;
+    }
+    .auth-title,
+    .form-title {
+      font-size: 24px;
+    }
+    .i-field {
+      font-size: 16px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .group-option {
+      padding: 14px 16px;
+      gap: 12px;
+    }
+    .group-option__avatar {
+      width: 44px;
+      height: 44px;
+      font-size: 18px;
+    }
   }
 </style>

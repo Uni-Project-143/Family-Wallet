@@ -9,6 +9,8 @@ class BankCardResponse(BaseModel):
     account_id: str
     masked_pan: str
     balance: Decimal
+    effective_balance: Decimal
+    virtual_balance: Optional[Decimal] = None
     status: str
     transaction_ids: List[str] = Field(default_factory=list)
     owner_full_name: Optional[str] = None

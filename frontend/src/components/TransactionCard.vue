@@ -10,10 +10,23 @@
             <span v-if="transaction.is_secret_gift" class="tx-card__gift-badge">Gift</span>
           </div>
 
-          <div class="tx-card__category">
-            <span v-if="transaction.category_emoji">{{ transaction.category_emoji }}</span>
-            {{ transaction.category_name || 'Other' }}
+          <div class="tx-card__category" :style="categoryBadgeStyle">
+            <span v-if="category.emoji" class="tx-card__category-emoji">{{ category.emoji }}</span>
+            <span
+              v-else
+              class="tx-card__category-dot"
+              :style="{ background: category.color }"
+            ></span>
+            {{ category.label }}
           </div>
+
+          <span
+            v-if="transaction.is_virtual"
+            class="tx-card__virtual-badge"
+            title="Внутрішній переказ"
+          >
+            ↔ Transfer
+          </span>
 
           <div v-if="transaction.description" class="tx-card__desc">
             {{ transaction.description }}
@@ -28,25 +41,95 @@
         </div>
       </div>
 
-      <div v-if="transaction.reactions?.length" class="tx-card__reactions">
-        <button v-for="r in transaction.reactions" :key="r.emoji" class="reaction-pill">
+      <div class="tx-card__reactions">
+        <button
+          v-for="r in displayReactions"
+          :key="r.emoji"
+          class="reaction-pill"
+          :class="{ 'reaction-pill--mine': r.mine }"
+          @click="onToggle(r.emoji)"
+        >
           {{ r.emoji }} {{ r.count }}
         </button>
+
+        <div class="reaction-picker">
+          <button
+            class="reaction-add"
+            :class="{ 'reaction-add--open': isPickerOpen }"
+            aria-label="Додати реакцію"
+            @click="togglePicker"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3" />
+              <path
+                d="M5.8 9.4C6.2 10.2 7 10.8 8 10.8C9 10.8 9.8 10.2 10.2 9.4"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"
+              />
+              <circle cx="6" cy="6.4" r="0.9" fill="currentColor" />
+              <circle cx="10" cy="6.4" r="0.9" fill="currentColor" />
+            </svg>
+          </button>
+
+          <Transition name="picker">
+            <div v-if="isPickerOpen" class="reaction-menu" role="menu">
+              <button
+                v-for="emoji in REACTION_EMOJIS"
+                :key="emoji"
+                class="reaction-menu__item"
+                :class="{ 'reaction-menu__item--active': myReaction === emoji }"
+                :aria-label="`Реакція ${emoji}`"
+                @click="onPick(emoji)"
+              >
+                {{ emoji }}
+              </button>
+            </div>
+          </Transition>
+        </div>
       </div>
     </div>
+
+    <div v-if="isPickerOpen" class="reaction-backdrop" @click="closePicker" />
   </div>
 </template>
 
 <script setup>
-  import { computed } from 'vue'
+  import { computed, ref } from 'vue'
   import UserAvatar from './UserAvatar.vue'
+  import { useReactions, useDisplayReactions, REACTION_EMOJIS } from '../composables/useReactions'
+  import { parseServerDate } from '../utils/datetime'
+  import { resolveCategory, badgeStyleFromColor } from '../utils/categoryColors'
 
   const props = defineProps({
     transaction: { type: Object, required: true },
   })
 
+  const category = computed(() => resolveCategory(props.transaction))
+  const categoryBadgeStyle = computed(() => badgeStyleFromColor(category.value.color))
+
+  const { getMyReaction, toggleReaction } = useReactions()
+  const displayReactions = useDisplayReactions(() => props.transaction)
+  const myReaction = computed(() => getMyReaction(props.transaction.id))
+
+  const isPickerOpen = ref(false)
+
+  function togglePicker() {
+    isPickerOpen.value = !isPickerOpen.value
+  }
+  function closePicker() {
+    isPickerOpen.value = false
+  }
+  function onPick(emoji) {
+    toggleReaction(props.transaction.id, emoji)
+    closePicker()
+  }
+  function onToggle(emoji) {
+    toggleReaction(props.transaction.id, emoji)
+  }
+
   const authorDisplayName = computed(() => {
-    return props.transaction.display_name || 'Невідомий учасник'
+    return props.transaction.display_name || 'Unknown User'
   })
 
   const isIncome = computed(() => Number(props.transaction.amount) > 0)
@@ -58,24 +141,21 @@
     return `${sign}${Math.abs(num).toLocaleString('uk-UA')}`
   })
 
-  /**
-   * Відносний час: "2 хв тому", "3 год тому", "вчора", "12 кві".
-   */
   const relativeTime = computed(() => {
-    if (!props.transaction.timestamp) return ''
-    const txDate = new Date(props.transaction.timestamp)
+    const txDate = parseServerDate(props.transaction.timestamp)
+    if (!txDate) return ''
     const diffMs = Date.now() - txDate.getTime()
     const minutes = Math.floor(diffMs / 60000)
 
-    if (minutes < 1) return 'щойно'
-    if (minutes < 60) return `${minutes} хв тому`
+    if (minutes < 1) return 'just now'
+    if (minutes < 60) return `${minutes} min ago`
 
     const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `${hours} год тому`
+    if (hours < 24) return `${hours} hr ago`
 
     const days = Math.floor(hours / 24)
-    if (days === 1) return 'вчора'
-    if (days < 7) return `${days} дн тому`
+    if (days === 1) return 'yesterday'
+    if (days < 7) return `${days} days ago`
 
     return txDate.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })
   })
@@ -83,6 +163,7 @@
 
 <style scoped>
   .tx-card {
+    position: relative;
     display: flex;
     gap: 14px;
     padding: 16px 18px;
@@ -127,9 +208,20 @@
     background: #fbf7ec;
     border: 1px solid #f2e9c8;
     font-size: 11px;
-    font-weight: 500;
+    font-weight: 600;
     color: #9b7a25;
     margin-bottom: 4px;
+  }
+
+  .tx-card__category-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .tx-card__category-emoji {
+    line-height: 1;
   }
 
   .tx-card__desc {
@@ -166,6 +258,7 @@
 
   .tx-card__reactions {
     display: flex;
+    align-items: center;
     gap: 6px;
     margin-top: 10px;
     flex-wrap: wrap;
@@ -189,6 +282,97 @@
     background: #fbf7ec;
     border-color: #f2e9c8;
   }
+
+  .reaction-pill--mine {
+    background: #fbf7ec;
+    border-color: #dfc876;
+    color: #9b7a25;
+    font-weight: 600;
+  }
+
+  /* ── Пікер реакцій ── */
+  .reaction-picker {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .reaction-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 26px;
+    border-radius: 9999px;
+    border: 1px dashed #d6d3ce;
+    color: #b0ada7;
+    background: none;
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+  .reaction-add:hover,
+  .reaction-add--open {
+    color: #9b7a25;
+    border-color: #dfc876;
+    background: #fbf7ec;
+  }
+
+  .reaction-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    z-index: 30;
+    display: flex;
+    gap: 2px;
+    padding: 6px;
+    background: #fff;
+    border: 1px solid #eae8e4;
+    border-radius: 9999px;
+    box-shadow: 0 8px 24px rgba(13, 12, 10, 0.16);
+  }
+
+  .reaction-menu__item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: none;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      transform 0.12s ease,
+      background 0.12s ease;
+  }
+  .reaction-menu__item:hover {
+    background: #f4f1e9;
+    transform: scale(1.25);
+  }
+  .reaction-menu__item--active {
+    background: #fbf7ec;
+    box-shadow: inset 0 0 0 1.5px #dfc876;
+  }
+
+  .reaction-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+  }
+
+  .picker-enter-active,
+  .picker-leave-active {
+    transition:
+      opacity 0.15s ease,
+      transform 0.15s ease;
+    transform-origin: bottom left;
+  }
+  .picker-enter-from,
+  .picker-leave-to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.92);
+  }
   .tx-card__gift-badge {
     display: inline-block;
     margin-left: 6px;
@@ -201,6 +385,20 @@
     font-weight: 700;
     letter-spacing: 0.6px;
     text-transform: uppercase;
+    vertical-align: middle;
+  }
+
+  .tx-card__virtual-badge {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    background-color: rgba(184, 151, 58, 0.12);
+    color: #9b7a25;
+    border: 1px solid rgba(184, 151, 58, 0.28);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-weight: 600;
     vertical-align: middle;
   }
 </style>

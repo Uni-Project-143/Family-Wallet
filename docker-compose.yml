@@ -21,6 +21,7 @@ services:
       - "5173:5173"
     environment:
       - VITE_API_URL=http://localhost:8000
+      - VITE_WS_ENABLED=true
     command: npm run dev -- --host
 
 networks:

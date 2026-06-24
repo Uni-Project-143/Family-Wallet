@@ -116,7 +116,7 @@
         <div class="feed-main__header">
           <h1 class="feed-main__title">Family Feed</h1>
           <ConnectionIndicator :is-connected="wsConnected" />
-          <div class="feed-filters">
+          <div v-if="hasOwnCard && transactions.length > 0" class="feed-filters">
             <button
               v-for="f in memberFilters"
               :key="f.value"

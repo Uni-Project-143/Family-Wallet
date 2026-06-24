@@ -438,9 +438,13 @@
 
   const minDateTime = computed(() => {
     const d = new Date()
-    d.setDate(d.getDate() + 1)
-    d.setHours(0, 0, 0, 0)
+    d.setMinutes(d.getMinutes() + 1)
     return formatLocalDateTime(d)
+    // --- ОРИГІНАЛ (revert) ---
+    // const d = new Date()
+    // d.setDate(d.getDate() + 1)
+    // d.setHours(0, 0, 0, 0)
+    // return formatLocalDateTime(d)
   })
 
   function formatLocalDateTime(date) {
